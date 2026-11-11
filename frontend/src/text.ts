@@ -58,7 +58,7 @@ export const text = {
     standard: 'обычный',
     mapLabel: 'Редактор арены Match Lab',
     editMap: 'Редактор',
-    watchReplay: 'Replay',
+    watchReplay: 'Повторить',
     mapHint: 'Перетащите танки и стены. У выбранной стены тяните углы, чтобы менять размер. Escape — снять выбор.',
     walls: 'Стены',
     invalidWall: 'Стена должна находиться внутри арены, её ширина и высота — не меньше 0,4.',
