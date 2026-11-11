@@ -86,6 +86,8 @@ body { background: radial-gradient(ellipse at 40% -25%, #153c50 0, transparent 5
 .arena-modal-body { max-height:calc(100dvh - 126px); overflow:auto; padding:22px; }
 .lab-settings { display:grid; gap:18px; }
 .lab-settings-top { display:flex; justify-content:space-between; align-items:center; gap:12px; color:#8faabc; }
+.lab-reset-button { color:#ff786f!important; background:transparent!important; border-color:#8b4848!important; }
+.lab-reset-button:hover:not(:disabled) { color:#fff!important; background:#b52f32!important; border-color:#df5757!important; }
 .lab-team-layout { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
 .lab-team { min-width:0; padding:16px; border:1px solid #2f4b5e; border-radius:13px; background:#0c1b2a; }
 .lab-team>header { display:flex; align-items:end; justify-content:space-between; gap:14px; margin-bottom:14px; }

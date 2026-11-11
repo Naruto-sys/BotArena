@@ -71,7 +71,7 @@ export const text = {
     classicWalls: 'По умолчанию',
     clearWalls: 'Без стен',
     noWalls: 'Стен нет — открытое поле.',
-    reset: 'Сбросить Lab',
+    reset: 'Сбросить',
     presetsUnavailable: 'Не удалось загрузить пресеты поведения.',
   },
   campaign: {

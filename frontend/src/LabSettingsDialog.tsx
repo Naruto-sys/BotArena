@@ -20,7 +20,7 @@ export function LabSettingsDialog({ setup, presets, onRosterChange, onReset, onB
   ];
 
   return <div className="lab-settings">
-    <div className="lab-settings-top"><p>Настройки сохраняются автоматически.</p><button type="button" onClick={onReset}>{text.lab.reset}</button></div>
+    <div className="lab-settings-top"><p>Настройки сохраняются автоматически.</p><button type="button" className="lab-reset-button" onClick={onReset}>{text.lab.reset}</button></div>
     <div className="lab-team-layout">
       {teams.map(team => <section className={`lab-team lab-team-${team.id}`} key={team.id}>
         <header>
