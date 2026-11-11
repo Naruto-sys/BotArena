@@ -134,8 +134,8 @@ export interface ArenaUser {
   balance: number;
 }
 export type AuthSession =
-  | { authenticated: false }
-  | { authenticated: true; user: ArenaUser; needsNickname: boolean };
+  | { authenticated: false; loginAvailable?: boolean }
+  | { authenticated: true; user: ArenaUser; needsNickname: boolean; loginAvailable?: boolean };
 export type UgcVisibility = 'Private' | 'Unlisted' | 'Public';
 export interface UgcAuthor { id: string; nickname: string; avatarUrl: string | null }
 export interface UgcStrategyCard {

@@ -26,6 +26,7 @@ export function buildCustomMatchPayload(setup: LabSetup, language: StrategyLangu
         bodyAngle: bot.bodyAngle,
         turretAngle: bot.turretAngle,
         hp: bot.hp,
+        movement: bot.movement ?? 'tracked',
       })),
       loadouts: setup.bots.map(bot => bot.source === 'preset'
         ? { botId: bot.id, source: 'preset', presetId: bot.presetId }

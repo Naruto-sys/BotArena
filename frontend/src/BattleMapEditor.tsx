@@ -1,13 +1,15 @@
+import { useMounted } from './useMounted';
 import { useEffect, useState } from 'react';
 import type { MouseEvent } from 'react';
 import type { BattleMap, Wall } from './contracts';
-import { isUnauthorized, login, ugcApi } from './ugcApi';
+import { isUnauthorized, requireLogin, ugcApi } from './ugcApi';
 
 const WIDTH = 16;
 const HEIGHT = 10;
 const snap = (value: number) => Math.round(value * 4) / 4;
 
 export function BattleMapEditor() {
+  const mounted = useMounted();
   const [maps, setMaps] = useState<BattleMap[]>([]);
   const [editing, setEditing] = useState<BattleMap | 'new'>();
   const [name, setName] = useState('');
@@ -19,7 +21,7 @@ export function BattleMapEditor() {
   useEffect(() => { void load(); }, []);
   async function load() {
     try { setMaps(await ugcApi.maps()); setError(''); }
-    catch (problem) { if (isUnauthorized(problem)) login(); else setError(message(problem)); }
+    catch (problem) { if (!mounted.current) return; if (isUnauthorized(problem)) requireLogin(); else setError(message(problem)); }
   }
   function begin(map?: BattleMap) {
     setEditing(map ?? 'new'); setName(map?.name ?? 'Новая арена'); setWalls(map?.walls.map(wall => ({ ...wall })) ?? []);

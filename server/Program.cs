@@ -132,6 +132,8 @@ static IResult? ValidateCustomMatch(MatchRequest request, CustomMatchSpec custom
             return Results.BadRequest(new { error = "У каждого танка должен быть teamId." });
         if (spawn.TeamId == Match.PlayerTeamId) hasPlayer = true;
         else hasEnemy = true;
+        if (!MovementCatalog.Supports(spawn.Movement))
+            return Results.BadRequest(new { error = "Выберите существующее шасси робота." });
         if (spawn.Hp is < 1 or > 500)
             return Results.BadRequest(new { error = "HP танка должен быть от 1 до 500." });
         if (spawn.X < 0.5 || spawn.Y < 0.5 || spawn.X > 15.5 || spawn.Y > 9.5)

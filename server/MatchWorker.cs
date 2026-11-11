@@ -103,7 +103,7 @@ internal static class MatchWorker
                 spawn.BodyAngle,
                 spawn.TurretAngle,
                 spawn.TeamId,
-                spawn.Hp)).ToArray();
+                spawn.Hp) { Movement = MovementCatalog.Create(spawn.Movement) }).ToArray();
         var config = MatchConfig.Classic with
         {
             MaxTicks = custom.MaxTicks ?? MatchConfig.Classic.MaxTicks,

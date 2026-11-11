@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useMounted } from './useMounted';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { Friendship, ManeuverSnippet, StrategyLanguage, UgcStrategy, UgcStrategyCard } from './contracts';
-import { isUnauthorized, login, type SaveStrategy, ugcApi } from './ugcApi';
+import { isUnauthorized, requireLogin, type SaveStrategy, ugcApi } from './ugcApi';
 import { FriendsPanel } from './FriendsPanel';
 import { RoomsPanel } from './RoomsPanel';
 import { BattleMapEditor } from './BattleMapEditor';
+import { platformText as ui } from './text';
 
 type Section = 'catalog' | 'mine' | 'maneuvers' | 'friends' | 'rooms' | 'maps';
 const starter: SaveStrategy = {
@@ -14,7 +16,10 @@ const starter: SaveStrategy = {
 };
 
 export function UgcHub() {
+  const mounted = useMounted();
   const [section, setSection] = useState<Section>('catalog');
+  const currentSection = useRef(section);
+  currentSection.current = section;
   const [cards, setCards] = useState<UgcStrategyCard[]>([]);
   const [maneuvers, setManeuvers] = useState<ManeuverSnippet[]>([]);
   const [query, setQuery] = useState('');
@@ -24,7 +29,9 @@ export function UgcHub() {
   const [detail, setDetail] = useState<UgcStrategy>();
   const [editing, setEditing] = useState<UgcStrategy | 'new'>();
   const [draft, setDraft] = useState<SaveStrategy>(starter);
-  const [error, setError] = useState('');
+  const [notification, setNotification] = useState<{ kind: 'success' | 'error'; message: string }>();
+  const setError = (message: string) => setNotification(message ? { kind: 'error', message } : undefined);
+  const showNotice = (message: string) => setNotification({ kind: 'success', message });
   const [busy, setBusy] = useState(false);
   const [publishing, setPublishing] = useState<UgcStrategy>();
   const [paid, setPaid] = useState(false);
@@ -45,10 +52,11 @@ export function UgcHub() {
       else if (section === 'maneuvers') setManeuvers(await ugcApi.maneuvers(category));
       setError('');
     } catch (problem) {
-      if (isUnauthorized(problem)) login(); else showError(problem);
+      if (!mounted.current || currentSection.current !== section) return;
+      if (isUnauthorized(problem)) requireLogin(); else showError(problem);
     }
   }
-  function showError(problem: unknown) { setError(problem instanceof Error ? problem.message : 'Что-то пошло не так.'); }
+  function showError(problem: unknown) { if (!mounted.current) return; setError(problem instanceof Error ? problem.message : 'Что-то пошло не так.'); }
   async function open(id: string) { try { setDetail(await ugcApi.strategy(id)); } catch (problem) { showError(problem); } }
   function newStrategy() { setDraft({ ...starter }); setEditing('new'); }
   function edit(strategy: UgcStrategy) {
@@ -63,7 +71,7 @@ export function UgcHub() {
       const updated = await ugcApi.mine();
       setCards(updated); setEditing(undefined); setSection('mine');
       window.dispatchEvent(new Event('botarena-strategies-changed'));
-    } catch (problem) { if (isUnauthorized(problem)) login(); else showError(problem); }
+    } catch (problem) { if (!mounted.current) return; if (isUnauthorized(problem)) requireLogin(); else showError(problem); }
     finally { setBusy(false); }
   }
   async function publish() {
@@ -88,13 +96,13 @@ export function UgcHub() {
   }
   async function sendTo(friendId: string) {
     if (!sending) return; setBusy(true);
-    try { await ugcApi.sendStrategy(sending.id, friendId); setSending(undefined); setError('Стратегия отправлена другу.'); }
+    try { await ugcApi.sendStrategy(sending.id, friendId); setSending(undefined); showNotice(ui.strategySent); }
     catch (problem) { showError(problem); } finally { setBusy(false); }
   }
   async function fork() {
     if (!detail) return; setBusy(true);
     try { const result = await ugcApi.fork(detail.id); setDetail(undefined); edit(result); }
-    catch (problem) { if (isUnauthorized(problem)) login(); else showError(problem); }
+    catch (problem) { if (!mounted.current) return; if (isUnauthorized(problem)) requireLogin(); else showError(problem); }
     finally { setBusy(false); }
   }
   async function purchase() {
@@ -104,7 +112,7 @@ export function UgcHub() {
       setDetail(undefined); setSection('mine'); setCards(await ugcApi.mine());
       window.dispatchEvent(new Event('botarena-balance-changed'));
       window.dispatchEvent(new Event('botarena-strategies-changed'));
-      setError('Стратегия куплена и добавлена в личную мастерскую.');
+      showNotice(ui.strategyPurchased);
     } catch (problem) { showError(problem); } finally { setBusy(false); }
   }
 
@@ -118,13 +126,13 @@ export function UgcHub() {
       <button className={section === 'rooms' ? 'active' : ''} onClick={() => setSection('rooms')}>Комнаты</button>
       <button className={section === 'maps' ? 'active' : ''} onClick={() => setSection('maps')}>Карты</button>
     </div>
-    {error && <p className={error.includes('скопирована') || error.includes('куплена') || error.includes('отправлена') ? 'ugc-notice' : 'error-card'}>{error}</p>}
+    {notification && <p role={notification.kind === 'success' ? 'status' : 'alert'} className={notification.kind === 'success' ? 'ugc-notice' : 'error-card'}>{notification.message}</p>}
     {section !== 'maneuvers' && section !== 'friends' && section !== 'rooms' && section !== 'maps' && <>
       <div className="ugc-section-head"><div><h2>{section === 'catalog' ? 'Стратегии сообщества' : 'Личная мастерская'}</h2><p>{section === 'catalog' ? 'Ищи идеи, изучай код и создавай собственные ремиксы.' : 'Все твои стратегии: опубликованные, неопубликованные, активные и требующие исправления.'}</p></div><button className="primary" onClick={newStrategy}>+ Новая стратегия</button></div>
       {section === 'catalog' && <div className="ugc-toolbar"><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Название, автор или идея…" /><select value={language} onChange={event => setLanguage(event.target.value)}><option value="">Все языки</option><option value="javascript">JavaScript</option><option value="python">Python</option></select><select value={sort} onChange={event => setSort(event.target.value)}><option value="popular">Популярные</option><option value="new">Новые</option><option value="forks">Часто форкают</option></select></div>}
       <div className="ugc-grid">{cards.map(card => <StrategyCard key={card.id} item={card} mine={section === 'mine'} onClick={() => void open(card.id)} />)}{!cards.length && <div className="ugc-empty"><b>{section === 'mine' ? 'Мастерская пуста' : 'Ничего не найдено'}</b><p>{section === 'mine' ? 'Создай первую стратегию — опубликовать её можно будет после проверки кода.' : 'Измени запрос или фильтры.'}</p></div>}</div>
     </>}
-    {section === 'maneuvers' && <><div className="ugc-section-head"><div><h2>Библиотека манёвров</h2><p>Копируй готовую механику и адаптируй под своего бота.</p></div></div><div className="ugc-chips"><button className={!category ? 'active' : ''} onClick={() => setCategory('')}>Все</button><button className={category === 'movement' ? 'active' : ''} onClick={() => setCategory('movement')}>Движение</button><button className={category === 'combat' ? 'active' : ''} onClick={() => setCategory('combat')}>Бой</button></div><div className="maneuver-grid">{maneuvers.map(item => <article className="maneuver-card" key={item.id}><span className="maneuver-icon">{item.category === 'combat' ? '⌖' : '↝'}</span><div><small>{item.language === 'python' ? 'Python' : 'JavaScript'} · {item.category === 'combat' ? 'Бой' : 'Движение'}</small><h3>{item.name}</h3><p>{item.description}</p><code>{item.usage}</code><button onClick={async () => { await navigator.clipboard.writeText(item.code); setError('Код манёвра скопирован.'); }}>Копировать код</button></div></article>)}</div></>}
+    {section === 'maneuvers' && <><div className="ugc-section-head"><div><h2>Библиотека манёвров</h2><p>Копируй готовую механику и адаптируй под своего бота.</p></div></div><div className="ugc-chips"><button className={!category ? 'active' : ''} onClick={() => setCategory('')}>Все</button><button className={category === 'movement' ? 'active' : ''} onClick={() => setCategory('movement')}>Движение</button><button className={category === 'combat' ? 'active' : ''} onClick={() => setCategory('combat')}>Бой</button></div><div className="maneuver-grid">{maneuvers.map(item => <article className="maneuver-card" key={item.id}><span className="maneuver-icon">{item.category === 'combat' ? '⌖' : '↝'}</span><div><small>{item.language === 'python' ? 'Python' : 'JavaScript'} · {item.category === 'combat' ? 'Бой' : 'Движение'}</small><h3>{item.name}</h3><p>{item.description}</p><code>{item.usage}</code><button onClick={async () => { try { await navigator.clipboard.writeText(item.code); showNotice(ui.maneuverCopied); } catch { setError(ui.copyFailed); } }}>Копировать код</button></div></article>)}</div></>}
     {section === 'friends' && <FriendsPanel />}
     {section === 'rooms' && <RoomsPanel />}
     {section === 'maps' && <BattleMapEditor />}

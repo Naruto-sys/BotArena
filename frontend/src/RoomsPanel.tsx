@@ -1,7 +1,8 @@
+import { useMounted } from './useMounted';
 import { useEffect, useRef, useState } from 'react';
 import type { BattleMap, GameRoom, MatchResponse, StrategyLanguage, UgcStrategyCard } from './contracts';
 import { ReplayPlayer } from './ReplayPlayer';
-import { isUnauthorized, login, type CreateRoom, ugcApi } from './ugcApi';
+import { isUnauthorized, requireLogin, type CreateRoom, ugcApi } from './ugcApi';
 
 const initialRoom: CreateRoom = {
   name: '', allowClipboard: true, allowPresetStrategies: true,
@@ -9,6 +10,7 @@ const initialRoom: CreateRoom = {
 };
 
 export function RoomsPanel() {
+  const mounted = useMounted();
   const [rooms, setRooms] = useState<GameRoom[]>([]);
   const [maps, setMaps] = useState<BattleMap[]>([]);
   const [filters, setFilters] = useState({ clipboard: '', presets: '', maxCharactersPerSecond: '', maxStake: '' });
@@ -43,7 +45,8 @@ export function RoomsPanel() {
   }, [waiting, room?.id]);
 
   function handleError(problem: unknown) {
-    if (isUnauthorized(problem)) login();
+    if (!mounted.current) return;
+    if (isUnauthorized(problem)) requireLogin();
     else setError(problem instanceof Error ? problem.message : 'Не удалось выполнить действие.');
   }
   async function refresh() {

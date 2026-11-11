@@ -14,7 +14,7 @@ public static class YandexAuthentication
     public static IServiceCollection AddYandexAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
         var section = configuration.GetSection("Authentication:Yandex");
-        services.AddAuthentication(options =>
+        var authentication = services.AddAuthentication(options =>
         {
             options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
             // Protected API endpoints challenge the session cookie and therefore
@@ -31,8 +31,11 @@ public static class YandexAuthentication
             options.SlidingExpiration = true;
             options.Events.OnRedirectToLogin = context => ApiStatus(context, StatusCodes.Status401Unauthorized);
             options.Events.OnRedirectToAccessDenied = context => ApiStatus(context, StatusCodes.Status403Forbidden);
-        })
-        .AddOAuth(Scheme, options =>
+        });
+        // Keep public pages and cookie challenges working before OAuth is configured.
+        // The explicit login endpoint reports 503 until both credentials are provided.
+        if (!string.IsNullOrWhiteSpace(section["ClientId"]) && !string.IsNullOrWhiteSpace(section["ClientSecret"]))
+        authentication.AddOAuth(Scheme, options =>
         {
             options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
             options.ClientId = section["ClientId"] ?? "";
@@ -62,22 +65,23 @@ public static class YandexAuthentication
 
     public static void MapAuthenticationEndpoints(this WebApplication app)
     {
-        app.MapGet("/api/auth/login", (string? returnUrl, IConfiguration configuration) =>
+        app.MapGet("/api/auth/login", async (string? returnUrl, IConfiguration configuration, IAuthenticationSchemeProvider schemes) =>
         {
-            if (string.IsNullOrWhiteSpace(configuration["Authentication:Yandex:ClientId"])
-                || string.IsNullOrWhiteSpace(configuration["Authentication:Yandex:ClientSecret"]))
+            if (!await IsLoginAvailableAsync(configuration, schemes))
                 return Results.Problem("Yandex ID не настроен на сервере.", statusCode: 503);
             var destination = IsLocal(returnUrl) ? returnUrl! : "/";
             return Results.Challenge(new AuthenticationProperties { RedirectUri = destination }, [Scheme]);
         }).AllowAnonymous();
 
-        app.MapGet("/api/auth/session", async (ClaimsPrincipal principal, UgcDbContext database) =>
+        app.MapGet("/api/auth/session", async (ClaimsPrincipal principal, UgcDbContext database, IAuthenticationSchemeProvider schemes, IConfiguration configuration) =>
         {
-            if (principal.UserId() is not { } id) return Results.Ok(new { authenticated = false });
+            var loginAvailable = await IsLoginAvailableAsync(configuration, schemes);
+            if (principal.UserId() is not { } id) return Results.Ok(new { authenticated = false, loginAvailable });
             var user = await database.Users.AsNoTracking().SingleOrDefaultAsync(item => item.Id == id);
-            return user is null ? Results.Ok(new { authenticated = false }) : Results.Ok(new
+            return user is null ? Results.Ok(new { authenticated = false, loginAvailable }) : Results.Ok(new
             {
                 authenticated = true,
+                loginAvailable,
                 user = new { user.Id, user.FirstName, user.LastName, user.AvatarUrl, user.Nickname, user.Balance },
                 needsNickname = user.Nickname is null
             });
@@ -106,6 +110,11 @@ public static class YandexAuthentication
             return Results.NoContent();
         }).RequireAuthorization();
     }
+
+    internal static async Task<bool> IsLoginAvailableAsync(IConfiguration configuration, IAuthenticationSchemeProvider schemes) =>
+        !string.IsNullOrWhiteSpace(configuration["Authentication:Yandex:ClientId"])
+        && !string.IsNullOrWhiteSpace(configuration["Authentication:Yandex:ClientSecret"])
+        && await schemes.GetSchemeAsync(Scheme) is not null;
 
     private static async Task CreateTicket(OAuthCreatingTicketContext context)
     {

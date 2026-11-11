@@ -1,9 +1,11 @@
+import { useMounted } from './useMounted';
 import { useEffect, useState } from 'react';
 import type { BattleChallenge, FriendStrategy, Friendship, FriendUser, MatchResponse, StrategyTransfer, UgcStrategyCard } from './contracts';
 import { ReplayPlayer } from './ReplayPlayer';
-import { isUnauthorized, login, ugcApi } from './ugcApi';
+import { isUnauthorized, requireLogin, ugcApi } from './ugcApi';
 
 export function FriendsPanel() {
+  const mounted = useMounted();
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [results, setResults] = useState<FriendUser[]>([]);
   const [query, setQuery] = useState('');
@@ -30,7 +32,8 @@ export function FriendsPanel() {
   }, [query]);
 
   function handleError(problem: unknown) {
-    if (isUnauthorized(problem)) login();
+    if (!mounted.current) return;
+    if (isUnauthorized(problem)) requireLogin();
     else setError(problem instanceof Error ? problem.message : 'Не удалось выполнить действие.');
   }
   async function refresh() {

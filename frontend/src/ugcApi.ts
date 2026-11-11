@@ -1,3 +1,4 @@
+import { platformText as ui } from './text';
 import type { ArenaUser, AuthSession, BattleChallenge, BattleMap, FriendStrategy, Friendship, FriendUser, GameRoom, ManeuverSnippet, MatchResponse, PveAttemptResult, PveCourse, PveLeaderboard, StrategyLanguage, StrategyTransfer, UgcStrategy, UgcStrategyCard, Wall } from './contracts';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -75,8 +76,31 @@ export const ugcApi = {
 export interface SaveStrategy { name: string; description: string; language: StrategyLanguage; code: string; tags: string[]; salePrice: number | null }
 export interface CreateRoom { name: string; allowClipboard: boolean; allowPresetStrategies: boolean; maxCharactersPerSecond: number; stake: number; mapId: string | null }
 
-export function login() {
-  location.assign(`/api/auth/login?returnUrl=${encodeURIComponent(location.pathname + location.search + location.hash)}`);
+export interface AuthNotice { message: string; canLogin: boolean }
+
+function announceAuth(notice: AuthNotice) {
+  window.dispatchEvent(new CustomEvent<AuthNotice>('botarena-auth-notice', { detail: notice }));
+}
+
+// A protected section must never navigate away merely because its API returned 401.
+export function requireLogin() {
+  announceAuth({ message: ui.authRequiredNotice, canLogin: true });
+}
+
+export async function login() {
+  const origin = location.href;
+  try {
+    const session = await ugcApi.session();
+    if (location.href !== origin) return;
+    if (!session.loginAvailable) {
+      announceAuth({ message: ui.authUnavailable, canLogin: false });
+      return;
+    }
+    location.assign(`/api/auth/login?returnUrl=${encodeURIComponent(location.pathname + location.search + location.hash)}`);
+  } catch {
+    if (location.href !== origin) return;
+    announceAuth({ message: ui.authCheckFailed, canLogin: false });
+  }
 }
 
 export function isUnauthorized(error: unknown) {

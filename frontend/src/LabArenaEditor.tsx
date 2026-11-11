@@ -2,8 +2,9 @@ import { useEffect, useRef } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { Arena, CampaignSpawn, Wall } from './contracts';
 import { ArenaCoordinates, arenaViewBox } from './ArenaCoordinates';
-import { botColor } from './botDisplay';
-import type { LabBot } from './labDraft';
+import { botColor, botLabel } from './botDisplay';
+import { classicWalls, type LabBot } from './labDraft';
+import { wallOverlapsBot } from './mapGeometry';
 import { text } from './text';
 
 const MIN_WALL = 0.4;
@@ -80,6 +81,8 @@ export function LabArenaEditor({
   arena,
   bots,
   selectedWall,
+  placementError,
+  onPlacementError: setPlacementError,
   onSelectWall,
   onMoveBot,
   onChangeWall,
@@ -91,15 +94,50 @@ export function LabArenaEditor({
   arena: Arena;
   bots: LabBot[];
   selectedWall: number | null;
+  placementError: string;
+  onPlacementError: (message: string) => void;
   onSelectWall: (index: number | null) => void;
   onMoveBot: (botId: string, x: number, y: number) => void;
   onChangeWall: (index: number, wall: Wall) => void;
-  onAddWall: () => void;
+  onAddWall: (wall: Wall) => void;
   onRemoveWall: (index: number) => void;
   onClassicWalls: () => void;
   onClearWalls: () => void;
 }) {
   const spawns = bots.map(toSpawn);
+
+  function validWalls(walls: Wall[]) {
+    for (const wall of walls) {
+      if (![wall.x, wall.y, wall.width, wall.height].every(Number.isFinite)
+        || wall.width < MIN_WALL || wall.height < MIN_WALL || wall.x < 0 || wall.y < 0
+        || wall.x + wall.width > arena.width || wall.y + wall.height > arena.height) {
+        setPlacementError(text.lab.invalidWall);
+        return false;
+      }
+      const overlap = bots.find(bot => wallOverlapsBot(wall, bot));
+      if (overlap) {
+        setPlacementError(text.lab.wallOverlapsBot(botLabel(overlap.id, overlap.teamId, bots)));
+        return false;
+      }
+    }
+    setPlacementError('');
+    return true;
+  }
+
+  function changeWall(index: number, wall: Wall) {
+    if (validWalls([wall])) onChangeWall(index, wall);
+  }
+
+  function moveBot(botId: string, x: number, y: number) {
+    const bot = bots.find(item => item.id === botId);
+    if (!bot) return;
+    if (arena.walls.some(wall => wallOverlapsBot(wall, { ...bot, position: { x, y } }))) {
+      setPlacementError(text.lab.botOverlapsWall);
+      return;
+    }
+    setPlacementError('');
+    onMoveBot(botId, x, y);
+  }
   const dragging = useRef(false);
 
   useEffect(() => {
@@ -163,7 +201,7 @@ export function LabArenaEditor({
       svg,
       { x: event.clientX, y: event.clientY },
       point => {
-        onChangeWall(index, clampWall({
+        changeWall(index, clampWall({
           ...wall0,
           x: point.x - offsetX,
           y: point.y - offsetY,
@@ -192,13 +230,14 @@ export function LabArenaEditor({
       svg,
       { x: event.clientX, y: event.clientY },
       point => {
-        onChangeWall(index, clampWall(resizeFromCorner(wall0, corner, point), arena));
+        changeWall(index, clampWall(resizeFromCorner(wall0, corner, point), arena));
       },
     );
   }
 
   return (
     <div className="lab-map">
+      {placementError && <p role="alert" className="error-card map-placement-error">{placementError}</p>}
       <div className="arena-stage">
         <svg
           className="arena lab-arena"
@@ -268,7 +307,7 @@ export function LabArenaEditor({
                   const offsetY = start.y - bot.position.y;
                   const move = (moveEvent: PointerEvent) => {
                     const point = clientToArena(svg, moveEvent.clientX, moveEvent.clientY);
-                    onMoveBot(
+                    moveBot(
                       bot.id,
                       Math.min(15.5, Math.max(0.5, round1(point.x - offsetX))),
                       Math.min(9.5, Math.max(0.5, round1(point.y - offsetY))),
@@ -300,12 +339,15 @@ export function LabArenaEditor({
       <div className="lab-walls">
         <div className="lab-walls-toolbar">
           <strong>{text.lab.walls}</strong>
-          <button type="button" onClick={onAddWall}>{text.lab.addWall}</button>
+          <button type="button" onClick={() => {
+            const wall = { x: 6, y: 4, width: 1.5, height: 1.5 };
+            if (validWalls([wall])) onAddWall(wall);
+          }}>{text.lab.addWall}</button>
           <button type="button" disabled={selectedWall == null} onClick={() => onSelectWall(null)}>
             {text.lab.deselectWall}
           </button>
-          <button type="button" onClick={onClassicWalls}>{text.lab.classicWalls}</button>
-          <button type="button" onClick={onClearWalls}>{text.lab.clearWalls}</button>
+          <button type="button" onClick={() => { if (validWalls(classicWalls)) onClassicWalls(); }}>{text.lab.classicWalls}</button>
+          <button type="button" onClick={() => { setPlacementError(''); onClearWalls(); }}>{text.lab.clearWalls}</button>
         </div>
         {arena.walls.length === 0 && <p className="muted">{text.lab.noWalls}</p>}
         {arena.walls.map((wall, index) => (
@@ -326,12 +368,12 @@ export function LabArenaEditor({
                   min="0"
                   max={key === 'width' || key === 'x' ? arena.width : arena.height}
                   value={wall[key]}
-                  onChange={event => onChangeWall(index, { ...wall, [key]: Number(event.target.value) })}
+                  onChange={event => changeWall(index, { ...wall, [key]: Number(event.target.value) })}
                   onFocus={() => onSelectWall(index)}
                 />
               </label>
             ))}
-            <button type="button" onClick={() => onRemoveWall(index)}>{text.lab.removeWall}</button>
+            <button type="button" onClick={() => { setPlacementError(''); onRemoveWall(index); }}>{text.lab.removeWall}</button>
           </div>
         ))}
       </div>
