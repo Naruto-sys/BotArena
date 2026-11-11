@@ -134,11 +134,11 @@ export interface ArenaUser {
   balance: number;
   login: string | null;
 }
+export interface OAuthProvider { id: string; displayName: string; badge: string; color: string }
 export type AuthSession =
-  | { authenticated: false; loginAvailable?: boolean; yandexAvailable?: boolean; githubAvailable?: boolean }
+  | { authenticated: false; loginAvailable?: boolean }
   | { authenticated: true; user: ArenaUser; needsNickname: boolean; loginAvailable?: boolean;
-      yandexAvailable?: boolean; githubAvailable?: boolean; hasPassword: boolean;
-      yandexLinked: boolean; githubLinked: boolean };
+      hasPassword: boolean; linkedOAuthProviders: string[] };
 export type UgcVisibility = 'Private' | 'Unlisted' | 'Public';
 export interface UgcAuthor { id: string; nickname: string; avatarUrl: string | null }
 export interface UgcStrategyCard {

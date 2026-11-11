@@ -1,5 +1,5 @@
 import { platformText as ui } from './text';
-import type { ArenaUser, AuthSession, BattleChallenge, BattleMap, FriendStrategy, Friendship, FriendUser, GameRoom, ManeuverSnippet, MatchResponse, PveAttemptResult, PveCourse, PveLeaderboard, StrategyLanguage, StrategyTransfer, UgcStrategy, UgcStrategyCard, Wall } from './contracts';
+import type { ArenaUser, AuthSession, BattleChallenge, BattleMap, FriendStrategy, Friendship, FriendUser, GameRoom, ManeuverSnippet, MatchResponse, OAuthProvider, PveAttemptResult, PveCourse, PveLeaderboard, StrategyLanguage, StrategyTransfer, UgcStrategy, UgcStrategyCard, Wall } from './contracts';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -17,6 +17,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const ugcApi = {
   session: () => request<AuthSession>('/api/auth/session'),
+  oauthProviders: () => request<OAuthProvider[]>('/api/auth/providers'),
   register: (value: { login: string; password: string; firstName: string; lastName: string; nickname: string }) =>
     request<ArenaUser>('/api/auth/register', { method: 'POST', body: JSON.stringify(value) }),
   passwordLogin: (login: string, password: string) => request<ArenaUser>('/api/auth/password-login', {
@@ -98,26 +99,12 @@ export function requireLogin() {
   announceAuth({ message: ui.authRequiredNotice, canLogin: true });
 }
 
-export async function login(provider: 'yandex' | 'github' = 'yandex') {
-  const origin = location.href;
-  try {
-    const session = await ugcApi.session();
-    if (location.href !== origin) return;
-    const available = provider === 'github' ? session.githubAvailable : session.yandexAvailable ?? session.loginAvailable;
-    if (!available) {
-      announceAuth({ message: ui.authUnavailable, canLogin: false });
-      return;
-    }
-    const path = provider === 'github' ? '/api/auth/login/github' : '/api/auth/login';
-    location.assign(`${path}?returnUrl=${encodeURIComponent(location.pathname + location.search + location.hash)}`);
-  } catch {
-    if (location.href !== origin) return;
-    announceAuth({ message: ui.authCheckFailed, canLogin: false });
-  }
+export function login(provider: string) {
+  location.assign(`/api/auth/oauth/${encodeURIComponent(provider)}/login?returnUrl=${encodeURIComponent(location.pathname + location.search + location.hash)}`);
 }
 
-export function linkProvider(provider: 'yandex' | 'github') {
-  location.assign(`/api/auth/link/${provider}?returnUrl=${encodeURIComponent(location.pathname + location.search + location.hash)}`);
+export function linkProvider(provider: string) {
+  location.assign(`/api/auth/oauth/${encodeURIComponent(provider)}/link?returnUrl=${encodeURIComponent(location.pathname + location.search + location.hash)}`);
 }
 
 export function isUnauthorized(error: unknown) {

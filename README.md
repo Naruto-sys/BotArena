@@ -17,7 +17,7 @@ dotnet run --project server
 
 Откройте [http://127.0.0.1:5050](http://127.0.0.1:5050). Для разработки фронтенда запустите `npm --prefix frontend run dev` в отдельном терминале с работающим сервером и откройте [http://127.0.0.1:5173](http://127.0.0.1:5173).
 
-## PostgreSQL, Yandex ID и GitHub OAuth
+## PostgreSQL и OAuth
 
 Раздел «Сообщество» хранит пользователей, стратегии, версии и библиотеку манёвров в PostgreSQL. Для локального запуска поднимите базу и укажите настройки авторизации:
 
@@ -33,7 +33,7 @@ Docker Compose создаёт пользователя `botarena` и базу `b
 
 Создайте OAuth-приложение Yandex ID, запросите права `login:info` и
 `login:avatar`, затем перенесите значения полей ClientID и Client secret приложения
-в `Authentication:Yandex:ClientId` и `Authentication:Yandex:ClientSecret`.
+в `Authentication:OAuth:Providers:yandex:ClientId` и `ClientSecret`.
 Callback URL в настройках Yandex задайте **точно** как
 `http://127.0.0.1:5050/auth/callback`. Открывайте локальное приложение через
 `http://127.0.0.1:5050`: `localhost` и `127.0.0.1` не взаимозаменяемы для OAuth
@@ -44,21 +44,35 @@ Callback URL в настройках Yandex задайте **точно** как
 New OAuth App**. Укажите Homepage URL `http://127.0.0.1:5050`, а Authorization
 callback URL — **точно** `http://127.0.0.1:5050/auth/github/callback`. После
 создания приложения перенесите Client ID и сгенерированный Client secret в
-`Authentication:GitHub`. Для production создайте отдельное OAuth-приложение с
+`Authentication:OAuth:Providers:github`. Для production создайте отдельное OAuth-приложение с
 публичным HTTPS-адресом. Пользователь, вошедший по локальному логину, может
-привязать Yandex ID и GitHub в настройках профиля.
+привязать любой настроенный OAuth-сервис в настройках профиля. Для Google callback
+по умолчанию: `http://127.0.0.1:5050/auth/google/callback`.
+
+Провайдеры не зашиты во frontend. Сервер читает любое количество дочерних секций
+`Authentication:OAuth:Providers`, регистрирует корректно заполненные OAuth-схемы
+и публикует безопасный список через `GET /api/auth/providers`. Client secret,
+OAuth endpoints и правила разбора профиля в ответ API не попадают. Полный шаблон
+Yandex, GitHub и Google находится в `server/appsettings.json`; чтобы добавить
+другой сервис, скопируйте одну секцию и задайте уникальный ключ, callback,
+authorization/token/userinfo endpoints, scopes и имена JSON-полей профиля.
 
 Те же настройки можно передать переменными среды:
 
 ```text
 ConnectionStrings__BotArena=Host=127.0.0.1;Port=5432;Database=botarena;Username=botarena;Password=...
 Database__MigrateOnStartup=true
-Authentication__Yandex__ClientId=...
-Authentication__Yandex__ClientSecret=...
-Authentication__Yandex__CallbackPath=/auth/callback
-Authentication__GitHub__ClientId=...
-Authentication__GitHub__ClientSecret=...
-Authentication__GitHub__CallbackPath=/auth/github/callback
+Authentication__OAuth__Providers__github__ClientId=...
+Authentication__OAuth__Providers__github__ClientSecret=...
+Authentication__OAuth__Providers__google__ClientId=...
+Authentication__OAuth__Providers__google__ClientSecret=...
+Authentication__OAuth__Providers__custom__DisplayName=Example ID
+Authentication__OAuth__Providers__custom__CallbackPath=/auth/custom/callback
+Authentication__OAuth__Providers__custom__AuthorizationEndpoint=https://example.com/oauth/authorize
+Authentication__OAuth__Providers__custom__TokenEndpoint=https://example.com/oauth/token
+Authentication__OAuth__Providers__custom__UserInformationEndpoint=https://example.com/api/user
+Authentication__OAuth__Providers__custom__Scopes__0=profile
+Authentication__OAuth__Providers__custom__SubjectField=id
 ```
 
 При `Database:MigrateOnStartup=true` сервер создаёт отсутствующую базу и применяет

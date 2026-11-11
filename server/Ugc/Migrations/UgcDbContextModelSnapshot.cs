@@ -388,6 +388,39 @@ namespace BotArena.Ugc.Migrations
                         });
                 });
 
+            modelBuilder.Entity("BotArena.OAuthIdentity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Provider", "Subject")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "Provider")
+                        .IsUnique();
+
+                    b.ToTable("oauth_identities", (string)null);
+                });
+
             modelBuilder.Entity("BotArena.PveLevelProgress", b =>
                 {
                     b.Property<Guid>("Id")
@@ -765,6 +798,17 @@ namespace BotArena.Ugc.Migrations
                     b.Navigation("Guest");
                 });
 
+            modelBuilder.Entity("BotArena.OAuthIdentity", b =>
+                {
+                    b.HasOne("BotArena.AppUser", "User")
+                        .WithMany("OAuthIdentities")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("BotArena.PveLevelProgress", b =>
                 {
                     b.HasOne("BotArena.AppUser", "User")
@@ -880,6 +924,8 @@ namespace BotArena.Ugc.Migrations
 
             modelBuilder.Entity("BotArena.AppUser", b =>
                 {
+                    b.Navigation("OAuthIdentities");
+
                     b.Navigation("Strategies");
                 });
 

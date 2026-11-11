@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { createPortal } from 'react-dom';
-import type { AuthSession } from './contracts';
+import type { AuthSession, OAuthProvider } from './contracts';
 import { linkProvider, login, ugcApi } from './ugcApi';
 
 type AuthMode = 'login' | 'register';
@@ -20,12 +20,17 @@ export function AuthPanel({ session, onChange }: { session: AuthSession | undefi
   const [notice, setNotice] = useState('');
   const [saving, setSaving] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [providers, setProviders] = useState<OAuthProvider[]>([]);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => localStorage.getItem('botarena-theme') === 'light' ? 'light' : 'dark');
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem('botarena-theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    void ugcApi.oauthProviders().then(setProviders).catch(() => setProviders([]));
+  }, []);
 
   useEffect(() => {
     const open = () => { setError(''); setAuthOpen(true); };
@@ -102,8 +107,8 @@ export function AuthPanel({ session, onChange }: { session: AuthSession | undefi
         </form>
         <div className="auth-divider"><span>или</span></div>
         <div className="oauth-buttons">
-          {session.yandexAvailable && <button className="yandex-login" onClick={() => void login('yandex')}><b>Я</b><span>Продолжить с Яндекс ID</span></button>}
-          {session.githubAvailable && <button className="github-login" onClick={() => void login('github')}><b>GH</b><span>Продолжить с GitHub</span></button>}
+          {providers.map(provider => <button key={provider.id} className="oauth-login" style={{ borderColor: provider.color }} onClick={() => login(provider.id)}><b style={{ background: provider.color }}>{provider.badge}</b><span>Продолжить с {provider.displayName}</span></button>)}
+          {providers.length === 0 && <p className="muted">OAuth-сервисы не настроены. Используйте локальный логин.</p>}
         </div>
       </section>
     </div>, document.body)}
@@ -132,7 +137,7 @@ export function AuthPanel({ session, onChange }: { session: AuthSession | undefi
         <p className="ugc-kicker">НАСТРОЙКИ ПРОФИЛЯ</p><h2>Профиль и вход</h2>
         <form onSubmit={saveProfile}><div className="auth-name-grid"><label>Имя<input maxLength={100} value={firstName} onChange={event => setFirstName(event.target.value)} /></label><label>Фамилия<input maxLength={100} value={lastName} onChange={event => setLastName(event.target.value)} /></label></div><label>Ник<input required minLength={3} maxLength={24} value={nickname} onChange={event => setNickname(event.target.value)} /></label><button className="primary" disabled={saving}>Сохранить профиль</button></form>
         <form className="password-form" onSubmit={changePassword}><h3>{session.hasPassword ? 'Изменить пароль' : 'Установить пароль'}</h3>{session.hasPassword && <label>Текущий пароль<input required type="password" autoComplete="current-password" value={currentPassword} onChange={event => setCurrentPassword(event.target.value)} /></label>}<label>Новый пароль<input required minLength={8} maxLength={128} type="password" autoComplete="new-password" value={newPassword} onChange={event => setNewPassword(event.target.value)} /></label><button disabled={saving}>{session.hasPassword ? 'Изменить пароль' : 'Установить пароль'}</button></form>
-        <div className="linked-accounts"><h3>Связанные аккаунты</h3><div><span>Яндекс ID</span>{session.yandexLinked ? <b>Подключён</b> : <button disabled={!session.yandexAvailable} onClick={() => linkProvider('yandex')}>Привязать</button>}</div><div><span>GitHub</span>{session.githubLinked ? <b>Подключён</b> : <button disabled={!session.githubAvailable} onClick={() => linkProvider('github')}>Привязать</button>}</div></div>
+        <div className="linked-accounts"><h3>Связанные аккаунты</h3>{providers.map(provider => <div key={provider.id}><span>{provider.displayName}</span>{session.linkedOAuthProviders.includes(provider.id) ? <b>Подключён</b> : <button onClick={() => linkProvider(provider.id)}>Привязать</button>}</div>)}{providers.length === 0 && <p className="muted">OAuth-сервисы не настроены.</p>}</div>
         <div className="theme-setting"><span><b>Тема интерфейса</b><small>{theme === 'dark' ? 'Тёмная' : 'Светлая'}</small></span><button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☀ Светлая' : '☾ Тёмная'}</button></div>
         {error && <p className="error">{error}</p>}{notice && <p className="success-card">{notice}</p>}
       </section>

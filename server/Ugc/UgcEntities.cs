@@ -23,6 +23,17 @@ public sealed class AppUser
     public DateTimeOffset LastLoginAt { get; set; } = DateTimeOffset.UtcNow;
     public long Balance { get; set; } = 1_000;
     public List<UserStrategy> Strategies { get; set; } = [];
+    public List<OAuthIdentity> OAuthIdentities { get; set; } = [];
+}
+
+public sealed class OAuthIdentity
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid UserId { get; set; }
+    public required AppUser User { get; set; }
+    public required string Provider { get; set; }
+    public required string Subject { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
 public sealed class Friendship

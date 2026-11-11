@@ -6,13 +6,13 @@ export type Page = keyof typeof ui.nav;
 export function ComingSoon({ children }: { children: React.ReactNode }) {
   return <div className="ux-placeholder"><span className="ux-tag">{ui.soon}</span><p>{children}</p></div>;
 }
-export function Home({ tracks, completed, languages, navigate, onContinue }: { tracks: CampaignTrack[]; completed: string[]; languages: StrategyLanguage[]; navigate: (page: Page) => void; onContinue: () => void }) {
+export function Home({ tracks, completed, languages, navigate, onContinue, onDemo, demoInvite }: { tracks: CampaignTrack[]; completed: string[]; languages: StrategyLanguage[]; navigate: (page: Page) => void; onContinue: () => void; onDemo: () => void; demoInvite: boolean }) {
   const available = tracks.filter(t => t.available);
   const ids = new Set(tracks.flatMap(t => t.levels.map(l => l.id)));
   const done = completed.filter(id => ids.has(id)).length;
   return <div className="ux-home">
-    <section className="ux-hero"><div><small>BOTARENA / ACADEMY</small><h1>{ui.hero}</h1><p>{ui.intro}</p><div className="ux-actions"><button className="primary" onClick={onContinue}>{ui.learn} →</button><button onClick={() => navigate('arena')}>{ui.arena}</button></div></div><div className="ux-radar" aria-hidden="true">BA</div></section>
-    <div className="ux-stats"><div><b>{done} / {ids.size}</b><span>{ui.progress}</span></div><div><b>{available.length}</b><span>{ui.chapters}</span></div><div><b>{languages.map(l => l === 'javascript' ? 'JS' : 'Python').join(' + ')}</b><span>{ui.local}</span></div></div>
+    <section className="ux-hero" data-tour-target="home-start"><div><small>BOTARENA / ACADEMY</small><h1>{ui.hero}</h1><p>{ui.intro}</p><div className="ux-actions"><button className="primary" onClick={onContinue}>{ui.learn} →</button><button onClick={() => navigate('arena')}>{ui.arena}</button><button className={`demo-launch-button ${demoInvite ? 'soft-invite-pulse' : ''}`} onClick={onDemo}>▶ Тестовый запуск · 1 минута</button></div>{demoInvite && <p className="demo-invite-copy">Начните с готового примера: код уже написан, останется запустить бой.</p>}</div><div className="ux-radar" aria-hidden="true">BA</div></section>
+    <div className="ux-stats" data-tour-target="home-progress"><div><b>{done} / {ids.size}</b><span>{ui.progress}</span></div><div><b>{available.length}</b><span>{ui.chapters}</span></div><div><b>{languages.map(l => l === 'javascript' ? 'JS' : 'Python').join(' + ')}</b><span>{ui.local}</span></div></div>
     <h2>{ui.next}</h2><div className="ux-grid">{ui.paths.map(([title, description], i) => <article className="panel ux-path" key={title}><small>0{i + 1}</small><h2>{title}</h2><p>{description}</p><button onClick={() => navigate((['learn', 'arena', 'workshop'] as Page[])[i])}>{title} →</button></article>)}</div>
   </div>;
 }
@@ -31,7 +31,6 @@ export function Community() {
   const [tab, setTab] = useState<string>(ui.communityTabs[0]);
   return <><h1>{ui.nav.community}</h1><div className="ux-tabs">{ui.communityTabs.map(label => <button key={label} aria-pressed={tab === label} onClick={() => setTab(label)}>{label}</button>)}</div><ComingSoon>{ui.communityNote}</ComingSoon></>;
 }
-
 export function LearningMap({ tracks, completed, onOpen }: {
   tracks: CampaignTrack[]; completed: string[]; onOpen: (track: CampaignTrack, levelId: string) => void;
 }) {
@@ -56,34 +55,53 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   </dialog>;
 }
 
-const tourStages: { page: Page; title: string; tips: string[] }[] = [
-  { page: 'home', title: 'Главная', tips: ['Продолжайте с ближайшего доступного испытания.', 'Карточка прогресса показывает пройденные уровни.', 'Быстрые переходы ведут в обучение, арену и мастерскую.'] },
-  { page: 'learn', title: 'Обучение', tips: ['Уровни открываются по порядку.', 'В редакторе задаются команды робота.', 'Запустите испытание и изучите запись боя.'] },
-  { page: 'arena', title: 'Арена', tips: ['Здесь можно менять код и состав участников.', 'Карту и препятствия можно редактировать перед боем.', 'PvP-комнаты доступны зарегистрированным игрокам.'] },
-  { page: 'workshop', title: 'Мастерская', tips: ['Локальные стратегии остаются на этом устройстве.', 'Опубликованные стратегии доступны после входа.', 'Платный код открывается после покупки.'] },
-  { page: 'community', title: 'Сообщество', tips: ['Добавляйте игроков в друзья.', 'Отправляйте друзьям копии стратегий.', 'Приглашайте друзей в PvP-бои со ставкой.'] },
+const tourSteps: { page: Page; section: string; title: string; description: string; target: string }[] = [
+  { page: 'home', section: 'Главная', title: 'Первый шаг', description: 'Начните с тестового боя или ближайшего учебного испытания.', target: '[data-tour-target="home-start"]' },
+  { page: 'home', section: 'Главная', title: 'Ваш прогресс', description: 'Здесь видно, сколько испытаний уже пройдено и какие главы доступны.', target: '[data-tour-target="home-progress"]' },
+  { page: 'home', section: 'Главная', title: 'Маршруты', description: 'Карточки ведут к обучению, свободной арене и сохранённым стратегиям.', target: '.ux-grid' },
+  { page: 'learn', section: 'Обучение', title: 'Карта уровней', description: 'Доступные узлы подсвечены, а следующий уровень открывается после победы.', target: '.learning-map' },
+  { page: 'learn', section: 'Обучение', title: 'Доступное испытание', description: 'Нажмите на яркий узел, чтобы открыть редактор и условие задачи.', target: '.lesson-stop.available' },
+  { page: 'learn', section: 'Обучение', title: 'Режим обучения', description: 'Переключайтесь между учебными испытаниями и рейтинговым PvE.', target: '.ux-tabs' },
+  { page: 'arena', section: 'Арена', title: 'Редактор стратегии', description: 'Здесь меняются код, язык, шасси и состав участников боя.', target: '.editor' },
+  { page: 'arena', section: 'Арена', title: 'Поле боя', description: 'После запуска здесь появится запись матча и инструменты анализа.', target: '.replay' },
+  { page: 'arena', section: 'Арена', title: 'PvP-комнаты', description: 'Зарегистрированные игроки могут перейти к открытым сетевым комнатам.', target: '.platform-content > .ux-tabs' },
+  { page: 'workshop', section: 'Мастерская', title: 'Разделы мастерской', description: 'Переключайтесь между локальными работами и онлайн-каталогом.', target: '.ux-tabs' },
+  { page: 'workshop', section: 'Мастерская', title: 'Поиск и создание', description: 'Фильтруйте стратегии или создавайте новую копию для эксперимента.', target: '.ux-actions' },
+  { page: 'workshop', section: 'Мастерская', title: 'Ваши стратегии', description: 'Каждая сохранённая работа остаётся доступной для редактирования.', target: '.ux-grid' },
+  { page: 'community', section: 'Сообщество', title: 'Стратегии сообщества', description: 'Изучайте публикации, покупайте код и создавайте собственные ремиксы.', target: '.ugc-hero' },
+  { page: 'community', section: 'Сообщество', title: 'Навигация сообщества', description: 'Здесь находятся маркетплейс, друзья, комнаты и ваши публикации.', target: '.ugc-tabs' },
+  { page: 'community', section: 'Сообщество', title: 'Общение и PvP', description: 'Добавляйте друзей, делитесь стратегиями и приглашайте их в бой.', target: '.ugc-hub' },
 ];
 
 export function SystemTour({ onClose, onNavigate }: { onClose: () => void; onNavigate: (page: Page) => void }) {
-  const [stage, setStage] = useState(0);
-  const current = tourStages[stage];
-  useEffect(() => { onNavigate(current.page); }, [current.page, onNavigate]);
-  function finish() { localStorage.setItem('botarena-system-tour', 'completed'); onClose(); }
+  const [step, setStep] = useState(0);
+  const [finishing, setFinishing] = useState(false);
+  const current = tourSteps[step];
+  const section = [...new Set(tourSteps.map(item => item.section))].indexOf(current.section);
+  useEffect(() => {
+    onNavigate(current.page);
+    let highlighted: Element | null = null;
+    let attempts = 0;
+    const timer = window.setInterval(() => {
+      highlighted = document.querySelector(current.target);
+      if (highlighted || attempts++ > 12) {
+        window.clearInterval(timer);
+        highlighted?.classList.add('tour-highlight-pulse');
+        highlighted?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
+    return () => { window.clearInterval(timer); highlighted?.classList.remove('tour-highlight-pulse'); };
+  }, [step]);
+  function finish() {
+    localStorage.setItem('botarena-system-tour', 'completed'); setFinishing(true);
+    window.setTimeout(onClose, 1300);
+  }
+  if (finishing) return <div className="tour-backdrop"><div className="tour-complete"><span>✓</span><h2>Обзор пройден!</h2><p>Можно переходить к первому бою.</p></div></div>;
   return <div className="tour-backdrop" role="presentation"><section className="tour-dialog" role="dialog" aria-modal="true" aria-labelledby="tour-title">
     <button className="tour-close" onClick={onClose} aria-label="Закрыть">×</button>
-    <small>ЭТАП {stage + 1} ИЗ {tourStages.length}</small><h2 id="tour-title">{current.title}</h2>
-    <div className="tour-progress">{tourStages.map((_, index) => <span key={index} className={index <= stage ? 'done' : ''} />)}</div>
-    <ol>{current.tips.map(tip => <li key={tip}>{tip}</li>)}</ol>
-    <div className="tour-actions"><button disabled={stage === 0} onClick={() => setStage(value => value - 1)}>← Назад</button>{stage === tourStages.length - 1 ? <button className="primary" onClick={finish}>Завершить</button> : <button className="primary" onClick={() => setStage(value => value + 1)}>Далее →</button>}</div>
-  </section></div>;
-}
-
-export function FirstRunDialog({ onStart, onClose }: { onStart: () => void; onClose: () => void }) {
-  return <div className="tour-backdrop"><section className="tour-dialog first-run-dialog" role="dialog" aria-modal="true" aria-labelledby="first-run-title">
-    <small>ПЕРВЫЙ ЗАПУСК · 1 МИНУТА</small><h2 id="first-run-title">Посмотрите, как оживает код</h2>
-    <p>Мы уже подготовили простую стратегию: робот найдёт противника, наведёт башню и выстрелит. Откроем Арену — останется нажать «Запустить».</p>
-    <pre><code>{'function tick({ self, enemy }) {\n  if (!enemy) return { leftTrack: 0.4, rightTrack: -0.4 };\n  const x = enemy.position.x - self.position.x;\n  const y = enemy.position.y - self.position.y;\n  return { aimDirection: { x, y }, shoot: self.canShoot };\n}'}</code></pre>
-    <p className="guest-progress-note">Играть можно без аккаунта. Гостевой прогресс не сохраняется — войдите или зарегистрируйтесь, чтобы продолжить с того же места позже.</p>
-    <div className="tour-actions"><button onClick={onClose}>Не сейчас</button><button className="primary" onClick={onStart}>Вставить пример и открыть Арену →</button></div>
+    <small>РАЗДЕЛ {section + 1} ИЗ 5 · ШАГ {step + 1} ИЗ {tourSteps.length}</small><h2 id="tour-title">{current.title}</h2>
+    <div className="tour-progress">{[0, 1, 2, 3, 4].map(index => <span key={index} className={index <= section ? 'done' : ''} />)}</div>
+    <p>{current.description}</p>
+    <div className="tour-actions"><button disabled={step === 0} onClick={() => setStep(value => value - 1)}>← Назад</button>{step === tourSteps.length - 1 ? <button className="primary" onClick={finish}>Завершить</button> : <button className="primary" onClick={() => setStep(value => value + 1)}>Далее →</button>}</div>
   </section></div>;
 }

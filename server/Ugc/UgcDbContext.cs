@@ -5,6 +5,7 @@ namespace BotArena;
 public sealed class UgcDbContext(DbContextOptions<UgcDbContext> options) : DbContext(options)
 {
     public DbSet<AppUser> Users => Set<AppUser>();
+    public DbSet<OAuthIdentity> OAuthIdentities => Set<OAuthIdentity>();
     public DbSet<UserStrategy> Strategies => Set<UserStrategy>();
     public DbSet<UserStrategyVersion> StrategyVersions => Set<UserStrategyVersion>();
     public DbSet<ManeuverSnippet> Maneuvers => Set<ManeuverSnippet>();
@@ -38,6 +39,16 @@ public sealed class UgcDbContext(DbContextOptions<UgcDbContext> options) : DbCon
         users.Property(user => user.NormalizedNickname).HasMaxLength(24);
         users.Property(user => user.AvatarUrl).HasMaxLength(500);
         users.Property(user => user.Balance).HasDefaultValue(1_000L);
+
+        var oauthIdentities = modelBuilder.Entity<OAuthIdentity>();
+        oauthIdentities.ToTable("oauth_identities");
+        oauthIdentities.HasKey(item => item.Id);
+        oauthIdentities.HasIndex(item => new { item.Provider, item.Subject }).IsUnique();
+        oauthIdentities.HasIndex(item => new { item.UserId, item.Provider }).IsUnique();
+        oauthIdentities.Property(item => item.Provider).HasMaxLength(40);
+        oauthIdentities.Property(item => item.Subject).HasMaxLength(200);
+        oauthIdentities.HasOne(item => item.User).WithMany(user => user.OAuthIdentities)
+            .HasForeignKey(item => item.UserId).OnDelete(DeleteBehavior.Cascade);
 
         var friendships = modelBuilder.Entity<Friendship>();
         friendships.ToTable("friendships");

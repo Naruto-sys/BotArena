@@ -32,7 +32,7 @@ import { StrategyHelp } from './StrategyHelp';
 import { AuthPanel } from './AuthPanel';
 import { ugcApi, type AuthNotice } from './ugcApi';
 import { text } from './text';
-import { FirstRunDialog, Home, Workshop, LearningMap, SettingsDialog, SystemTour, type Page } from './PlatformPages';
+import { Home, Workshop, LearningMap, SettingsDialog, SystemTour, type Page } from './PlatformPages';
 import { platformText as ui } from './text';
 import { loadStrategies, saveStrategies, type SavedStrategy } from './strategyLibrary';
 import './style.css';
@@ -211,13 +211,15 @@ function App() {
   const [rooms, setRooms] = useState(location.hash === '#arena/rooms');
   const [settings, setSettings] = useState(false);
   const [tourOpen, setTourOpen] = useState(false);
-  const [firstRunOpen, setFirstRunOpen] = useState(() => localStorage.getItem('botarena-first-run-v2') !== 'done');
+  const [demoInvite, setDemoInvite] = useState(() => localStorage.getItem('botarena-first-run-v2') !== 'done');
+  const [demoStartPulse, setDemoStartPulse] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [library, setLibrary] = useState(loadStrategies);
   const [strategyName, setStrategyName] = useState<string>(ui.defaultName);
   const [libraryNote, setLibraryNote] = useState('');
   const [libraryId, setLibraryId] = useState<string>();
   const editorPanel = useRef<HTMLFormElement>(null);
+  const startButton = useRef<HTMLButtonElement>(null);
   const [mode, setMode] = useState<AppMode>(() => location.hash.startsWith('#arena') ? 'lab' : 'campaign');
   const [languages, setLanguages] = useState<StrategyLanguage[]>(['javascript']);
   const [language, setLanguage] = useState<StrategyLanguage>('javascript');
@@ -370,11 +372,6 @@ function App() {
     if (next === 'arena') { setRooms(false); selectMode('lab'); }
   }
 
-  function closeFirstRun() {
-    localStorage.setItem('botarena-first-run-v2', 'done');
-    setFirstRunOpen(false);
-  }
-
   function startQuickDemo() {
     const setup = loadLabSetup();
     const player = setup.bots.find(bot => bot.teamId === 'player') ?? setup.bots[0];
@@ -385,7 +382,12 @@ function App() {
     setEditorEpoch(value => value + 1);
     history.replaceState(null, '', '#arena');
     setAuthNotice({ message: 'Пример вставлен. Нажмите «Запустить», чтобы посмотреть первый бой.', canLogin: false });
-    closeFirstRun();
+    localStorage.setItem('botarena-first-run-v2', 'done');
+    setDemoInvite(false);
+    window.setTimeout(() => {
+      startButton.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setDemoStartPulse(true);
+    }, 350);
   }
 
   useEffect(() => {
@@ -516,6 +518,7 @@ function App() {
   async function run(event: FormEvent) {
     event.preventDefault();
     if (activeRun.current) return;
+    setDemoStartPulse(false);
     if (mode === 'campaign' && level && !isLevelUnlocked(level.order, levels, completed)) return;
     setExpanded(false);
     const controller = new AbortController();
@@ -611,13 +614,12 @@ function App() {
       </header>
       {settings && <SettingsDialog onClose={() => setSettings(false)} />}
       {tourOpen && <SystemTour onClose={() => setTourOpen(false)} onNavigate={navigate} />}
-      {firstRunOpen && session && !session.authenticated && <FirstRunDialog onStart={startQuickDemo} onClose={closeFirstRun} />}
       <div className="platform-content">
       <div className="ux-breadcrumb">BotArena / {ui.nav[page]}{page === 'learn' && track ? ` / ${track.name}` : ''}</div>
       {session && !session.authenticated && <div className="guest-banner"><b>Гостевой режим</b><span>Можно запускать одиночные бои, но прогресс не сохраняется.</span><button onClick={() => window.dispatchEvent(new CustomEvent('botarena-open-auth'))}>Войти или зарегистрироваться</button></div>}
       {authNotice && <div className="auth-callout auth-feedback" role="status"><p>{authNotice.message}</p><div className="ux-actions">{authNotice.canLogin && <button className="account-login" onClick={() => window.dispatchEvent(new CustomEvent('botarena-open-auth'))}>Войти / Регистрация</button>}<button type="button" onClick={() => setAuthNotice(undefined)}>{ui.close}</button></div></div>}
       <Suspense fallback={<div className="empty">{ui.loadingSection}</div>}>
-      {page === 'home' ? <><Home tracks={tracks} completed={completed} languages={languages} navigate={navigate} onContinue={() => {
+      {page === 'home' ? <><Home tracks={tracks} completed={completed} languages={languages} navigate={navigate} onDemo={startQuickDemo} demoInvite={demoInvite} onContinue={() => {
           navigate('learn');
           const next = tracks.find(t => t.available && t.levels.some(l => !completed.includes(l.id) && isLevelUnlocked(l.order, t.levels, completed)));
           if (next) openTrack(next);
@@ -867,7 +869,7 @@ function App() {
               <p className="muted">{text.lab.sourcePreset}: {text.lab.customCode.toLowerCase()} не выбран — все на пресетах.</p>
             )}
             {!session?.authenticated && <div className="auth-callout"><div className="auth-callout-copy"><strong>Гостевой бой доступен</strong><p>Результат можно посмотреть, но прогресс сохранится только после входа или регистрации.</p></div></div>}
-            <button className="primary" disabled={loading || !canRun}>
+            <button ref={startButton} data-tour-target="arena-run" className={`primary ${demoStartPulse ? 'demo-start-pulse' : ''}`} disabled={loading || !canRun}>
               {loading ? text.working : text.start}
             </button>
             {code.length > 16384 && <p role="alert" className="error">{text.strategyTooLong}</p>}
