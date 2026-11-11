@@ -94,3 +94,27 @@ dialog.ux-modal::backdrop { background: #020a13bb; backdrop-filter: blur(8px); }
 .platform-footer strong { color: #9bb8c8; font-size: 14px; }
 .platform-footer span { font-size: 12px; }
 .map-placement-error { margin-bottom: 12px; }
+/* Match the unified shell to the theme supplied by the profile menu. */
+[data-theme="light"] { --neon: #08796b; --cyan: #166c91; }
+[data-theme="light"] .platform-header { background: #fffffff5; border-color: #cad8e2; }
+[data-theme="light"] .platform-brand { background: transparent; }
+[data-theme="light"] .platform-brand span { color: #172634 !important; }
+[data-theme="light"] .platform-header nav button { color: #526b7b; }
+[data-theme="light"] .platform-header nav button[aria-current] { background: #d5f3e9; color: #086c60; }
+[data-theme="light"] .platform-content .panel { background: #fff; border-color: #c7d5df; }
+[data-theme="light"] .ux-hero { background: #e8f5f4; border-color: #bad7d7; }
+[data-theme="light"] .ux-hero p, [data-theme="light"] .ux-path p,
+[data-theme="light"] .ux-page-heading p, [data-theme="light"] .ux-lead,
+[data-theme="light"] .ux-stats span, [data-theme="light"] .ux-breadcrumb,
+[data-theme="light"] .lesson-stop p, [data-theme="light"] .chapter-route > summary p,
+[data-theme="light"] .platform-footer, [data-theme="light"] .platform-footer strong { color: #526b7b; }
+[data-theme="light"] .chapter-route > summary strong { color: #172634; }
+[data-theme="light"] .ux-tabs button { color: #526b7b; }
+[data-theme="light"] .ux-tabs button[aria-pressed="true"] { color: #086c60; background: #d5f3e9; border-color: #85bcad; }
+[data-theme="light"] .campaign-brief, [data-theme="light"] .level-card,
+[data-theme="light"] .lab-bot-card, [data-theme="light"] .debug-panel,
+[data-theme="light"] .ux-placeholder, [data-theme="light"] .ux-modal { background: #f3f8fb; color: #385162; border-color: #b9cdd9; }
+[data-theme="light"] .platform-content input:not([type="range"]):not([type="checkbox"]),
+[data-theme="light"] .platform-content select { color: #203443; background: #fff; border-color: #aebfcb; }
+[data-theme="light"] .lesson-stop.available > button { color: #086c60; background: #d5f3e9; }
+[data-theme="light"] .ux-stages { color: #526b7b; }

@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
 import type {
   AppMode,
+  AuthSession,
   CampaignTrack,
   MatchJobStatus,
   Movement,
@@ -28,13 +29,18 @@ import {
 } from './labDraft';
 import { MatchDiagnosticError, buildCustomMatchPayload, runMatch } from './matchApi';
 import { StrategyHelp } from './StrategyHelp';
+import { AuthPanel } from './AuthPanel';
+import { login, ugcApi } from './ugcApi';
 import { text } from './text';
-import { Community, ComingSoon, Home, Workshop, LearningMap, SettingsDialog, type Page } from './PlatformPages';
+import { Home, Workshop, LearningMap, SettingsDialog, type Page } from './PlatformPages';
 import { platformText as ui } from './text';
 import { loadStrategies, saveStrategies, type SavedStrategy } from './strategyLibrary';
 import './style.css';
 import './platform.css';
 
+const PveMap = lazy(() => import('./PveMap').then(module => ({ default: module.PveMap })));
+const UgcHub = lazy(() => import('./UgcHub').then(module => ({ default: module.UgcHub })));
+const RoomsPanel = lazy(() => import('./RoomsPanel').then(module => ({ default: module.RoomsPanel })));
 const StrategyEditor = lazy(() => import('./StrategyEditor'));
 const ReplayPlayer = lazy(() => import('./ReplayPlayer').then(module => ({ default: module.ReplayPlayer })));
 
@@ -190,8 +196,11 @@ const modelOptions = Object.entries(text.movements).map(([id, label]) =>
   <option key={id} value={id}>{label}</option>);
 
 function App() {
-  const [page, setPage] = useState<Page>('home');
-  const [rooms, setRooms] = useState(false);
+  const [page, setPage] = useState<Page>(() => location.hash === '#ugc' ? 'community' : Object.hasOwn(ui.nav, location.hash.slice(1).split('/')[0]) ? location.hash.slice(1).split('/')[0] as Page : new URLSearchParams(location.search).has('share') ? 'community' : 'home');
+  const [session, setSession] = useState<AuthSession>();
+  const [onlineWorkshop, setOnlineWorkshop] = useState(location.hash === '#workshop/online');
+  const [training, setTraining] = useState(location.hash === '#learn/pve');
+  const [rooms, setRooms] = useState(location.hash === '#arena/rooms');
   const [settings, setSettings] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [library, setLibrary] = useState(loadStrategies);
@@ -199,7 +208,7 @@ function App() {
   const [libraryNote, setLibraryNote] = useState('');
   const [libraryId, setLibraryId] = useState<string>();
   const editorPanel = useRef<HTMLFormElement>(null);
-  const [mode, setMode] = useState<AppMode>('campaign');
+  const [mode, setMode] = useState<AppMode>(() => location.hash.startsWith('#arena') ? 'lab' : 'campaign');
   const [languages, setLanguages] = useState<StrategyLanguage[]>(['javascript']);
   const [language, setLanguage] = useState<StrategyLanguage>('javascript');
   const [labSetup, setLabSetup] = useState<LabSetup>(loadLabSetup);
@@ -301,6 +310,17 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const reload = () => void ugcApi.session().then(setSession).catch(() => setSession({ authenticated: false }));
+    reload();
+    window.addEventListener('botarena-auth-changed', reload);
+    window.addEventListener('botarena-balance-changed', reload);
+    return () => {
+      window.removeEventListener('botarena-auth-changed', reload);
+      window.removeEventListener('botarena-balance-changed', reload);
+    };
+  }, []);
+
   function resetRunState() {
     activeRun.current?.abort();
     setError('');
@@ -324,8 +344,12 @@ function App() {
   function navigate(next: Page) {
     if (loading) return;
     setPage(next);
+    const destination = new URL(location.href);
+    destination.hash = next === 'community' ? '#ugc' : next === 'workshop' && onlineWorkshop ? '#workshop/online' : `#${next}`;
+    if (next !== 'community') destination.searchParams.delete('share');
+    history.replaceState(null, '', destination.pathname + destination.search + destination.hash);
     setExpanded(false);
-    if (next === 'learn') selectMode('campaign');
+    if (next === 'learn') { setTraining(false); selectMode('campaign'); }
     if (next === 'arena') { setRooms(false); selectMode('lab'); }
   }
 
@@ -456,7 +480,7 @@ function App() {
 
   async function run(event: FormEvent) {
     event.preventDefault();
-    if (activeRun.current) return;
+    if (activeRun.current || !session?.authenticated) return;
     if (mode === 'campaign' && level && !isLevelUnlocked(level.order, levels, completed)) return;
     setExpanded(false);
     const controller = new AbortController();
@@ -533,9 +557,9 @@ function App() {
       const value = bot.code[language] ?? '';
       return value.trim().length > 0 && value.length <= 16384;
     });
-  const canRun = mode === 'lab'
+  const canRun = session?.authenticated && (mode === 'lab'
     ? labSetup.bots.length >= 2 && labCodesReady
-    : Boolean(level && isLevelUnlocked(level.order, levels, completed) && campaignCodesReady);
+    : Boolean(level && isLevelUnlocked(level.order, levels, completed) && campaignCodesReady));
 
   return (
     <main className={`platform-app${expanded ? ' editor-expanded' : ''}`}>
@@ -544,24 +568,27 @@ function App() {
         <nav aria-label="Основная навигация">{Object.entries(ui.nav).map(([id, label]) =>
           <button key={id} type="button" aria-current={page === id ? 'page' : undefined}
             disabled={loading} onClick={() => navigate(id as Page)}>{label}</button>)}</nav>
-        <div className="platform-account"><small>{ui.local}</small><button onClick={() => setSettings(true)}>{ui.settings}</button></div>
+        <div className="platform-account"><AuthPanel session={session} onChange={setSession} /><button onClick={() => setSettings(true)}>{ui.settings}</button></div>
       </header>
       {settings && <SettingsDialog onClose={() => setSettings(false)} />}
       <div className="platform-content">
       <div className="ux-breadcrumb">BotArena / {ui.nav[page]}{page === 'learn' && track ? ` / ${track.name}` : ''}</div>
+      <Suspense fallback={<div className="empty">{ui.loadingSection}</div>}>
       {page === 'home' ? <><Home tracks={tracks} completed={completed} languages={languages} navigate={navigate} onContinue={() => {
           navigate('learn');
           const next = tracks.find(t => t.available && t.levels.some(l => !completed.includes(l.id) && isLevelUnlocked(l.order, t.levels, completed)));
           if (next) openTrack(next);
         }} />{error && <p role="alert" className="error-card">{error}</p>}</>
-      : page === 'workshop' ? <Workshop items={library} onOpen={openStrategy}
+      : page === 'workshop' ? <><div className="ux-tabs"><button aria-pressed={!onlineWorkshop} onClick={() => { setOnlineWorkshop(false); history.replaceState(null, '', '#workshop'); }}>{ui.localStrategies}</button><button aria-pressed={onlineWorkshop} onClick={() => { setOnlineWorkshop(true); history.replaceState(null, '', '#workshop/online'); }}>{ui.onlineWorkshop}</button></div>{onlineWorkshop ? <UgcHub /> : <Workshop items={library} onOpen={openStrategy}
           onRemove={removeStrategy}
-          onArena={() => { setLibraryId(undefined); setStrategyName(ui.defaultName); navigate('arena'); }} />
-      : page === 'community' ? <Community />
+          onArena={() => { setLibraryId(undefined); setStrategyName(ui.defaultName); navigate('arena'); }} />}</>
+      : page === 'community' ? <UgcHub />
       : <>
         <div className="ux-page-heading"><div><small>{page === 'learn' ? 'ACADEMY / BOT PATH' : 'MATCH LAB / PVE'}</small><h1>{ui.nav[page]}</h1><p>{page === 'learn' ? ui.learnIntro : ui.arenaIntro}</p></div></div>
-        {page === 'arena' && <div className="ux-tabs"><button aria-pressed={!rooms} onClick={() => setRooms(false)}>{ui.pve}</button><button aria-pressed={rooms} onClick={() => setRooms(true)}>{ui.rooms}</button></div>}
-        {page === 'arena' && rooms ? <ComingSoon>{ui.roomsNote}</ComingSoon> : <>
+        {page === 'learn' && <div className="ux-tabs"><button aria-pressed={!training} onClick={() => { setTraining(false); history.replaceState(null, '', '#learn'); }}>{ui.learningLab}</button><button aria-pressed={training} onClick={() => { setTraining(true); history.replaceState(null, '', '#learn/pve'); }}>{ui.pveProgress}</button></div>}
+        {page === 'learn' && training ? <PveMap session={session} /> : <>
+        {page === 'arena' && <div className="ux-tabs"><button aria-pressed={!rooms} onClick={() => { setRooms(false); history.replaceState(null, '', '#arena'); }}>{ui.pve}</button><button aria-pressed={rooms} onClick={() => { setRooms(true); history.replaceState(null, '', '#arena/rooms'); }}>{ui.rooms}</button></div>}
+        {page === 'arena' && rooms ? session?.authenticated ? <RoomsPanel /> : <section className="panel auth-required"><h2>{ui.roomsTitle}</h2><p>{ui.roomsAuth}</p><button onClick={login}>{ui.signIn}</button></section> : <>
         {!inCampaignHub && <div className="ux-stages">{[ui.preparation, ui.battle, ui.result].map((label, i) => <span key={label} className={(loading ? 1 : replay ? 2 : 0) === i ? 'active' : ''}>{i + 1} · {label}</span>)}</div>}
       {inCampaignHub ? (
         <>
@@ -796,6 +823,7 @@ function App() {
             {mode === 'lab' && labCustomBots.length === 0 && (
               <p className="muted">{text.lab.sourcePreset}: {text.lab.customCode.toLowerCase()} не выбран — все на пресетах.</p>
             )}
+            {!session?.authenticated && <div className="auth-required"><p>{ui.authRequired}</p><button type="button" onClick={login}>{ui.signIn}</button></div>}
             <button className="primary" disabled={loading || !canRun}>
               {loading ? text.working : text.start}
             </button>
@@ -952,8 +980,10 @@ function App() {
         </div>
       )}
         </>}
+        </>}
       </>}
       {page === 'workshop' && libraryNote && <p role="status" className="ux-notice">{libraryNote}</p>}
+      </Suspense>
       <footer className="platform-footer"><strong>BotArena</strong><span>{ui.footer}</span></footer>
       </div>
     </main>

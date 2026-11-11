@@ -15,13 +15,16 @@ internal static class MatchWorker
         var request = await JsonSerializer.DeserializeAsync<MatchRequest>(Console.OpenStandardInput(), Json);
         if (request is null) return 1;
         if (request.CustomMatch is null && request.BotCode is null) return 1;
-        if (request.CustomMatch is null && request.CampaignLevelId is null &&
+        if (request.CustomMatch is null && request.PveLevelId is null && request.OpponentCode is null &&
+            request.CampaignLevelId is null &&
             MatchSetup.GetOpponents(request) is null && request.OpponentId is null) return 1;
 
         MatchWorkerResult result;
         try
         {
-            result = request.CustomMatch is not null ? RunCustom(request, request.CustomMatch)
+            result = request.PveLevelId is not null || request.OpponentCode is not null || request.CustomArena is not null
+                ? RunTrustedDuel(request)
+                : request.CustomMatch is not null ? RunCustom(request, request.CustomMatch)
                 : request.CampaignLevelId is { } levelId ? RunCampaign(request, levelId)
                 : MatchSetup.GetOpponents(request) is { } opponents ? RunFfa(request, opponents)
                 : RunLab(request);
@@ -32,6 +35,23 @@ internal static class MatchWorker
         }
         await JsonSerializer.SerializeAsync(Console.OpenStandardOutput(), result, Json);
         return 0;
+    }
+
+    private static MatchWorkerResult RunTrustedDuel(MatchRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.BotCode) || string.IsNullOrWhiteSpace(request.OpponentCode))
+            throw new StrategyException("Для доверенного боя нужен код обоих участников.");
+        using var player = StrategyLanguages.Create(request.Language, request.BotCode);
+        using var opponent = StrategyLanguages.Create(request.OpponentLanguage, request.OpponentCode);
+        var config = request.PveLevelId is { } levelId ? PveCatalog.Get(levelId).Config
+            : request.CustomArena is { } arena ? new MatchConfig(20, 240, arena,
+                Array.AsReadOnly(new BotSpawn[]
+                {
+                    new("player", new(2, 5), 0, 0, "player"),
+                    new("opponent", new(14, 5), Math.PI, Math.PI, "opponent")
+                }))
+            : MatchConfig.Classic;
+        return new(Match.Run(config, player, opponent), null);
     }
 
     private static MatchWorkerResult RunFfa(MatchRequest request, IReadOnlyList<OpponentSlot> opponents)
@@ -200,7 +220,7 @@ internal static class MatchWorker
         start.Environment["DOTNET_GCHeapHardLimit"] = "0x8000000";
         start.Environment["DOTNET_gcServer"] = "0";
 
-        var needsPython = request.Language == StrategyLanguages.Python &&
+        var needsPython = request.OpponentLanguage == StrategyLanguages.Python || request.Language == StrategyLanguages.Python &&
             (request.CustomMatch?.Loadouts.Any(item =>
                 string.Equals(item.Source, "code", StringComparison.OrdinalIgnoreCase) &&
                 request.CustomMatch.Spawns.Any(spawn =>

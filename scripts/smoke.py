@@ -1,15 +1,18 @@
 """Smoke test for the local BotArena HTTP contract. Start the server first."""
 
 import json
+import os
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-BASE = "http://127.0.0.1:5050"
+BASE = os.environ.get("BOTARENA_URL", "http://127.0.0.1:5050")
 
 
 def request(path, payload=None, **headers):
     data = None if payload is None else json.dumps(payload).encode()
+    if os.environ.get("BOTARENA_COOKIE"):
+        headers.setdefault("Cookie", os.environ["BOTARENA_COOKIE"])
     req = Request(BASE + path, data=data, headers={"Content-Type": "application/json", **headers})
     try:
         response = urlopen(req, timeout=10)
@@ -59,6 +62,10 @@ def main():
     assert [level["id"] for level in campaign[2]["levels"]] == [
         "mode-duel", "mode-team-3v3", "mode-ffa", "mode-outnumbered"
     ]
+    if not request("/api/auth/session")[1].get("authenticated"):
+        assert run("function tick() { return {}; }")[0] == 401
+        print("Public HTTP smoke passed; authenticated match scenarios skipped (set BOTARENA_COOKIE).")
+        return
     status, move = request("/api/matches", {
         "botCode": "function tick() { return { driveTo: { x: 10, y: 5 } }; }",
         "campaignLevelId": "move",

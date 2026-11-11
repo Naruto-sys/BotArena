@@ -1,5 +1,6 @@
 **/bin/
 **/obj/
+**/.dotnet/
 frontend/node_modules/
 server/wwwroot/
 .DS_Store
@@ -7,3 +8,6 @@ server/wwwroot/
 .botarena/
 frontend/test-results/
 frontend/playwright-report/
+
+# Local configuration may contain PostgreSQL and OAuth secrets.
+server/appsettings.Local.json

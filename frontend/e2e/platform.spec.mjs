@@ -1,7 +1,9 @@
 import { test } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { wallOverlapsBot } from '../src/mapGeometry.ts';
-test('unified UX: campaign, strategy library, replay tools and mobile', async ({ page }) => {
+test('unified UX: campaign, strategy library, replay tools and mobile', async ({ page, request }) => {
+const session = await request.get('/api/auth/session').then(r => r.json());
+test.skip(!session.authenticated, 'Requires an authenticated storage state (BOTARENA_STORAGE_STATE)');
 await page.setViewportSize({width:1440,height:1000});
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
 const nav = name => page.getByRole('navigation').getByRole('button',{name,exact:true});
@@ -56,13 +58,13 @@ await page.getByText('Звук',{exact:true}).click();
 await page.locator('summary').filter({hasText:/^Экспорт видео$/}).click();
 console.log('Workshop save/reopen + omni + analysis/audio/video passed');
 await nav('Арена').click();await page.getByRole('button',{name:'Комнаты · PvP',exact:true}).click();
-await page.getByText('В разработке',{exact:true}).waitFor();
+await page.getByRole('heading',{name:'Игровые комнаты',exact:true}).waitFor();
 await nav('Мастерская').click();
 await page.getByRole('button',{name:'Открыть на арене',exact:true}).click();
 await page.locator('.cm-content').waitFor();
 assert.equal(await page.getByRole('button',{name:'PvE · Тренировка',exact:true}).getAttribute('aria-pressed'),'true');
-await nav('Сообщество').click();await page.getByRole('button',{name:'Игроки',exact:true}).click();
-await page.getByText('В разработке',{exact:true}).waitFor();
+await nav('Сообщество').click();await page.getByRole('button',{name:'Друзья',exact:true}).click();
+await page.locator('.friends-panel').waitFor();
 await nav('Главная').click();
 await page.setViewportSize({width:390,height:844});
 assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Mobile overflow');
@@ -73,6 +75,8 @@ console.log('Placeholders, mobile, no browser exceptions passed');
 });
 
 test('custom matches execute each selected movement model and reject unknown models', async ({ request }) => {
+  const session = await request.get('/api/auth/session').then(r => r.json());
+  test.skip(!session.authenticated, 'Requires an authenticated storage state (BOTARENA_STORAGE_STATE)');
   const commands = {
     tracked: '{ leftTrack: 1, rightTrack: 1 }',
     hover: '{ thrust: { x: 0, y: 1 } }',
@@ -108,6 +112,8 @@ test('custom matches execute each selected movement model and reject unknown mod
 });
 
 test('Python strategies can be saved and reopened; unavailable features stay placeholders', async ({ page, request }) => {
+  const session = await request.get('/api/auth/session').then(r => r.json());
+  test.skip(!session.authenticated, 'Requires an authenticated storage state (BOTARENA_STORAGE_STATE)');
   const languages = await request.get('/api/strategy-languages').then(r => r.json());
   test.skip(!languages.includes('python'), 'Python WASI is not configured');
   await page.goto('/');
@@ -237,4 +243,68 @@ test('changing team size cannot respawn robots inside a wall', async ({page}) =>
   await page.getByRole('button',{name:'Без стен',exact:true}).click();
   await page.getByLabel('Ваши танки',{exact:true}).fill('2');
   assert.equal(await page.getByLabel('Ваши танки',{exact:true}).inputValue(),'2');
+});
+
+
+test('merged shell exposes online features and preserves anonymous authorization boundaries', async ({ page, request }) => {
+  const session = await request.get('/api/auth/session').then(r => r.json());
+  test.skip(session.authenticated, 'This scenario checks an anonymous session');
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('/');
+  const nav=name=>page.getByRole('navigation',{name:'Основная навигация'}).getByRole('button',{name,exact:true});
+  assert.equal(await page.locator('.platform-header').count(),1);
+  assert.equal(await page.locator('.app-header').count(),0);
+  await nav('Арена').click();
+  await page.getByText('Войдите через Яндекс, чтобы запустить бой. Подготовка кода и карты доступна без входа.').waitFor();
+  assert.equal(await page.getByRole('button',{name:'Запустить матч',exact:true}).isDisabled(),true);
+  assert.equal((await request.post('/api/matches',{data:{botCode:'function tick(){return {};}',opponentId:'aggressive'}})).status(),401);
+  await page.getByRole('button',{name:'Комнаты · PvP',exact:true}).click();
+  await page.getByRole('heading',{name:'Игровые комнаты',exact:true}).waitFor();
+  await nav('Обучение').click();
+  await page.getByRole('button',{name:'PvE · Прогресс и рейтинг',exact:true}).click();
+  await page.locator('.learning-auth').waitFor();
+  await page.reload();
+  await page.locator('.learning-auth').waitFor();
+  await nav('Главная').click();
+  await page.getByRole('button',{name:'Продолжить обучение →',exact:true}).click();
+  await page.locator('.cm-content').waitFor();
+  assert.equal(await page.locator('.learning-auth').count(),0);
+  await nav('Мастерская').click();
+  await page.getByRole('button',{name:'Публикации и каталог',exact:true}).click();
+  await page.getByRole('heading',{name:'Стратегии сообщества',exact:true}).waitFor();
+  await page.reload();
+  await page.getByRole('heading',{name:'Стратегии сообщества',exact:true}).waitFor();
+  assert(page.url().endsWith('#workshop/online'));
+  await page.goto('/#ugc');
+  await page.getByRole('heading',{name:'Стратегии сообщества',exact:true}).waitFor();
+  await page.goto('/?share=missing#arena');
+  await page.locator('.cm-content').waitFor();
+  await nav('Мастерская').click();
+  assert(!new URL(page.url()).searchParams.has('share'));
+  await page.reload();
+  await page.getByRole('button',{name:'Публикации и каталог',exact:true}).waitFor();
+  await page.setViewportSize({width:390,height:844});
+  await nav('Главная').click();
+  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Mobile header overflow');
+  assert.deepEqual(errors,[]);
+});
+
+test('light theme keeps unified home and arena text readable', async ({page}) => {
+  await page.addInitScript(()=>localStorage.setItem('botarena-theme','light'));
+  await page.goto('/');
+  await page.locator('html[data-theme="light"]').waitFor();
+  async function contrast(textSelector, backgroundSelector) {
+    return page.evaluate(({textSelector,backgroundSelector})=>{
+      const rgb=value=>value.match(/[\d.]+/g).slice(0,3).map(Number).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;});
+      const luminance=color=>{const [r,g,b]=rgb(color);return .2126*r+.7152*g+.0722*b;};
+      const foreground=luminance(getComputedStyle(document.querySelector(textSelector)).color);
+      const background=luminance(getComputedStyle(document.querySelector(backgroundSelector)).backgroundColor);
+      return (Math.max(foreground,background)+.05)/(Math.min(foreground,background)+.05);
+    },{textSelector,backgroundSelector});
+  }
+  assert(await contrast('.ux-hero h1','.ux-hero')>=4.5);
+  assert(await contrast('.ux-path p','.ux-path')>=4.5);
+  assert(await contrast('.platform-brand span','.platform-header')>=4.5);
+  await page.getByRole('navigation',{name:'Основная навигация'}).getByRole('button',{name:'Арена',exact:true}).click();
+  assert(await contrast('.editor h1','.editor')>=4.5);
 });

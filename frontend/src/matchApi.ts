@@ -50,6 +50,7 @@ export async function runMatch(
     signal,
   });
   if (!response.ok) {
+    if (response.status === 401) throw new Error('Войдите через Yandex ID, чтобы запустить матч.');
     const problem = await response.json().catch(() => null);
     throw new Error(response.status === 429 ? text.queueFull : problem?.error ?? text.serverError(response.status));
   }

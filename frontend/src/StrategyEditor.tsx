@@ -12,14 +12,14 @@ export default function StrategyEditor({ initialCode, language, onChange }: {
   language: StrategyLanguage;
   onChange: (code: string) => void;
 }) {
-  const initial = useRef(initialCode);
   const changed = useRef(onChange);
   changed.current = onChange;
   const parent = useRef<HTMLDivElement>(null);
+  const editor = useRef<EditorView | null>(null);
 
   useEffect(() => {
-    const editor = new EditorView({
-      doc: initial.current,
+    editor.current = new EditorView({
+      doc: initialCode,
       parent: parent.current!,
       extensions: [
         minimalSetup,
@@ -32,8 +32,14 @@ export default function StrategyEditor({ initialCode, language, onChange }: {
         }),
       ],
     });
-    return () => editor.destroy();
+    return () => { editor.current?.destroy(); editor.current = null; };
   }, [language]);
+
+  useEffect(() => {
+    const view = editor.current;
+    if (!view || view.state.doc.toString() === initialCode) return;
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: initialCode } });
+  }, [initialCode]);
 
   return <div className="code-editor" ref={parent} />;
 }
