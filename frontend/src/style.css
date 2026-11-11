@@ -736,10 +736,11 @@ main { padding: 0 1.2rem 1.2rem; }
 .lab-bot-card {
   display: grid; gap: .4rem; padding: .55rem; border: 1px solid #293f57; border-radius: .45rem; background: #0e1824;
 }
-.lab-walls-toolbar { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
+.lab-walls { display: grid; gap: .7rem; }
+.lab-walls-toolbar { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-bottom: .15rem; }
 .lab-wall-row {
   display: grid; grid-template-columns: auto repeat(4, minmax(3.5rem, 1fr)) auto; gap: .35rem; align-items: end;
-  padding: .4rem; border: 1px solid #293f57; border-radius: .35rem;
+  padding: .55rem; border: 1px solid #293f57; border-radius: .5rem;
 }
 .lab-wall-row.selected { border-color: #3dc9f1; }
 .lab-wall-select { background: #152536; color: #7be0ff; border: 1px solid #39526f; border-radius: .3rem; }

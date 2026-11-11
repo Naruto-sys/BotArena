@@ -181,3 +181,100 @@ dialog.ux-modal::backdrop { background: #020a13bb; backdrop-filter: blur(8px); }
 [data-theme="light"] .guest-banner,[data-theme="light"] .guest-progress-note { background:#fff8df; color:#655a35; border-color:#d3bd78; }
 [data-theme="light"] .tour-dialog { background:#fff; color:#203746; border-color:#b7cbd5; }[data-theme="light"] .tour-dialog p,[data-theme="light"] .tour-dialog li { color:#526b78; }
 @media(max-width:700px){.tour-dialog{left:10px;right:10px;bottom:10px;width:auto;max-height:42dvh}.tour-highlight-pulse{z-index:299!important}}
+
+/* Light theme polish. Keep legacy UGC and lab styles from leaking dark surfaces. */
+[data-theme="light"] .platform-content { color:#172634; }
+[data-theme="light"] .ugc-hub .ugc-tabs {
+  background:#f4f7faf2;
+  border-color:#c7d5df;
+  box-shadow:0 10px 24px #4962730b;
+}
+[data-theme="light"] .ugc-hub .ugc-tabs button {
+  color:#526b7b;
+  background:transparent;
+  border-color:transparent;
+  box-shadow:none;
+}
+[data-theme="light"] .ugc-hub .ugc-tabs button:hover:not(:disabled) {
+  color:#086c60;
+  background:#e5f4ef;
+}
+[data-theme="light"] .ugc-hub .ugc-tabs button.active {
+  color:#086c60;
+  background:#d5f3e9;
+  border-color:#4da88f;
+}
+[data-theme="light"] .ugc-card,
+[data-theme="light"] .maneuver-card,
+[data-theme="light"] .room-card,
+[data-theme="light"] .friend-row,
+[data-theme="light"] .map-card {
+  background:#fff;
+  color:#172634;
+  border-color:#c7d5df;
+}
+[data-theme="light"] .ugc-card > p,
+[data-theme="light"] .maneuver-card p,
+[data-theme="light"] .ugc-empty,
+[data-theme="light"] .friend-row small { color:#526b7b; }
+[data-theme="light"] .ugc-tags span { color:#315b65; background:#e7f2f2; }
+[data-theme="light"] .ugc-language,
+[data-theme="light"] .ugc-visibility { background:#f5f9fb; border-color:#afc3cf; }
+[data-theme="light"] .ugc-empty { background:#f8fbfc; border-color:#b9cdd9; }
+[data-theme="light"] .ux-tag { color:#805015; background:#fff4df; border-color:#d5ae72; }
+[data-theme="light"] .chapter-route .ux-tag { color:#086c60; background:#dff5ed; border-color:#85bcad; }
+[data-theme="light"] .lesson-stop:not(:last-child)::after { background:#aac2cc; }
+[data-theme="light"] .lesson-stop.locked { opacity:.7; }
+
+[data-theme="light"] .platform-content .lab-roster,
+[data-theme="light"] .platform-content .lab-walls,
+[data-theme="light"] .platform-content .replay-toolbox { border-color:#c7d5df; }
+[data-theme="light"] .lab-bot-card,
+[data-theme="light"] .lab-wall-row {
+  color:#172634;
+  background:#f8fbfc;
+  border-color:#c7d5df;
+  box-shadow:0 4px 14px #4660700b;
+}
+[data-theme="light"] .lab-wall-row.selected {
+  background:#edf9fc;
+  border-color:#159bc2;
+  box-shadow:0 0 0 2px #55c9e72b;
+}
+[data-theme="light"] .lab-wall-select {
+  color:#086c60;
+  background:#e2f5ef;
+  border-color:#85bcad;
+}
+[data-theme="light"] .preview-caption {
+  color:#38586a;
+  background:#f8fbfce8;
+  border-color:#9cb6c4;
+}
+[data-theme="light"] .lab-arena {
+  background:#edf4f7;
+  border-color:#b5c8d3;
+}
+[data-theme="light"] #lab-grid path { stroke:#bfd0d9; }
+[data-theme="light"] .lab-arena .arena-coordinates line { stroke:#7895a5; }
+[data-theme="light"] .lab-arena .arena-coordinates text { fill:#526f80; }
+[data-theme="light"] .lab-arena .lab-wall {
+  fill:#c1d3df;
+  stroke:#68899f;
+}
+[data-theme="light"] .lab-arena .lab-wall-group:has(.lab-wall-handle) .lab-wall {
+  fill:#8fb8cf;
+  stroke:#148db5;
+}
+[data-theme="light"] .outcome:not(.preview-caption) {
+  color:#38586a;
+  background:#fffffff0;
+  border-color:#9cb6c4;
+}
+[data-theme="light"] .ux-placeholder {
+  color:#526b7b;
+  background:#f8fbfc;
+  border-color:#b9cdd9;
+}
+[data-theme="light"] dialog.ux-modal { color:#172634; background:#fff; border-color:#b9cdd9; }
+[data-theme="light"] .tour-backdrop { background:linear-gradient(110deg,transparent 35%,#55707c18); }
