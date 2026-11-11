@@ -9,6 +9,7 @@ body { background: radial-gradient(ellipse at 40% -25%, #153c50 0, transparent 5
 .platform-header nav button { border: 0; background: transparent; color: #99b3c5; border-radius: 9px; padding: 10px 13px; }
 .platform-header nav button[aria-current] { background: #143d3b; color: var(--neon); }
 .platform-account { margin-left: auto; display: flex; align-items: center; gap: 15px; color: #85a7ba; }
+.platform-settings-button { display:grid; place-items:center; width:38px; height:38px; padding:0; font-size:18px; }
 .platform-content { width: 100%; max-width: 1640px; padding: 24px 32px 0; margin: 0 auto; }
 .platform-content .learning-shell { max-width:none; }
 .platform-content h1 { font-size: 32px; letter-spacing: -1px; }
