@@ -671,7 +671,6 @@ function App() {
         {page === 'learn' && training ? <PveMap session={session} /> : <>
         {page === 'arena' && <div className="ux-tabs"><button aria-pressed={!rooms} onClick={() => { setRooms(false); history.replaceState(null, '', '#arena'); }}>{ui.pve}</button><button aria-pressed={rooms} onClick={() => { setRooms(true); history.replaceState(null, '', '#arena/rooms'); }}>{ui.rooms}</button></div>}
         {page === 'arena' && rooms ? session?.authenticated ? <RoomsPanel /> : <section className="panel auth-required"><h2>{ui.roomsTitle}</h2><p>{ui.roomsAuth}</p><button className="account-login" onClick={() => window.dispatchEvent(new CustomEvent('botarena-open-auth'))}>Войти / Регистрация</button></section> : <>
-        {!inCampaignHub && <div className="ux-stages">{[ui.preparation, ui.battle, ui.result].map((label, i) => <span key={label} className={(loading ? 1 : replay ? 2 : 0) === i ? 'active' : ''}>{i + 1} · {label}</span>)}</div>}
       {inCampaignHub ? (
         <>
           {error && <p role="alert" className="error-card">{error}</p>}
