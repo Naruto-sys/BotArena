@@ -3,6 +3,7 @@ body { background: radial-gradient(ellipse at 40% -25%, #153c50 0, transparent 5
 .platform-app { padding: 0; }
 .platform-header { position: sticky; top: 0; z-index: 40; min-height: 76px; margin: 0; padding: 14px 28px; align-items: center; background: #091521f5; border-bottom: 1px solid #294454; backdrop-filter: blur(18px); }
 .platform-brand { display: flex; align-items: center; gap: 12px; background: transparent; border: 0; color: var(--neon); font-size: 28px; padding: 0; }
+.platform-brand>img { width:36px; height:36px; flex:0 0 auto; border-radius:9px; object-fit:cover; }
 .platform-brand span { text-align: left; color: #ecf8ff !important; font-size: 19px !important; }
 .platform-brand small { display: block; font-size: 8px; color: #7095a8; letter-spacing: 2px; }
 .platform-header nav { display: flex; gap: 3px; flex-wrap: wrap; }

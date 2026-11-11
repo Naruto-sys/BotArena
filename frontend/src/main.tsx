@@ -610,7 +610,7 @@ function App() {
   return (
     <main className={`platform-app${expanded ? ' editor-expanded' : ''}`}>
       <header className="platform-header">
-        <button className="platform-brand" onClick={() => navigate('home')}>◈ <span>{text.brand}<small>CODE · SIMULATE · EVOLVE</small></span></button>
+        <button className="platform-brand" onClick={() => navigate('home')}><img src="/botarena-forge-icon.png" alt="" /><span>{text.brand}<small>CODE · SIMULATE · EVOLVE</small></span></button>
         <nav aria-label="Основная навигация">{Object.entries(ui.nav).map(([id, label]) =>
           <button key={id} type="button" aria-current={page === id ? 'page' : undefined}
             disabled={loading} onClick={() => navigate(id as Page)}>{label}</button>)}</nav>
