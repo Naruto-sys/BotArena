@@ -30,7 +30,7 @@ public sealed class PythonBot : IBotRuntime
         var parentScratch = Environment.GetEnvironmentVariable(ScratchVariable);
         scratch = parentScratch is null
             ? Directory.CreateTempSubdirectory("botarena-python-")
-            : Directory.CreateDirectory(Path.Combine(parentScratch, "guest"));
+            : Directory.CreateDirectory(Path.Combine(parentScratch, "guest-" + Guid.NewGuid().ToString("N")));
         try
         {
             var lib = scratch.CreateSubdirectory("lib");

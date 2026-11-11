@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { Arena, Bot, Frame, Point, Replay } from './contracts';
 import { text } from './text';
 
@@ -76,12 +76,25 @@ function ArenaView({ arena, frame, next, fraction, finished, winner }: {
   );
 }
 
-export function ReplayPlayer({ replay }: { replay: Replay }) {
+export function ReplayPlayer({ replay, onComplete }: { replay: Replay; onComplete?: () => void }) {
   const [position, setPosition] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [speed, setSpeed] = useState(1);
   const last = replay.frames.length - 1;
   const finished = position >= last;
+  const completionReported = useRef(false);
+
+  useEffect(() => {
+    completionReported.current = false;
+    setPosition(0);
+    setPlaying(true);
+  }, [replay]);
+
+  useEffect(() => {
+    if (!finished || completionReported.current) return;
+    completionReported.current = true;
+    onComplete?.();
+  }, [finished, onComplete]);
 
   useEffect(() => {
     if (!playing || finished) return;

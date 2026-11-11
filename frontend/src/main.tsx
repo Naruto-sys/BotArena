@@ -1,14 +1,28 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import type { FormEvent } from 'react';
+import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import type { ErrorInfo, FormEvent, ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import type { MatchJobStatus, Opponent, Replay, ScriptError, StrategyLanguage } from './contracts';
+import type { AuthSession, MatchJobStatus, Opponent, Replay, ScriptError, StrategyLanguage, UgcStrategyCard } from './contracts';
 import { ReplayPlayer } from './ReplayPlayer';
 import { MatchDiagnosticError, runMatch } from './matchApi';
 import { StrategyHelp } from './StrategyHelp';
+import { AuthPanel } from './AuthPanel';
+import { UgcHub } from './UgcHub';
+import { PveMap } from './PveMap';
+import { login, ugcApi } from './ugcApi';
 import { text } from './text';
 import './style.css';
 
 const StrategyEditor = lazy(() => import('./StrategyEditor'));
+
+class AppGuard extends Component<{ children: ReactNode }, { error?: Error }> {
+  state: { error?: Error } = {};
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error, info: ErrorInfo) { console.error('BotArena UI crashed', error, info); }
+  render() {
+    if (!this.state.error) return this.props.children;
+    return <main className="fatal-screen"><section className="panel"><h1>Интерфейс не смог продолжить работу</h1><p>{this.state.error.message}</p><button className="primary" onClick={() => location.reload()}>Перезагрузить BotArena</button></section></main>;
+  }
+}
 
 const example = `function tick({ self, enemy }) {
   const { x, y } = self.position;
@@ -51,7 +65,15 @@ const examples = {
 `,
 };
 
+type Workspace = 'learn' | 'match' | 'ugc';
+
 function App() {
+  const [workspace, setWorkspace] = useState<Workspace>(() =>
+    location.hash === '#ugc' || new URLSearchParams(location.search).has('share') ? 'ugc'
+      : location.hash === '#arena' ? 'match' : 'learn');
+  const [session, setSession] = useState<AuthSession>();
+  const [savedStrategies, setSavedStrategies] = useState<UgcStrategyCard[]>([]);
+  const [savedStrategyId, setSavedStrategyId] = useState('');
   const [languages, setLanguages] = useState<StrategyLanguage[]>(['javascript']);
   const [language, setLanguage] = useState<StrategyLanguage>('javascript');
   const [drafts, setDrafts] = useState(examples);
@@ -67,6 +89,21 @@ function App() {
   const [error, setError] = useState('');
   const [scriptError, setScriptError] = useState<ScriptError>();
   const [replay, setReplay] = useState<Replay>();
+
+  useEffect(() => {
+    const reload = () => { void ugcApi.session().then(setSession).catch(() => setSession({ authenticated: false })); };
+    reload();
+    window.addEventListener('botarena-balance-changed', reload);
+    return () => window.removeEventListener('botarena-balance-changed', reload);
+  }, []);
+
+  useEffect(() => {
+    if (!session?.authenticated) { setSavedStrategies([]); setSavedStrategyId(''); return; }
+    const reload = () => { void ugcApi.mine().then(items => setSavedStrategies(items.filter(item => item.isActive))).catch(() => setSavedStrategies([])); };
+    reload();
+    window.addEventListener('botarena-strategies-changed', reload);
+    return () => window.removeEventListener('botarena-strategies-changed', reload);
+  }, [session]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -94,6 +131,7 @@ function App() {
 
   async function run(event: FormEvent) {
     event.preventDefault();
+    if (!session?.authenticated) { login(); return; }
     if (activeRun.current) return;
     const controller = new AbortController();
     activeRun.current = controller;
@@ -120,6 +158,19 @@ function App() {
     }
   }
 
+  async function chooseSavedStrategy(id: string) {
+    setSavedStrategyId(id);
+    if (!id) return;
+    try {
+      const strategy = await ugcApi.strategy(id);
+      setLanguage(strategy.language);
+      setDrafts(previous => ({ ...previous, [strategy.language]: strategy.code }));
+      setError('');
+    } catch (problem) {
+      setError(problem instanceof Error ? problem.message : 'Не удалось загрузить стратегию.');
+    }
+  }
+
   function opponentText(opponent: Opponent) {
     return Object.hasOwn(text.opponents, opponent.id)
       ? text.opponents[opponent.id as keyof typeof text.opponents] : opponent;
@@ -129,10 +180,25 @@ function App() {
 
   return (
     <main>
-      <header><span>{text.brand}</span><span className="muted">{text.mode}</span></header>
-      <div className="layout">
+      <header className="app-header">
+        <button className="brand-button" onClick={() => { setWorkspace('learn'); history.replaceState(null, '', '#learn'); }}><span className="brand-mark">B</span><span><b>{text.brand}</b><small>CODE · FIGHT · EVOLVE</small></span></button>
+        <nav aria-label="Разделы">
+          <button className={workspace === 'learn' ? 'active' : ''} onClick={() => { setWorkspace('learn'); history.replaceState(null, '', '#learn'); }}><span>◫</span> Обучение</button>
+          <button className={workspace === 'match' ? 'active' : ''} onClick={() => { setWorkspace('match'); history.replaceState(null, '', '#arena'); }}><span>⌁</span> Арена</button>
+          <button className={workspace === 'ugc' ? 'active' : ''} onClick={() => { setWorkspace('ugc'); history.replaceState(null, '', '#ugc'); }}><span>♧</span> Сообщество</button>
+        </nav>
+        <AuthPanel session={session} onChange={setSession} />
+      </header>
+      {workspace === 'learn' ? <PveMap session={session} /> : workspace === 'ugc' ? <UgcHub /> : <><section className="arena-heading"><div><p className="eyebrow">ПЕСОЧНИЦА</p><h1>Испытай стратегию на арене</h1><p>Выбери сохранённый алгоритм или напиши новый — справа сразу появится повтор боя.</p></div><span className="arena-status">● СИМУЛЯТОР ГОТОВ</span></section><div className="layout">
         <form className="panel editor" onSubmit={run}>
           <h1>{text.strategy}</h1>
+          {!session?.authenticated && <div className="auth-required"><b>Для боя нужна авторизация</b><p>Войдите через Yandex ID, чтобы запускать матчи и использовать сохранённые стратегии.</p><button type="button" className="yandex-login" onClick={login}><b>Я</b> Войти через Яндекс</button></div>}
+          {session?.authenticated && <label className="saved-strategy-picker">Сохранённая стратегия
+            <select value={savedStrategyId} disabled={loading} onChange={event => void chooseSavedStrategy(event.target.value)}>
+              <option value="">Код из редактора</option>
+              {savedStrategies.map(strategy => <option key={strategy.id} value={strategy.id}>{strategy.name} · {strategy.language === 'python' ? 'Python' : 'JavaScript'}</option>)}
+            </select>
+          </label>}
           <div className="strategy-language">
             <span className="muted" id="strategy-label">{text.strategyLanguage(language)}</span>
             <select aria-label={text.languageLabel} value={language} disabled={loading}
@@ -165,8 +231,8 @@ function App() {
             {opponents.map(item => <option key={item.id} value={item.id}>{opponentText(item).name}</option>)}
           </select>
           {opponent && <p className="muted">{opponentText(opponent).description}</p>}
-          <button className="primary" disabled={loading || !opponentId || !code.trim() || code.length > 16384}>
-            {loading ? text.working : text.start}
+          <button className="primary" disabled={loading || !!session?.authenticated && (!opponentId || !code.trim() || code.length > 16384)}>
+            {!session?.authenticated ? 'Войти для запуска матча' : loading ? text.working : text.start}
           </button>
           {code.length > 16384 && <p role="alert" className="error">{text.strategyTooLong}</p>}
           {jobStatus?.state === 'queued' && <p role="status">{text.queuePosition(jobStatus.position)}</p>}
@@ -177,11 +243,11 @@ function App() {
           {replay ? <ReplayPlayer replay={replay} /> :
             <div className="empty">{text.emptyArena}</div>}
         </section>
-      </div>
+      </div></>}
     </main>
   );
 }
 
 document.title = text.title;
 document.documentElement.lang = text.language;
-createRoot(document.getElementById('root')!).render(<App />);
+createRoot(document.getElementById('root')!).render(<AppGuard><App /></AppGuard>);

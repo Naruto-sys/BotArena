@@ -14,6 +14,30 @@ dotnet run --project server
 
 Откройте [http://127.0.0.1:5050](http://127.0.0.1:5050). Для разработки фронтенда запустите `npm --prefix frontend run dev` в отдельном терминале с работающим сервером и откройте [http://127.0.0.1:5173](http://127.0.0.1:5173).
 
+## PostgreSQL и Yandex ID
+
+Раздел «Сообщество» хранит пользователей, стратегии, версии и библиотеку манёвров в PostgreSQL. Для локального запуска поднимите базу и укажите настройки авторизации:
+
+```sh
+docker compose -f server/compose.postgres.yml up -d
+```
+
+Создайте `server/appsettings.Local.json` по примеру `server/appsettings.Local.example.json`. Этот файл исключён из Git. В приложении Yandex OAuth запросите права `login:info` и `login:avatar`, а Callback URL задайте **точно** как `http://localhost:5050/auth/callback` для локальной разработки. Протокол, домен, порт и путь должны совпадать посимвольно. В production используйте HTTPS и соответствующий публичный адрес.
+
+Те же настройки можно передать переменными среды:
+
+```text
+ConnectionStrings__BotArena=Host=localhost;Port=5432;Database=botarena;Username=botarena;Password=...
+Database__MigrateOnStartup=true
+Authentication__Yandex__ClientId=...
+Authentication__Yandex__ClientSecret=...
+Authentication__Yandex__CallbackPath=/auth/callback
+```
+
+При запуске сервер применяет миграции EF Core. После первого входа через Yandex ID пользователь обязан выбрать уникальный ник. Имя, фамилия и фотография профиля обновляются из Yandex ID при последующих входах.
+
+Новый пользователь получает 1000 виртуальных кредитов. Кредиты можно получить за победы в дружеских боях на ставку и продажу опубликованных стратегий. Все списания и начисления записываются в журнал операций PostgreSQL; при ничьей или техническом сбое боя ставки возвращаются обоим игрокам.
+
 ## Python в редакторе
 
 По умолчанию доступен JavaScript. Чтобы включить Python на macOS или Linux (ARM64 или x86-64), установите среду из корня репозитория. Для установщика нужен Python 3.11+.

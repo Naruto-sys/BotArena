@@ -16,15 +16,47 @@ internal static class MatchWorker
         if (request?.BotCode is null || request.OpponentId is null) return 1;
 
         MatchWorkerResult result;
+        IBotRuntime? bot = null;
+        IBotRuntime? opponent = null;
         try
         {
-            using var bot = StrategyLanguages.Create(request.Language, request.BotCode);
-            using var opponent = StrategyLanguages.Create(StrategyLanguages.JavaScript, OpponentCatalog.GetCode(request.OpponentId));
-            result = new(Match.Run(MatchConfig.Classic, bot, opponent), null);
+            try { bot = StrategyLanguages.Create(request.Language, request.BotCode); }
+            catch (StrategyException error)
+            {
+                result = new(null, error.Message, new("player", error.Tick, error.Message, error.Line, error.Column));
+                await JsonSerializer.SerializeAsync(Console.OpenStandardOutput(), result, Json);
+                return 0;
+            }
+            try
+            {
+                opponent = request.OpponentCode is null
+                    ? StrategyLanguages.Create(StrategyLanguages.JavaScript, OpponentCatalog.GetCode(request.OpponentId))
+                    : StrategyLanguages.Create(request.OpponentLanguage, request.OpponentCode);
+            }
+            catch (StrategyException error)
+            {
+                result = new(null, error.Message, new("opponent", error.Tick, error.Message, error.Line, error.Column));
+                await JsonSerializer.SerializeAsync(Console.OpenStandardOutput(), result, Json);
+                return 0;
+            }
+            var config = request.PveLevelId is { } levelId ? PveCatalog.Get(levelId).Config
+                : request.CustomArena is { } arena ? new MatchConfig(20, 240, arena,
+                    Array.AsReadOnly(new BotSpawn[]
+                    {
+                        new("player", new(2, 5), 0, 0),
+                        new("opponent", new(14, 5), Math.PI, Math.PI)
+                    }))
+                : MatchConfig.Classic;
+            result = new(Match.Run(config, bot, opponent), null);
         }
         catch (StrategyException error)
         {
             result = new(null, error.Message, new("player", error.Tick, error.Message, error.Line, error.Column));
+        }
+        finally
+        {
+            opponent?.Dispose();
+            bot?.Dispose();
         }
         await JsonSerializer.SerializeAsync(Console.OpenStandardOutput(), result, Json);
         return 0;
@@ -46,7 +78,7 @@ internal static class MatchWorker
         start.Environment["DOTNET_GCHeapHardLimit"] = "0x8000000";
         start.Environment["DOTNET_gcServer"] = "0";
 
-        var scratch = request.Language == StrategyLanguages.Python
+        var scratch = request.Language == StrategyLanguages.Python || request.OpponentLanguage == StrategyLanguages.Python
             ? Directory.CreateTempSubdirectory("botarena-match-")
             : null;
         if (scratch is not null) start.Environment[PythonBot.ScratchVariable] = scratch.FullName;
