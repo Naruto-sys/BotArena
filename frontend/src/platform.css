@@ -72,6 +72,10 @@ body { background: radial-gradient(ellipse at 40% -25%, #153c50 0, transparent 5
 @media(max-width: 760px) { .platform-content .layout { grid-template-columns: 1fr; } .platform-header nav { flex-wrap: nowrap; overflow-x: auto; } .platform-header nav button { padding: 8px; font-size: 12px; } .platform-account small { display: none; } .ux-hero { padding: 26px; } .ux-radar { display: none; } .ux-stats { gap: 20px; flex-wrap: wrap; } .ux-stats b { font-size: 20px; } .ux-stages { gap: 14px; } }
 
 .arena-workspace-toolbar { display:flex; justify-content:flex-end; gap:10px; width:100%; margin:-2px 0 12px; }
+.arena-title { display:flex; align-items:center; gap:9px; }
+.arena-info { position:relative; display:grid; place-items:center; width:22px; height:22px; border:1px solid #66869a; border-radius:50%; color:#8fb5c7; font:700 13px/1 ui-serif,serif; cursor:help; }
+.arena-info::after { content:attr(data-tooltip); position:absolute; z-index:20; top:calc(100% + 10px); left:0; width:min(360px,70vw); padding:10px 12px; border:1px solid #3d6073; border-radius:8px; color:#d9e9f1; background:#0a1928f5; box-shadow:0 12px 30px #0007; font:12px/1.45 system-ui,sans-serif; opacity:0; visibility:hidden; transform:translateY(-4px); transition:.16s; pointer-events:none; }
+.arena-info:hover::after,.arena-info:focus-visible::after { opacity:1; visibility:visible; transform:translateY(0); }
 .arena-workspace-toolbar button { background:#10283a; border-color:#35566a; }
 .arena-modal-backdrop { position:fixed; inset:0; z-index:220; display:grid; place-items:center; padding:24px; background:#020a13c7; backdrop-filter:blur(9px); }
 .arena-modal { width:min(720px,100%); max-height:calc(100dvh - 48px); overflow:hidden; border:1px solid #36566d; border-radius:16px; color:#e9f4fb; background:#102234; box-shadow:0 28px 90px #000b; }
@@ -316,6 +320,8 @@ dialog.ux-modal::backdrop { background: #020a13bb; backdrop-filter: blur(8px); }
 [data-theme="light"] dialog.ux-modal { color:#172634; background:#fff; border-color:#b9cdd9; }
 [data-theme="light"] .tour-backdrop { background:linear-gradient(110deg,transparent 35%,#55707c18); }
 [data-theme="light"] .arena-workspace-toolbar button { color:#294758; background:#f4f8fa; border-color:#afc4cf; }
+[data-theme="light"] .arena-info { color:#466878; border-color:#89a6b4; }
+[data-theme="light"] .arena-info::after { color:#294758; background:#fffffff5; border-color:#b2c7d1; box-shadow:0 12px 30px #4962732e; }
 [data-theme="light"] .arena-modal-backdrop { background:#dce8edc9; }
 [data-theme="light"] .arena-modal { color:#172634; background:#fff; border-color:#b9cdd9; box-shadow:0 28px 90px #4a617933; }
 [data-theme="light"] .arena-modal>header { border-color:#c7d5df; }

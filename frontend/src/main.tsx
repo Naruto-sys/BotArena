@@ -872,7 +872,7 @@ function App() {
           </form>
           <section className="panel replay">
             <div className="arena-panel-heading">
-              <h2>{text.arena}</h2>
+              <div className="arena-title"><h2>{text.arena}</h2>{mode === 'lab' && <span className="arena-info" tabIndex={0} role="img" aria-label={text.lab.mapHint} data-tooltip={text.lab.mapHint}>i</span>}</div>
               {replay && <button type="button" onClick={() => { setExpanded(false); editorPanel.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>{ui.backCode}</button>}
               {mode === 'lab' && (
                 <div className="lab-arena-tabs" role="tablist" aria-label={text.arena}>

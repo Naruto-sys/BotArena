@@ -359,7 +359,6 @@ export function LabArenaEditor({
             );
           })}
         </svg>
-        <p role="status" className="outcome preview-caption">{text.lab.mapHint}</p>
       </div>
 
       <div className="lab-walls">
