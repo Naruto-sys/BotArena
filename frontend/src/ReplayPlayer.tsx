@@ -84,7 +84,7 @@ export function ReplayPlayer({ replay, botNames }: { replay: Replay; botNames?: 
   const [cameraMode, setCameraMode] = useState<CameraMode>('auto');
   const [showTrails, setShowTrails] = useState(true);
   const [showChronoXray, setShowChronoXray] = useState(true);
-  const [showTacticalTrace, setShowTacticalTrace] = useState(true);
+  const [showTacticalTrace, setShowTacticalTrace] = useState(false);
   const [traceBotId, setTraceBotId] = useState(replay.frames[0]?.bots[0]?.id ?? '');
   const heldChronoShots = useRef(new Set<string>());
   const chronoHoldUntil = useRef(0);

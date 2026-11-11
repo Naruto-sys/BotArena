@@ -33,6 +33,7 @@ export const text = {
   hoverExampleComment: 'Разгон вверх, поворот корпуса в скольжении, затем торможение.',
   strategy: 'Стратегия бота',
   languageLabel: 'Язык стратегии',
+  chooseLanguage: 'Выберите язык стратегии',
   languages,
   strategyLanguage: (language: StrategyLanguage) => `${languages[language]} · tick(state)`,
   strategyComment: 'Пока цель скрыта, объезжаем стену сверху.',
@@ -60,6 +61,10 @@ export const text = {
     watchReplay: 'Replay',
     mapHint: 'Перетащите танки и стены. У выбранной стены тяните углы, чтобы менять размер. Escape — снять выбор.',
     walls: 'Стены',
+    invalidWall: 'Стена должна находиться внутри арены, её ширина и высота — не меньше 0,4.',
+    wallOverlapsBot: (name: string) => `Нельзя поставить стену на робота «${name}». Измените положение или размер стены. Изменение не применено.`,
+    rosterOverlapsWall: (name: string) => `Нельзя изменить состав: робот «${name}» окажется внутри стены. Передвиньте стену или освободите места старта. Состав не изменён.`,
+    botOverlapsWall: 'Нельзя поставить робота внутрь стены. Выберите свободное место. Изменение не применено.',
     addWall: 'Добавить стену',
     removeWall: 'Удалить',
     deselectWall: 'Снять выбор',
@@ -256,6 +261,7 @@ export const text = {
 
 export const platformText = {
   defaultName: 'Моя стратегия',
+  footer: 'Пиши код. Создавай роботов. Проверяй стратегии в бою.',
   pythonRequired: 'Для этой стратегии нужен Python. Подключи Python WASI и перезапусти сервер.',
   levelState: { done: 'Пройден', available: 'Доступен', locked: 'Закрыт' },
   nav: { home: 'Главная', learn: 'Обучение', arena: 'Арена', workshop: 'Мастерская', community: 'Сообщество' },

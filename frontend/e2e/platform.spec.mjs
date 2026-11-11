@@ -1,5 +1,6 @@
 import { test } from '@playwright/test';
 import assert from 'node:assert/strict';
+import { wallOverlapsBot } from '../src/mapGeometry.ts';
 test('unified UX: campaign, strategy library, replay tools and mobile', async ({ page }) => {
 await page.setViewportSize({width:1440,height:1000});
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
@@ -15,6 +16,8 @@ await nav('Обучение').click();
 assert.equal(await page.locator('.lesson-stop').count(),levelCount);
 await page.locator('.lesson-stop.available button').first().click();
 await page.locator('.cm-content').waitFor();
+assert.equal(await page.getByLabel('Модель движения',{exact:true}).count(),0);
+await page.getByText('Выберите язык стратегии',{exact:true}).waitFor();
 await page.getByRole('button',{name:'Запустить матч',exact:true}).click();
 await page.locator('.blueprint-canvas').waitFor({state:'attached',timeout:30000});
 console.log('Campaign real calculation passed');
@@ -36,9 +39,14 @@ await page.getByRole('heading',{name:'UX test omni',exact:true}).waitFor();
 await page.reload();await nav('Мастерская').click();
 await page.getByRole('button',{name:'Открыть на арене',exact:true}).click();
 assert.equal(await page.getByLabel('Модель движения',{exact:true}).inputValue(),'omni');
+await page.getByRole('button',{name:'Развернуть редактор',exact:true}).click();
 await page.getByRole('button',{name:'Запустить матч',exact:true}).click();
+assert.equal(await page.locator('.replay').isVisible(),true);
+assert.equal(await page.getByRole('button',{name:'Свернуть редактор',exact:true}).count(),0);
 await page.locator('.blueprint-canvas').waitFor({state:'attached',timeout:30000});
 await page.getByText('Анализ боя',{exact:true}).click();
+assert.equal(await page.getByLabel('Тактический след',{exact:true}).isChecked(),false);
+await page.getByLabel('Тактический след',{exact:true}).check();
 await page.getByLabel('Тактический след',{exact:true}).uncheck();
 await page.getByRole('button',{name:'Башня времени',exact:true}).click();
 await page.locator('.arena-stage.timeline-mode').waitFor();
@@ -156,4 +164,77 @@ test('two tabs preserve each other’s saved strategies and synchronize removals
   await a.locator('article').filter({has: a.getByRole('heading', {name: 'Tab A', exact: true})}).getByRole('button', { name: 'Удалить', exact: true }).click();
   await b.getByRole('heading', { name: 'Tab A', exact: true }).waitFor({ state: 'detached' });
   assert.equal(await b.getByRole('heading', { name: 'Tab B', exact: true }).count(), 1);
+});
+
+
+test('map rejects wall overlap through fields, drag, resize, add and classic restore', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('navigation').getByRole('button', {name:'Арена',exact:true}).click();
+  const row = page.locator('.lab-wall-row').first();
+  await row.getByLabel('x',{exact:true}).fill('2');
+  await row.getByLabel('y',{exact:true}).fill('4.5');
+  await page.getByRole('alert').filter({hasText:'Нельзя поставить стену на робота'}).waitFor();
+  assert.equal(await row.getByLabel('y',{exact:true}).inputValue(),'1.9');
+  // SVG coordinates make the pointer checks independent of the viewport size.
+  const point = (x,y) => page.locator('.lab-arena').evaluate((svg, p) => {
+    const result = new DOMPoint(p.x,p.y).matrixTransform(svg.getScreenCTM());
+    return {x:result.x,y:result.y};
+  },{x,y});
+  async function drag(from,to) {
+    const a=await point(...from); const b=await point(...to);
+    await page.mouse.move(a.x,a.y); await page.mouse.down();
+    await page.mouse.move(b.x,b.y); await page.mouse.up();
+  }
+  await drag([2.7,2.5],[2.7,5]);
+  await page.getByRole('alert').filter({hasText:'Нельзя поставить стену на робота'}).waitFor();
+  assert.equal(await row.getByLabel('y',{exact:true}).inputValue(),'1.9');
+  // Bottom left corner expanding across the player hull must also be rejected.
+  await drag([2,3.2],[1.8,5.5]);
+  await page.getByRole('alert').filter({hasText:'Нельзя поставить стену на робота'}).waitFor();
+  assert.equal(await row.getByLabel('height',{exact:true}).inputValue(),'1.3');
+  await page.getByRole('button',{name:'Без стен',exact:true}).click();
+  await drag([2.2,5],[6.5,4.5]);
+  await page.getByRole('button',{name:'Добавить стену',exact:true}).click();
+  await page.getByRole('alert').filter({hasText:'Нельзя поставить стену на робота'}).waitFor();
+  assert.equal(await page.locator('.lab-wall').count(),0);
+  await drag([6.5,4.5],[5,2.5]);
+  await page.getByRole('button',{name:'Classic',exact:true}).click();
+  await page.getByRole('alert').filter({hasText:'Нельзя поставить стену на робота'}).waitFor();
+  assert.equal(await page.locator('.lab-wall').count(),0);
+  await drag([5,2.5],[2.2,5]);
+  await page.getByRole('button',{name:'Classic',exact:true}).click();
+  assert.equal(await page.locator('.lab-wall').count(),3);
+  // Moving the robot into a wall must preserve its previous position too.
+  await drag([2.2,5],[5,2.5]);
+  await page.getByRole('alert').filter({hasText:'Нельзя поставить робота внутрь стены'}).waitFor();
+  assert.equal(await page.locator('[data-bot="player"]').getAttribute('transform'),'translate(2.2 5)');
+});
+
+test('map geometry uses rotated hulls, not only centres or bounding boxes', () => {
+  const bot = {position:{x:0,y:0},bodyAngle:0};
+  assert(wallOverlapsBot({x:.33,y:-.1,width:.2,height:.2},bot));
+  assert(!wallOverlapsBot({x:.35,y:-.1,width:.2,height:.2},bot));
+  assert(wallOverlapsBot({x:.34,y:-.1,width:.2,height:.2},bot));
+  const rotated = {...bot,bodyAngle:Math.PI/4};
+  assert(wallOverlapsBot({x:.42,y:-.03,width:.1,height:.06},rotated));
+  assert(!wallOverlapsBot({x:.42,y:.42,width:.05,height:.05},rotated));
+});
+
+
+test('changing team size cannot respawn robots inside a wall', async ({page}) => {
+  await page.goto('/');
+  await page.getByRole('navigation').getByRole('button',{name:'Арена',exact:true}).click();
+  await page.getByRole('button',{name:'Без стен',exact:true}).click();
+  await page.getByRole('button',{name:'Добавить стену',exact:true}).click();
+  const row=page.locator('.lab-wall-row').first();
+  await row.getByLabel('y',{exact:true}).fill('1.5');
+  await row.getByLabel('x',{exact:true}).fill('1.5');
+  await page.locator('summary').filter({hasText:/^Участники и параметры боя$/}).click();
+  await page.getByLabel('Ваши танки',{exact:true}).fill('2');
+  await page.getByRole('alert').filter({hasText:'Нельзя изменить состав'}).waitFor();
+  assert.equal(await page.getByLabel('Ваши танки',{exact:true}).inputValue(),'1');
+  assert.equal(await page.locator('[data-bot="player"]').getAttribute('transform'),'translate(2.2 5)');
+  await page.getByRole('button',{name:'Без стен',exact:true}).click();
+  await page.getByLabel('Ваши танки',{exact:true}).fill('2');
+  assert.equal(await page.getByLabel('Ваши танки',{exact:true}).inputValue(),'2');
 });

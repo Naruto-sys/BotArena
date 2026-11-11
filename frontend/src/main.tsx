@@ -14,6 +14,7 @@ import type {
 import { ArenaPreview } from './ArenaPreview';
 import { botLabel, teamWon } from './botDisplay';
 import { isLevelUnlocked, loadCompletedLevels, markLevelCompleted } from './campaignProgress';
+import { wallOverlapsBot } from './mapGeometry';
 import { LabArenaEditor } from './LabArenaEditor';
 import {
   classicWalls,
@@ -203,6 +204,7 @@ function App() {
   const [language, setLanguage] = useState<StrategyLanguage>('javascript');
   const [labSetup, setLabSetup] = useState<LabSetup>(loadLabSetup);
   const [presets, setPresets] = useState<BehaviorPresetInfo[]>([]);
+  const [mapError, setMapError] = useState('');
   const [selectedWall, setSelectedWall] = useState<number | null>(null);
   const [labArenaView, setLabArenaView] = useState<'edit' | 'replay'>('edit');
   const [campaignDrafts, setCampaignDrafts] = useState<
@@ -429,21 +431,25 @@ function App() {
   }
 
   function updateRoster(allyCount: number, enemyCount: number) {
-    detachStrategy();
     const allies = Math.min(4, Math.max(1, allyCount || 1));
     const enemies = Math.min(4, Math.max(1, enemyCount || 1));
-    setLabSetup(previous => {
-      const bots = layoutBots(allies, enemies, previous.bots);
-      const custom = bots.filter(bot => bot.source === 'code');
-      return {
-        ...previous,
-        allyCount: allies,
-        enemyCount: enemies,
-        bots,
-        activeBotId: custom.some(bot => bot.id === previous.activeBotId)
-          ? previous.activeBotId
-          : (custom[0]?.id ?? bots[0].id),
-      };
+    const bots = layoutBots(allies, enemies, labSetup.bots);
+    const blocked = bots.find(bot => labSetup.arena.walls.some(wall => wallOverlapsBot(wall, bot)));
+    if (blocked) {
+      setMapError(text.lab.rosterOverlapsWall(botLabel(blocked.id, blocked.teamId, bots)));
+      return;
+    }
+    setMapError('');
+    detachStrategy();
+    const custom = bots.filter(bot => bot.source === 'code');
+    setLabSetup({
+      ...labSetup,
+      allyCount: allies,
+      enemyCount: enemies,
+      bots,
+      activeBotId: custom.some(bot => bot.id === labSetup.activeBotId)
+        ? labSetup.activeBotId
+        : (custom[0]?.id ?? bots[0].id),
     });
     setEditorEpoch(value => value + 1);
   }
@@ -452,6 +458,7 @@ function App() {
     event.preventDefault();
     if (activeRun.current) return;
     if (mode === 'campaign' && level && !isLevelUnlocked(level.order, levels, completed)) return;
+    setExpanded(false);
     const controller = new AbortController();
     activeRun.current = controller;
     setLoading(true);
@@ -631,6 +638,7 @@ function App() {
                   </label>
                   <button type="button" onClick={() => {
                     detachStrategy();
+                    setMapError('');
                     setLabSetup(defaultLabSetup());
                     setSelectedWall(null);
                     setEditorEpoch(value => value + 1);
@@ -708,9 +716,10 @@ function App() {
               </details>
             )}
 
+            {mode === 'lab' && labArenaView === 'replay' && mapError && <p role="alert" className="error-card">{mapError}</p>}
             <div className="strategy-language">
-              <span className="muted" id="strategy-label">{text.strategyLanguage(language)}</span>
-              <select aria-label={text.languageLabel} value={language} disabled={loading}
+              <label className="muted" htmlFor="strategy-language">{text.chooseLanguage}</label>
+              <select id="strategy-language" aria-label={text.languageLabel} value={language} disabled={loading}
                 onChange={event => {
                   detachStrategy();
                   setLanguage(event.target.value as StrategyLanguage);
@@ -719,14 +728,14 @@ function App() {
                 {languages.map(item => <option key={item} value={item}>{text.languages[item]}</option>)}
               </select>
             </div>
-            <div className="strategy-language">
+            {mode === 'lab' && <div className="strategy-language">
               <label htmlFor="movement">{text.movementLabel}</label>
               <select id="movement" value={movement}
-                disabled={loading || mode === 'campaign' || !labActiveBot}
+                disabled={loading || !labActiveBot}
                 onChange={event => setLabSetup(previous => ({ ...previous, bots: previous.bots.map(bot => bot.id === labActiveBot?.id ? { ...bot, movement: event.target.value as Movement } : bot) }))}>
                 {modelOptions}
               </select>
-            </div>
+            </div>}
             {mode === 'lab' && labActiveBot && <button type="button" onClick={() => {
               updateCode(({ tracked: trackedExamples, hover: hoverExamples, wheeled: wheeledExamples, omni: omniExamples })[movement][language]);
               setEditorEpoch(value => value + 1);
@@ -873,6 +882,8 @@ function App() {
                 arena={labSetup.arena}
                 bots={labSetup.bots}
                 selectedWall={selectedWall}
+                placementError={mapError}
+                onPlacementError={setMapError}
                 onSelectWall={setSelectedWall}
                 onMoveBot={(botId, x, y) => setLabSetup(previous => ({
                   ...previous,
@@ -888,12 +899,12 @@ function App() {
                       wallIndex === index ? wall : item),
                   },
                 }))}
-                onAddWall={() => {
+                onAddWall={wall => {
                   setLabSetup(previous => ({
                     ...previous,
                     arena: {
                       ...previous.arena,
-                      walls: [...previous.arena.walls, { x: 6, y: 4, width: 1.5, height: 1.5 }],
+                      walls: [...previous.arena.walls, wall],
                     },
                   }));
                   setSelectedWall(labSetup.arena.walls.length);
@@ -943,7 +954,7 @@ function App() {
         </>}
       </>}
       {page === 'workshop' && libraryNote && <p role="status" className="ux-notice">{libraryNote}</p>}
-      <footer className="platform-footer">BOTARENA · {ui.local} · JavaScript / Python · REST + Replay</footer>
+      <footer className="platform-footer"><strong>BotArena</strong><span>{ui.footer}</span></footer>
       </div>
     </main>
   );

@@ -5,6 +5,7 @@ import { python } from '@codemirror/lang-python';
 import type { StrategyLanguage } from './contracts';
 import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
+import { text } from './text';
 
 export default function StrategyEditor({ initialCode, language, onChange }: {
   initialCode: string;
@@ -25,7 +26,7 @@ export default function StrategyEditor({ initialCode, language, onChange }: {
         lineNumbers(),
         language === "python" ? python() : javascript(),
         oneDark,
-        EditorView.contentAttributes.of({ id: 'strategy', 'aria-labelledby': 'strategy-label' }),
+        EditorView.contentAttributes.of({ id: 'strategy', 'aria-label': text.strategy }),
         EditorView.updateListener.of(update => {
           if (update.docChanged) changed.current(update.state.doc.toString());
         }),
