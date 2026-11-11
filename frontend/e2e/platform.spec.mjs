@@ -255,7 +255,7 @@ test('merged shell exposes online features and preserves anonymous authorization
   assert.equal(await page.locator('.platform-header').count(),1);
   assert.equal(await page.locator('.app-header').count(),0);
   await nav('Арена').click();
-  await page.getByText('Войдите через Яндекс, чтобы запустить бой. Подготовка кода и карты доступна без входа.').waitFor();
+  await page.getByText('Для запуска боя нужен вход').waitFor();
   assert.equal(await page.getByRole('button',{name:'Запустить матч',exact:true}).isDisabled(),true);
   assert.equal((await request.post('/api/matches',{data:{botCode:'function tick(){return {};}',opponentId:'aggressive'}})).status(),401);
   await page.getByRole('button',{name:'Комнаты · PvP',exact:true}).click();

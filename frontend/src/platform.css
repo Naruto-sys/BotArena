@@ -118,3 +118,30 @@ dialog.ux-modal::backdrop { background: #020a13bb; backdrop-filter: blur(8px); }
 [data-theme="light"] .platform-content select { color: #203443; background: #fff; border-color: #aebfcb; }
 [data-theme="light"] .lesson-stop.available > button { color: #086c60; background: #d5f3e9; }
 [data-theme="light"] .ux-stages { color: #526b7b; }
+/* Sign-in is a regular platform action, with a quiet provider mark. */
+.yandex-login, .platform-content .yandex-login {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: 42px; padding: 10px 14px; border: 1px solid #35616b;
+  border-radius: 9px; background: #102c36; color: #c5f4ed;
+  font-size: 14px; font-weight: 650; line-height: 1.3; text-align: left;
+}
+.yandex-login b, .platform-content .yandex-login b {
+  display: grid; place-items: center; flex: 0 0 24px; width: 24px; height: 24px;
+  border: 1px solid #3a726e; border-radius: 7px; background: #183f43;
+  color: #7ce7d0; font-size: 15px; font-weight: 700;
+}
+.yandex-login:hover, .platform-content .yandex-login:hover { background: #173a43; border-color: #58c7b4; }
+.yandex-login:focus-visible { outline: 2px solid var(--neon); outline-offset: 3px; }
+.auth-callout { display: grid; gap: 14px; padding: 16px; border: 1px solid #2f4d60; border-radius: 11px; background: #102331; }
+.auth-callout-copy { display: grid; gap: 6px; text-align: left; }
+.auth-callout-copy strong { color: #e0eef7; font-size: 14px; line-height: 1.4; font-weight: 650; }
+.auth-callout-copy p { color: #9ab3c4; font-size: 13px; line-height: 1.5; margin: 0; }
+.auth-callout .yandex-login { justify-content: flex-start; width: 100%; }
+.login-arrow { margin-left: auto; color: #8dc8c1; }
+[data-theme="light"] .yandex-login, [data-theme="light"] .platform-content .yandex-login { color: #19564f; background: #e5f4f0; border-color: #91bcb0; }
+[data-theme="light"] .yandex-login b, [data-theme="light"] .platform-content .yandex-login b { color: #126452; background: #d3eae1; border-color: #8bb9ab; }
+[data-theme="light"] .yandex-login:hover, [data-theme="light"] .platform-content .yandex-login:hover { background: #d6ede5; border-color: #487c70; }
+[data-theme="light"] .auth-callout { background: #f0f7f9; border-color: #b8cdd6; }
+[data-theme="light"] .auth-callout-copy strong { color: #203b49; }
+[data-theme="light"] .auth-callout-copy p { color: #526b7b; }
+[data-theme="light"] .login-arrow { color: #326f62; }

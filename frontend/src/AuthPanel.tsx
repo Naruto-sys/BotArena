@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 import type { AuthSession } from './contracts';
 import { login, ugcApi } from './ugcApi';
+import { platformText as ui } from './text';
 
 export function AuthPanel({ session, onChange }: { session: AuthSession | undefined; onChange: (session: AuthSession) => void }) {
   const [nickname, setNickname] = useState('');
@@ -28,7 +29,7 @@ export function AuthPanel({ session, onChange }: { session: AuthSession | undefi
   }
 
   if (!session) return <span className="auth-loading" aria-label="Загрузка профиля" />;
-  if (!session.authenticated) return <button className="yandex-login" onClick={login}><b>Я</b> Войти через Яндекс</button>;
+  if (!session.authenticated) return <button className="yandex-login" onClick={login}><b aria-hidden="true">Я</b><span>{ui.signIn}</span></button>;
   return <>
     <div className="profile-menu">
       {session.user.avatarUrl ? <img src={session.user.avatarUrl} alt="" referrerPolicy="no-referrer" /> : <span className="profile-fallback">{session.user.firstName[0] || '?'}</span>}
