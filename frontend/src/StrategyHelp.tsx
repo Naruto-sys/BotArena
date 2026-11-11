@@ -26,10 +26,9 @@ const movementFields = {
   omni: text.help.omniFields,
 };
 
-export function StrategyHelp({ language, movement }: { language: StrategyLanguage; movement: Movement }) {
+export function StrategyHelpContent({ language, movement }: { language: StrategyLanguage; movement: Movement }) {
   return (
-    <details>
-      <summary>{text.help.title}</summary>
+    <div className="strategy-help-content">
       <p>{language === 'python' ? text.help.pythonIntro : text.help.intro}</p>
       <Fields title={text.help.input} rows={text.help.inputFields} />
       {movement === 'hover' && <p>{text.help.hoverIntro}</p>}
@@ -43,6 +42,10 @@ export function StrategyHelp({ language, movement }: { language: StrategyLanguag
       <Fields title={text.help.turretFunctions} rows={text.help.turretRows} />
       <Fields title={text.help.helpers} rows={text.help.helperFields} />
       <Fields title={text.help.nested} rows={text.help.nestedFields} />
-    </details>
+    </div>
   );
+}
+
+export function StrategyHelp({ language, movement }: { language: StrategyLanguage; movement: Movement }) {
+  return <details><summary>{text.help.title}</summary><StrategyHelpContent language={language} movement={movement} /></details>;
 }

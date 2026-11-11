@@ -17,6 +17,8 @@ import { botLabel, teamWon } from './botDisplay';
 import { isLevelUnlocked, loadCompletedLevels, markLevelCompleted } from './campaignProgress';
 import { wallOverlapsBot } from './mapGeometry';
 import { LabArenaEditor } from './LabArenaEditor';
+import { LabSettingsDialog } from './LabSettingsDialog';
+import { ArenaModal } from './ArenaModal';
 import {
   classicWalls,
   customBots,
@@ -28,7 +30,7 @@ import {
   type LabSetup,
 } from './labDraft';
 import { MatchDiagnosticError, buildCustomMatchPayload, runMatch } from './matchApi';
-import { StrategyHelp } from './StrategyHelp';
+import { StrategyHelpContent } from './StrategyHelp';
 import { AuthPanel } from './AuthPanel';
 import { ugcApi, type AuthNotice } from './ugcApi';
 import { text } from './text';
@@ -226,7 +228,9 @@ function App() {
   const [labSetup, setLabSetup] = useState<LabSetup>(loadLabSetup);
   const [presets, setPresets] = useState<BehaviorPresetInfo[]>([]);
   const [mapError, setMapError] = useState('');
-  const [selectedWall, setSelectedWall] = useState<number | null>(null);
+  const [selectedWalls, setSelectedWalls] = useState<number[]>([]);
+  const [labSettingsOpen, setLabSettingsOpen] = useState(false);
+  const [strategyHelpOpen, setStrategyHelpOpen] = useState(false);
   const [labArenaView, setLabArenaView] = useState<'edit' | 'replay'>('edit');
   const [campaignDrafts, setCampaignDrafts] = useState<
     Record<string, Record<string, Partial<Record<StrategyLanguage, string>>>>
@@ -614,6 +618,39 @@ function App() {
       </header>
       {settings && <SettingsDialog onClose={() => setSettings(false)} />}
       {tourOpen && <SystemTour onClose={() => setTourOpen(false)} onNavigate={navigate} />}
+      {labSettingsOpen && <ArenaModal title={ui.roster} wide onClose={() => setLabSettingsOpen(false)}>
+        <LabSettingsDialog
+          setup={labSetup}
+          presets={presets}
+          onRosterChange={updateRoster}
+          onReset={() => {
+            detachStrategy();
+            setMapError('');
+            setLabSetup(defaultLabSetup());
+            setSelectedWalls([]);
+            setEditorEpoch(value => value + 1);
+          }}
+          onBotChange={(id, patch) => setLabSetup(previous => ({
+            ...previous,
+            bots: previous.bots.map(bot => bot.id === id ? { ...bot, ...patch } : bot),
+          }))}
+          onBehaviorChange={(id, value) => {
+            detachStrategy();
+            setLabSetup(previous => {
+              const bots = previous.bots.map(bot => bot.id !== id ? bot : value === 'code'
+                ? { ...bot, source: 'code' as const }
+                : { ...bot, source: 'preset' as const, presetId: value, movement: 'tracked' as const });
+              const custom = bots.filter(bot => bot.source === 'code');
+              return { ...previous, bots, activeBotId: custom.some(bot => bot.id === previous.activeBotId)
+                ? previous.activeBotId : (custom[0]?.id ?? previous.activeBotId) };
+            });
+            setEditorEpoch(value => value + 1);
+          }}
+        />
+      </ArenaModal>}
+      {strategyHelpOpen && <ArenaModal title={text.help.title} wide onClose={() => setStrategyHelpOpen(false)}>
+        <StrategyHelpContent language={language} movement={movement} />
+      </ArenaModal>}
       <div className="platform-content">
       <div className="ux-breadcrumb">BotArena / {ui.nav[page]}{page === 'learn' && track ? ` / ${track.name}` : ''}</div>
       {session && !session.authenticated && <div className="guest-banner"><b>Гостевой режим</b><span>Можно запускать одиночные бои, но прогресс не сохраняется.</span><button onClick={() => window.dispatchEvent(new CustomEvent('botarena-open-auth'))}>Войти или зарегистрироваться</button></div>}
@@ -645,6 +682,11 @@ function App() {
           }} />
         </>
       ) : (
+        <>
+        <div className="arena-workspace-toolbar">
+          {mode === 'lab' && <button type="button" onClick={() => setLabSettingsOpen(true)}>⚙ {ui.roster}</button>}
+          <button type="button" onClick={() => setStrategyHelpOpen(true)}>？ {text.help.title}</button>
+        </div>
         <div className="layout">
           <form ref={editorPanel} className="panel editor" onSubmit={run}>
             <div className="ux-editor-heading"><small>{ui.editor}</small><button type="button" onClick={() => setExpanded(!expanded)}>{expanded ? ui.collapse : ui.focus}</button></div>
@@ -693,99 +735,6 @@ function App() {
                 <p className="muted"><strong>{text.campaign.hint}: </strong>{level.hint}</p>
                 <button type="button" onClick={loadStarter}>{text.campaign.loadStarter}</button>
               </div>
-            )}
-
-            {mode === 'lab' && (
-              <details className="lab-roster"><summary>{ui.roster}</summary>
-                <div className="lab-counts">
-                  <label>
-                    {text.lab.allies}
-                    <input type="number" min={1} max={4} value={labSetup.allyCount}
-                      onChange={event => updateRoster(Number(event.target.value), labSetup.enemyCount)} />
-                  </label>
-                  <label>
-                    {text.lab.enemies}
-                    <input type="number" min={1} max={4} value={labSetup.enemyCount}
-                      onChange={event => updateRoster(labSetup.allyCount, Number(event.target.value))} />
-                  </label>
-                  <button type="button" onClick={() => {
-                    detachStrategy();
-                    setMapError('');
-                    setLabSetup(defaultLabSetup());
-                    setSelectedWall(null);
-                    setEditorEpoch(value => value + 1);
-                  }}>{text.lab.reset}</button>
-                </div>
-                <ul className="lab-bot-list">
-                  {labSetup.bots.map(bot => (
-                    <li key={bot.id} className="lab-bot-card">
-                      <label>
-                        {text.lab.name}
-                        <input
-                          type="text"
-                          maxLength={24}
-                          value={bot.name}
-                          placeholder={botLabel(bot.id, bot.teamId, labSetup.bots.map(item => ({ ...item, name: '' })))}
-                          onChange={event => setLabSetup(previous => ({
-                            ...previous,
-                            bots: previous.bots.map(item => item.id === bot.id
-                              ? { ...item, name: event.target.value }
-                              : item),
-                          }))}
-                        />
-                      </label>
-                      <label>
-                        {text.lab.hp}
-                        <input type="number" min={1} max={500} value={bot.hp}
-                          onChange={event => setLabSetup(previous => ({
-                            ...previous,
-                            bots: previous.bots.map(item => item.id === bot.id
-                              ? { ...item, hp: Number(event.target.value) }
-                              : item),
-                          }))} />
-                      </label>
-                      <label>
-                        {text.lab.behavior}
-                        <select
-                          value={bot.source === 'code' ? 'code' : bot.presetId}
-                          onChange={event => {
-                            detachStrategy();
-                            const value = event.target.value;
-                            setLabSetup(previous => {
-                              const bots = previous.bots.map(item => {
-                                if (item.id !== bot.id) return item;
-                                if (value === 'code') return { ...item, source: 'code' as const };
-                                return { ...item, source: 'preset' as const, presetId: value, movement: 'tracked' as const };
-                              });
-                              const custom = bots.filter(item => item.source === 'code');
-                              return {
-                                ...previous,
-                                bots,
-                                activeBotId: custom.some(item => item.id === previous.activeBotId)
-                                  ? previous.activeBotId
-                                  : (custom[0]?.id ?? previous.activeBotId),
-                              };
-                            });
-                            setEditorEpoch(value => value + 1);
-                          }}
-                        >
-                          <option value="code">{text.lab.customCode}</option>
-                          {presets.map(preset => (
-                            <option key={preset.id} value={preset.id}>
-                              {preset.name} ({preset.strength === 'weak' ? text.lab.weak : text.lab.standard})
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      {bot.source === 'preset' && (
-                        <p className="muted">
-                          {presets.find(item => item.id === bot.presetId)?.description}
-                        </p>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </details>
             )}
 
             {mode === 'lab' && labArenaView === 'replay' && mapError && <p role="alert" className="error-card">{mapError}</p>}
@@ -904,7 +853,6 @@ function App() {
                 )}
               </div>
             )}
-            <StrategyHelp language={language} movement={movement} />
             <details className="debug-panel" open={logs.length > 0}>
               <summary>{text.debug.title}</summary>
               {logs.length === 0 ? (
@@ -954,10 +902,10 @@ function App() {
               <LabArenaEditor
                 arena={labSetup.arena}
                 bots={labSetup.bots}
-                selectedWall={selectedWall}
+                selectedWalls={selectedWalls}
                 placementError={mapError}
                 onPlacementError={setMapError}
-                onSelectWall={setSelectedWall}
+                onSelectWalls={setSelectedWalls}
                 onMoveBot={(botId, x, y) => setLabSetup(previous => ({
                   ...previous,
                   bots: previous.bots.map(bot => bot.id === botId
@@ -980,31 +928,25 @@ function App() {
                       walls: [...previous.arena.walls, wall],
                     },
                   }));
-                  setSelectedWall(labSetup.arena.walls.length);
+                  setSelectedWalls([labSetup.arena.walls.length]);
                 }}
-                onRemoveWall={index => {
+                onRemoveWalls={indices => {
+                  const removed = new Set(indices);
                   setLabSetup(previous => ({
                     ...previous,
                     arena: {
                       ...previous.arena,
-                      walls: previous.arena.walls.filter((_, wallIndex) => wallIndex !== index),
+                      walls: previous.arena.walls.filter((_, wallIndex) => !removed.has(wallIndex)),
                     },
                   }));
-                  setSelectedWall(null);
+                  setSelectedWalls([]);
                 }}
                 onClassicWalls={() => {
                   setLabSetup(previous => ({
                     ...previous,
                     arena: { ...previous.arena, walls: classicWalls.map(wall => ({ ...wall })) },
                   }));
-                  setSelectedWall(null);
-                }}
-                onClearWalls={() => {
-                  setLabSetup(previous => ({
-                    ...previous,
-                    arena: { ...previous.arena, walls: [] },
-                  }));
-                  setSelectedWall(null);
+                  setSelectedWalls([]);
                 }}
               />
             ) : replay ? (
@@ -1023,6 +965,7 @@ function App() {
             )}
           </section>
         </div>
+        </>
       )}
         </>}
         </>}

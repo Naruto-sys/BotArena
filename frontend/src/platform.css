@@ -41,7 +41,7 @@ body { background: radial-gradient(ellipse at 40% -25%, #153c50 0, transparent 5
 .ux-tag { color: #ffbd70; border: 1px solid #79623e; background: #3b3021; border-radius: 20px; padding: 4px 10px; font-size: 11px; }
 .ux-stages { display: flex; gap: 25px; color: #7692a7; margin: 20px 0; font-size: 12px; }
 .ux-stages .active { color: var(--neon); }
-.platform-content .layout { grid-template-columns: minmax(340px, 420px) minmax(0, 1fr); gap: 20px; }
+.platform-content .layout { width:100%; max-width:none; grid-template-columns: minmax(360px, .9fr) minmax(0, 1.65fr); gap: 20px; }
 .platform-content .panel { border-color: #294253; background: linear-gradient(135deg, #112335, #0e1c2c); border-radius: 14px; padding: 20px; }
 .platform-content .editor { gap: 14px; }
 .platform-content .editor > h1 { font-size: 21px; }
@@ -70,6 +70,43 @@ body { background: radial-gradient(ellipse at 40% -25%, #153c50 0, transparent 5
 .replay-toolbox > summary { font-size: 13px; color: var(--neon); margin-bottom: 10px; }
 @media(max-width: 1050px) { .platform-header { flex-wrap: wrap; padding: 12px 18px; gap: 10px; } .platform-header nav { order: 3; width: 100%; } .platform-content { padding: 20px 18px 0; } .platform-content .layout { grid-template-columns: minmax(300px, .9fr) minmax(0, 1.2fr); } .ux-radar { width: 150px; height: 150px; } }
 @media(max-width: 760px) { .platform-content .layout { grid-template-columns: 1fr; } .platform-header nav { flex-wrap: nowrap; overflow-x: auto; } .platform-header nav button { padding: 8px; font-size: 12px; } .platform-account small { display: none; } .ux-hero { padding: 26px; } .ux-radar { display: none; } .ux-stats { gap: 20px; flex-wrap: wrap; } .ux-stats b { font-size: 20px; } .ux-stages { gap: 14px; } }
+
+.arena-workspace-toolbar { display:flex; justify-content:flex-end; gap:10px; width:100%; margin:-2px 0 12px; }
+.arena-workspace-toolbar button { background:#10283a; border-color:#35566a; }
+.arena-modal-backdrop { position:fixed; inset:0; z-index:220; display:grid; place-items:center; padding:24px; background:#020a13c7; backdrop-filter:blur(9px); }
+.arena-modal { width:min(720px,100%); max-height:calc(100dvh - 48px); overflow:hidden; border:1px solid #36566d; border-radius:16px; color:#e9f4fb; background:#102234; box-shadow:0 28px 90px #000b; }
+.arena-modal.wide { width:min(1320px,100%); }
+.arena-modal>header { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:18px 22px; border-bottom:1px solid #294253; }
+.arena-modal>header h2 { margin:0; font-size:22px; }
+.arena-modal-close { width:36px; height:36px; padding:0; border-radius:50%; font-size:24px; line-height:1; }
+.arena-modal-body { max-height:calc(100dvh - 126px); overflow:auto; padding:22px; }
+.lab-settings { display:grid; gap:18px; }
+.lab-settings-top { display:flex; justify-content:space-between; align-items:center; gap:12px; color:#8faabc; }
+.lab-team-layout { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+.lab-team { min-width:0; padding:16px; border:1px solid #2f4b5e; border-radius:13px; background:#0c1b2a; }
+.lab-team>header { display:flex; align-items:end; justify-content:space-between; gap:14px; margin-bottom:14px; }
+.lab-team>header small { color:var(--neon); font-size:9px; letter-spacing:1.3px; }
+.lab-team>header h3 { margin:5px 0 0; }
+.lab-team>header label { display:grid; gap:4px; width:92px; font-size:11px; }
+.team-hp-control { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:end; gap:8px; margin-bottom:14px; padding:10px; border-radius:9px; background:#13293b; }
+.team-hp-control label { display:grid; gap:4px; font-size:11px; }
+.lab-team-bots { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:0; padding:0; list-style:none; }
+.lab-team-bots .lab-bot-card { align-content:start; min-width:0; }
+.lab-team-bots .lab-bot-card>b { color:var(--neon); font-size:12px; }
+.lab-team-bots .lab-bot-card p { font-size:11px; line-height:1.45; }
+.strategy-help-content>p { color:#a8bfcd; line-height:1.6; }
+.strategy-help-content .strategy-fields { margin-top:18px; }
+.lab-wall-add { min-width:42px; font-size:20px; font-weight:800; }
+.wall-delete-icon { display:grid; place-items:center; align-self:stretch; min-width:44px; padding:8px; color:#ff776d!important; background:#351c20!important; border-color:#743d42!important; }
+.wall-delete-icon:hover:not(:disabled) { color:#fff!important; background:#9b302f!important; border-color:#e65b53!important; }
+.wall-delete-icon svg,.lab-walls-toolbar .danger-button svg { width:19px; height:19px; fill:currentColor; }
+.lab-walls-toolbar .danger-button { display:inline-flex; align-items:center; gap:7px; margin-left:auto; }
+.lab-wall-selection-hint { color:#7894a6; }
+
+@media(max-width:900px){
+  .arena-modal-backdrop{padding:10px}.arena-modal{max-height:calc(100dvh - 20px)}.arena-modal-body{max-height:calc(100dvh - 92px);padding:14px}
+  .lab-team-layout{grid-template-columns:1fr}.lab-team-bots{grid-template-columns:1fr}.lab-settings-top{align-items:flex-start;flex-direction:column}
+}
 .learning-map { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 20px; align-items: start; }
 .chapter-route > summary { list-style: none; display: grid; gap: 12px; }
 .chapter-route > summary strong { font-size: 22px; color: #eaf4ff; }
@@ -262,7 +299,7 @@ dialog.ux-modal::backdrop { background: #020a13bb; backdrop-filter: blur(8px); }
   fill:#c1d3df;
   stroke:#68899f;
 }
-[data-theme="light"] .lab-arena .lab-wall-group:has(.lab-wall-handle) .lab-wall {
+[data-theme="light"] .lab-arena .lab-wall.selected {
   fill:#8fb8cf;
   stroke:#148db5;
 }
@@ -278,3 +315,12 @@ dialog.ux-modal::backdrop { background: #020a13bb; backdrop-filter: blur(8px); }
 }
 [data-theme="light"] dialog.ux-modal { color:#172634; background:#fff; border-color:#b9cdd9; }
 [data-theme="light"] .tour-backdrop { background:linear-gradient(110deg,transparent 35%,#55707c18); }
+[data-theme="light"] .arena-workspace-toolbar button { color:#294758; background:#f4f8fa; border-color:#afc4cf; }
+[data-theme="light"] .arena-modal-backdrop { background:#dce8edc9; }
+[data-theme="light"] .arena-modal { color:#172634; background:#fff; border-color:#b9cdd9; box-shadow:0 28px 90px #4a617933; }
+[data-theme="light"] .arena-modal>header { border-color:#c7d5df; }
+[data-theme="light"] .lab-settings-top { color:#526b7b; }
+[data-theme="light"] .lab-team { background:#f5f9fb; border-color:#c7d5df; }
+[data-theme="light"] .team-hp-control { background:#e7f1f4; }
+[data-theme="light"] .strategy-help-content>p { color:#526b7b; }
+[data-theme="light"] .wall-delete-icon { color:#b3262d!important; background:#fff1f1!important; border-color:#dda5a7!important; }
