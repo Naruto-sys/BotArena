@@ -4,7 +4,7 @@ import type { Arena, CampaignSpawn, Wall } from './contracts';
 import { ArenaCoordinates, arenaViewBox } from './ArenaCoordinates';
 import { botColor, botLabel } from './botDisplay';
 import { classicWalls, type LabBot } from './labDraft';
-import { wallOverlapsBot } from './mapGeometry';
+import { botsOverlap, wallOverlapsBot } from './mapGeometry';
 import { text } from './text';
 
 const MIN_WALL = 0.4;
@@ -130,6 +130,8 @@ export function LabArenaEditor({
   function moveBot(botId: string, x: number, y: number) {
     const bot = bots.find(item => item.id === botId);
     if (!bot) return;
+    const candidate = { ...bot, position: { x, y } };
+    if (bots.some(other => other.id !== botId && botsOverlap(candidate, other))) return;
     if (arena.walls.some(wall => wallOverlapsBot(wall, { ...bot, position: { x, y } }))) {
       setPlacementError(text.lab.botOverlapsWall);
       return;
