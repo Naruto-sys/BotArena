@@ -1,4 +1,4 @@
-import type { Arena, Point, StrategyLanguage, Wall } from './contracts';
+import type { Arena, Movement, Point, StrategyLanguage, Wall } from './contracts';
 
 export type BehaviorSource = 'preset' | 'code';
 
@@ -10,6 +10,7 @@ export interface LabBot {
   bodyAngle: number;
   turretAngle: number;
   hp: number;
+  movement?: Movement;
   source: BehaviorSource;
   presetId: string;
   code: Partial<Record<StrategyLanguage, string>>;
@@ -90,6 +91,7 @@ export function layoutBots(
       bodyAngle: 0,
       turretAngle: 0,
       hp: prior?.hp ?? 100,
+      movement: prior?.movement ?? 'tracked',
       source: prior?.source ?? (index === 0 ? 'code' as const : 'preset' as const),
       presetId: prior?.presetId ?? 'assault',
       code: prior?.code ?? { ...defaultAllyCode },
@@ -106,6 +108,7 @@ export function layoutBots(
       bodyAngle: Math.PI,
       turretAngle: Math.PI,
       hp: prior?.hp ?? 100,
+      movement: prior?.movement ?? 'tracked',
       source: prior?.source ?? 'preset' as const,
       presetId: prior?.presetId ?? 'blind-afraid',
       code: prior?.code ?? { javascript: 'function tick() { return {}; }', python: 'def tick(state):\n    return {}\n' },

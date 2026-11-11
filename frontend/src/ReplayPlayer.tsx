@@ -10,6 +10,7 @@ import { buildShotPlan, directorPlaybackRate, shotAt, VISUAL_TAIL_FRAMES } from 
 import { botColor, botLabel as rosterBotLabel, resolveTeamId, teamWon } from './botDisplay';
 import { botCssColor, botLabel as cinematicBotLabel } from './botVisuals';
 import { text } from './text';
+import { platformText as ui } from './text';
 
 const copy = text.replay;
 const speeds = [0.5, 1, 2, 4];
@@ -330,6 +331,8 @@ export function ReplayPlayer({ replay, botNames }: { replay: Replay; botNames?: 
             </button>
           ))}
         </div>
+      </div>
+<details className="replay-toolbox"><summary>{ui.analysis}</summary>
         <label className="trail-toggle">
           <input type="checkbox" checked={showTrails}
             onChange={event => setShowTrails(event.target.checked)} />
@@ -353,7 +356,7 @@ export function ReplayPlayer({ replay, botNames }: { replay: Replay; botNames?: 
             </select>
           )}
         </div>
-      </div>
+</details>
       <div className="controls replay-controls">
         <button type="button" onClick={() => {
           if (video.busy) return;
@@ -373,9 +376,9 @@ export function ReplayPlayer({ replay, botNames }: { replay: Replay; botNames?: 
           {speeds.map(value => <option key={value} value={value}>{copy.speedOption(value)}</option>)}
         </select>
       </div>
-      <AudioControls audio={audio} />
+      <details className="replay-toolbox"><summary>{ui.audio}</summary><AudioControls audio={audio} /></details>
       </fieldset>
-      <div className="video-export" aria-label={text.video.title}>
+      <details className="replay-toolbox"><summary>{ui.export}</summary><div className="video-export" aria-label={text.video.title}>
         <button type="button" className="video-export-start" disabled={!video.supported || video.busy} onClick={video.start}>
           {video.phase === 'preparing' ? text.video.preparing : video.phase === 'finishing' ? text.video.finishing
             : video.phase === 'recording' ? text.video.recording(video.progress) : text.video.start}
@@ -389,6 +392,7 @@ export function ReplayPlayer({ replay, botNames }: { replay: Replay; botNames?: 
         {video.error && <p role="alert" className="error">{video.error}</p>}
         {video.phase === 'ready' && <span role="status">{text.video.ready}</span>}
       </div>
+      </details>
       <ul className="health" aria-label={copy.health}>
         {frame.bots.map(bot => {
           const label = displayLabel(bot.id, bot.teamId);

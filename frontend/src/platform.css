@@ -1,0 +1,92 @@
+:root { --neon: #58e5cc; --cyan: #59cfff; }
+body { background: radial-gradient(ellipse at 40% -25%, #153c50 0, transparent 55%), #07111d; }
+.platform-app { padding: 0; }
+.platform-header { position: sticky; top: 0; z-index: 40; min-height: 76px; margin: 0; padding: 14px 28px; align-items: center; background: #091521f5; border-bottom: 1px solid #294454; backdrop-filter: blur(18px); }
+.platform-brand { display: flex; align-items: center; gap: 12px; background: transparent; border: 0; color: var(--neon); font-size: 28px; padding: 0; }
+.platform-brand span { text-align: left; color: #ecf8ff !important; font-size: 19px !important; }
+.platform-brand small { display: block; font-size: 8px; color: #7095a8; letter-spacing: 2px; }
+.platform-header nav { display: flex; gap: 3px; flex-wrap: wrap; }
+.platform-header nav button { border: 0; background: transparent; color: #99b3c5; border-radius: 9px; padding: 10px 13px; }
+.platform-header nav button[aria-current] { background: #143d3b; color: var(--neon); }
+.platform-account { margin-left: auto; display: flex; align-items: center; gap: 15px; color: #85a7ba; }
+.platform-content { width: 100%; max-width: 1640px; padding: 24px 32px 0; margin: 0 auto; }
+.ux-breadcrumb { font-size: 12px; color: #7d9aac; margin-bottom: 24px; }
+.platform-content h1 { font-size: 32px; letter-spacing: -1px; }
+.ux-page-heading { margin-bottom: 24px; }
+.ux-page-heading small, .ux-editor-heading small { color: var(--neon); letter-spacing: 1.5px; font-size: 10px; }
+.ux-page-heading h1 { margin: 8px 0; }
+.ux-page-heading p, .ux-lead { color: #97b1c1; max-width: 720px; }
+.ux-hero { display: flex; justify-content: space-between; align-items: center; border: 1px solid #2b4858; border-radius: 20px; padding: 46px; background: linear-gradient(125deg, #122b3c, #0c1b2b); overflow: hidden; }
+.ux-hero h1 { font-size: clamp(36px, 4vw, 60px); line-height: 1.05; max-width: 600px; margin: 16px 0; }
+.ux-hero small, .ux-path small { color: var(--neon); letter-spacing: 1.5px; }
+.ux-hero p { color: #9db8c9; max-width: 560px; font-size: 16px; }
+.ux-radar { display: grid; place-items: center; flex-shrink: 0; width: 220px; height: 220px; border: 1px solid #316477; border-radius: 50%; color: var(--neon); font: 800 46px monospace; box-shadow: 0 0 0 36px #183f4829, 0 0 0 72px #183f4815, inset 0 0 60px #55dfc014; }
+.ux-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 18px 0; }
+.platform-content button { border-radius: 9px; }
+.platform-content button:hover:not(:disabled) { border-color: var(--neon); }
+.platform-content button.primary { background: #58e5cc; border-color: #58e5cc; color: #06272e; }
+.ux-stats { display: flex; gap: 50px; border-bottom: 1px solid #284253; padding: 28px 4px; margin-bottom: 30px; }
+.ux-stats div { display: grid; gap: 4px; }
+.ux-stats b { font-size: 25px; }
+.ux-stats span { color: #87a5b8; font-size: 12px; }
+.ux-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; margin-top: 20px; }
+.ux-path { padding: 24px; display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
+.ux-path p { color: #9fb8c9; flex: 1; }
+.ux-path h2 { font-size: 21px; margin: 0; }
+.ux-path button { margin-top: auto; }
+.ux-tabs { display: flex; gap: 8px; padding-bottom: 16px; margin: 20px 0; border-bottom: 1px solid #294352; overflow-x: auto; }
+.ux-tabs button { white-space: nowrap; background: transparent; border-color: transparent; color: #99b5c8; }
+.ux-tabs button[aria-pressed="true"] { color: var(--neon); background: #153a3c; border-color: #28645e; }
+.ux-placeholder { display: grid; justify-items: start; gap: 16px; padding: 32px; border: 1px dashed #36586b; border-radius: 14px; color: #9fbaca; margin-top: 20px; }
+.ux-tag { color: #ffbd70; border: 1px solid #79623e; background: #3b3021; border-radius: 20px; padding: 4px 10px; font-size: 11px; }
+.ux-stages { display: flex; gap: 25px; color: #7692a7; margin: 20px 0; font-size: 12px; }
+.ux-stages .active { color: var(--neon); }
+.platform-content .layout { grid-template-columns: minmax(340px, 420px) minmax(0, 1fr); gap: 20px; }
+.platform-content .panel { border-color: #294253; background: linear-gradient(135deg, #112335, #0e1c2c); border-radius: 14px; padding: 20px; }
+.platform-content .editor { gap: 14px; }
+.platform-content .editor > h1 { font-size: 21px; }
+.ux-editor-heading { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+.ux-editor-heading button { font-size: 11px; }
+.platform-content .lab-roster { border: 1px solid #2b465b; border-radius: 10px; padding: 12px; }
+.platform-content .lab-bot-list { max-height: 400px; overflow: auto; }
+.platform-content .campaign-levels { max-height: 290px; overflow: auto; }
+.platform-content .campaign-levels > button { margin-top: 8px; }
+.platform-content .code-editor { height: clamp(260px, 42vh, 510px); }
+.platform-content .replay { min-width: 0; padding: 16px; }
+.ux-save { display: flex; gap: 8px; flex-wrap: wrap; }
+.ux-save input { flex: 1; min-width: 100px; }
+.ux-save small { flex-basis: 100%; color: var(--neon); }
+.platform-content input:not([type="range"]):not([type="checkbox"]), .platform-content select { background: #0a1928; color: #e5f4ff; border: 1px solid #35536b; border-radius: 8px; padding: 9px; font: inherit; max-width: 100%; }
+.ux-notice { margin-top: 18px; color: var(--neon); }
+.editor-expanded .layout { grid-template-columns: 1fr; }
+.editor-expanded .layout > .replay { display: none; }
+.editor-expanded .code-editor { height: 65vh; }
+.platform-footer { font-size: 11px; color: #65879b; border-top: 1px solid #233b4b; margin-top: 50px; padding: 22px 0; letter-spacing: 1px; }
+.ux-modal-back { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: #020a13bb; backdrop-filter: blur(8px); }
+.ux-modal { max-width: 560px; padding: 30px; display: grid; gap: 22px; }
+.ux-modal button { justify-self: end; }
+.ux-modal p { color: #a1bacb; }
+.replay-toolbox { margin-top: 12px; border-top: 1px solid #294253; padding-top: 12px; }
+.replay-toolbox > summary { font-size: 13px; color: var(--neon); margin-bottom: 10px; }
+@media(max-width: 1050px) { .platform-header { flex-wrap: wrap; padding: 12px 18px; gap: 10px; } .platform-header nav { order: 3; width: 100%; } .platform-content { padding: 20px 18px 0; } .platform-content .layout { grid-template-columns: minmax(300px, .9fr) minmax(0, 1.2fr); } .ux-radar { width: 150px; height: 150px; } }
+@media(max-width: 760px) { .platform-content .layout { grid-template-columns: 1fr; } .platform-header nav { flex-wrap: nowrap; overflow-x: auto; } .platform-header nav button { padding: 8px; font-size: 12px; } .platform-account small { display: none; } .ux-hero { padding: 26px; } .ux-radar { display: none; } .ux-stats { gap: 20px; flex-wrap: wrap; } .ux-stats b { font-size: 20px; } .ux-stages { gap: 14px; } }
+.learning-map { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 20px; align-items: start; }
+.chapter-route > summary { list-style: none; display: grid; gap: 12px; }
+.chapter-route > summary strong { font-size: 22px; color: #eaf4ff; }
+.chapter-route > summary p { color: #8eaebe; }
+.chapter-route .ux-tag { justify-self: start; color: var(--neon); background: #123d38; border-color: #2b6a5f; }
+.lesson-road { display: grid; margin: 25px 0 0; gap: 28px; }
+.lesson-stop { display: flex; align-items: center; gap: 16px; position: relative; }
+.lesson-stop:not(:last-child)::after { content: ''; position: absolute; left: 28px; top: 58px; height: 30px; width: 1px; background: #345264; }
+.lesson-stop > button { width: 58px; height: 58px; border-radius: 50%; flex-shrink: 0; font-weight: 800; font-size: 19px; }
+.lesson-stop.available > button { color: var(--neon); border-color: var(--neon); box-shadow: 0 0 25px #58e5cc16; background: #16443e; }
+.lesson-stop.passed > button { color: var(--neon); border-color: #38786a; }
+.lesson-stop.locked { opacity: .55; }
+.lesson-stop h2 { font-size: 16px; margin: 4px 0; }
+.lesson-stop p { font-size: 12px; color: #9bb4c5; }
+.lesson-stop small { font-size: 9px; letter-spacing: 1px; color: var(--neon); }
+@media(max-width: 760px) { .learning-map { grid-template-columns: 1fr; } }
+dialog.ux-modal { color: #edf4ff; background: #102234; border: 1px solid #36566d; border-radius: 16px; }
+dialog.ux-modal::backdrop { background: #020a13bb; backdrop-filter: blur(8px); }
+.replay-settings { display: flex; flex-direction: column; }
+.replay-controls { order: -1; }

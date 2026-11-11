@@ -12,6 +12,8 @@ export default function StrategyEditor({ initialCode, language, onChange }: {
   onChange: (code: string) => void;
 }) {
   const initial = useRef(initialCode);
+  const changed = useRef(onChange);
+  changed.current = onChange;
   const parent = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -25,12 +27,12 @@ export default function StrategyEditor({ initialCode, language, onChange }: {
         oneDark,
         EditorView.contentAttributes.of({ id: 'strategy', 'aria-labelledby': 'strategy-label' }),
         EditorView.updateListener.of(update => {
-          if (update.docChanged) onChange(update.state.doc.toString());
+          if (update.docChanged) changed.current(update.state.doc.toString());
         }),
       ],
     });
     return () => editor.destroy();
-  }, [language, onChange]);
+  }, [language]);
 
   return <div className="code-editor" ref={parent} />;
 }

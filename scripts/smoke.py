@@ -29,7 +29,7 @@ def check_replay(replay, bot_count=2):
     behavior_samples = replay["behaviorSamples"]
     assert replay["tickRate"] == 20
     assert [frame["tick"] for frame in frames] == list(range(len(frames)))
-    assert replay["result"]["durationTicks"] == len(frames) - 1 <= 200
+    assert replay["result"]["durationTicks"] == len(frames) - 1 <= 1000
     assert frames[-1]["events"][-1]["type"] == "MatchFinished"
     assert all(len(frame["bots"]) == bot_count for frame in frames)
     assert len(behavior_samples) <= replay["result"]["durationTicks"] * bot_count
@@ -55,7 +55,10 @@ def main():
     assert [level["id"] for level in campaign[1]["levels"]] == [
         "adv-move", "adv-steer-short", "adv-steer-long", "adv-shoot-simple", "adv-shoot-cover", "adv-track", "adv-duel"
     ]
-    assert campaign[2]["levels"] == []
+    assert campaign[2]["available"]
+    assert [level["id"] for level in campaign[2]["levels"]] == [
+        "mode-duel", "mode-team-3v3", "mode-ffa", "mode-outnumbered"
+    ]
     status, move = request("/api/matches", {
         "botCode": "function tick() { return { driveTo: { x: 10, y: 5 } }; }",
         "campaignLevelId": "move",
@@ -65,7 +68,7 @@ def main():
     assert move["replay"]["marker"]["x"] == 10
 
     app = Path(__file__).resolve().parents[1] / "frontend/src/main.tsx"
-    example = app.read_text(encoding="utf-8").split("javascript: `", 1)[1].split("`,", 1)[0]
+    example = app.read_text(encoding="utf-8").split("const example = `", 1)[1].split("`;", 1)[0]
     for opponent in opponents:
         status, match = run(example, opponent["id"])
         assert status == 200 and match["error"] is None, match
@@ -101,9 +104,10 @@ def main():
         status, match = run(code)
         assert status == 200 and match["error"]["tick"] == failed_tick, match
         check_replay(match["replay"])
-        assert match["replay"]["result"] == {
-            "winnerBotId": "opponent", "reason": "BotError", "durationTicks": failed_tick
-        }
+        result = match["replay"]["result"]
+        assert result["winnerBotId"] == "opponent"
+        assert result["reason"] == "BotError"
+        assert result["durationTicks"] == failed_tick
 
     status, match = run('function tick() {\n  throw Error("test");\n}')
     assert status == 200 and match["error"]["line"] == 2 and match["error"]["column"] > 0

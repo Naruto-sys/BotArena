@@ -5,3 +5,5 @@ server/wwwroot/
 .DS_Store
 
 .botarena/
+frontend/test-results/
+frontend/playwright-report/

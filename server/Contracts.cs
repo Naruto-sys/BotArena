@@ -17,7 +17,8 @@ public record CustomMatchSpawn(
     double Y,
     double BodyAngle = 0,
     double TurretAngle = 0,
-    int Hp = 100);
+    int Hp = 100,
+    string? Movement = null);
 public record CustomMatchLoadout(
     string BotId,
     string Source,

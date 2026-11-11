@@ -28,7 +28,11 @@ import {
 import { MatchDiagnosticError, buildCustomMatchPayload, runMatch } from './matchApi';
 import { StrategyHelp } from './StrategyHelp';
 import { text } from './text';
+import { Community, ComingSoon, Home, Workshop, LearningMap, SettingsDialog, type Page } from './PlatformPages';
+import { platformText as ui } from './text';
+import { loadStrategies, saveStrategies, type SavedStrategy } from './strategyLibrary';
 import './style.css';
+import './platform.css';
 
 const StrategyEditor = lazy(() => import('./StrategyEditor'));
 const ReplayPlayer = lazy(() => import('./ReplayPlayer').then(module => ({ default: module.ReplayPlayer })));
@@ -185,10 +189,18 @@ const modelOptions = Object.entries(text.movements).map(([id, label]) =>
   <option key={id} value={id}>{label}</option>);
 
 function App() {
+  const [page, setPage] = useState<Page>('home');
+  const [rooms, setRooms] = useState(false);
+  const [settings, setSettings] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [library, setLibrary] = useState(loadStrategies);
+  const [strategyName, setStrategyName] = useState<string>(ui.defaultName);
+  const [libraryNote, setLibraryNote] = useState('');
+  const [libraryId, setLibraryId] = useState<string>();
+  const editorPanel = useRef<HTMLFormElement>(null);
   const [mode, setMode] = useState<AppMode>('campaign');
   const [languages, setLanguages] = useState<StrategyLanguage[]>(['javascript']);
   const [language, setLanguage] = useState<StrategyLanguage>('javascript');
-  const [movement, setMovement] = useState<Movement>('tracked');
   const [labSetup, setLabSetup] = useState<LabSetup>(loadLabSetup);
   const [presets, setPresets] = useState<BehaviorPresetInfo[]>([]);
   const [selectedWall, setSelectedWall] = useState<number | null>(null);
@@ -218,6 +230,7 @@ function App() {
   const campaignActiveBotId = playerBotIds.includes(playerBotId) ? playerBotId : playerBotIds[0];
   const labCustomBots = customBots(labSetup);
   const labActiveBot = labCustomBots.find(bot => bot.id === labSetup.activeBotId) ?? labCustomBots[0];
+  const movement: Movement = mode === 'lab' ? (labActiveBot?.movement ?? 'tracked') : 'tracked';
   const inCampaignHub = mode === 'campaign' && !track;
   const code = mode === 'lab'
     ? (labActiveBot?.code[language] ?? '')
@@ -234,6 +247,7 @@ function App() {
   }, [labSetup]);
 
   const updateCode = useCallback((value: string) => {
+    setLibraryNote('');
     if (mode === 'lab') {
       if (!labActiveBot) return;
       setLabSetup(previous => ({
@@ -305,11 +319,59 @@ function App() {
     setEditorEpoch(value => value + 1);
   }
 
+  function navigate(next: Page) {
+    if (loading) return;
+    setPage(next);
+    setExpanded(false);
+    if (next === 'learn') selectMode('campaign');
+    if (next === 'arena') { setRooms(false); selectMode('lab'); }
+  }
+
+  useEffect(() => {
+    const refresh = () => setLibrary(loadStrategies());
+    window.addEventListener('storage', refresh);
+    return () => window.removeEventListener('storage', refresh);
+  }, []);
+
+  function detachStrategy() {
+    setLibraryId(undefined);
+    setStrategyName(ui.defaultName);
+    setLibraryNote('');
+  }
+
+  function removeStrategy(id: string) {
+    const next = loadStrategies().filter(item => item.id !== id);
+    if (!saveStrategies(next)) { setLibraryNote(ui.storageError); return; }
+    setLibrary(next);
+    if (id === libraryId) detachStrategy();
+  }
+
+  function saveCurrentStrategy() {
+    const item: SavedStrategy = { id: libraryId ?? crypto.randomUUID(),
+      name: strategyName.trim() || ui.defaultName, code, language, movement };
+    const next = [item, ...loadStrategies().filter(entry => entry.id !== item.id)];
+    if (!saveStrategies(next)) { setLibraryNote(ui.storageError); return; }
+    setLibrary(next); setLibraryId(item.id); setLibraryNote(ui.saved);
+  }
+
+  function openStrategy(item: SavedStrategy) {
+    if (!languages.includes(item.language)) { setLibraryNote(ui.pythonRequired); return; }
+    navigate('arena');
+    resetRunState();
+    const setup = loadLabSetup();
+    const bot = setup.bots.find(b => b.teamId === 'player')!;
+    setLabSetup({ ...setup, activeBotId: bot.id, bots: setup.bots.map(b => b.id === bot.id
+      ? { ...b, source: 'code', code: { ...b.code, [item.language]: item.code }, movement: item.movement } : b) });
+    setLanguage(item.language);
+    setStrategyName(item.name); setLibraryId(item.id); setLibraryNote('');
+    setEditorEpoch(value => value + 1);
+  }
+
   function openTrack(next: CampaignTrack) {
     if (!next.available || next.levels.length === 0) return;
     resetRunState();
     setTrackId(next.id);
-    const firstOpen = next.levels.find(item => isLevelUnlocked(item.order, next.levels, completed))
+    const firstOpen = next.levels.find(item => !completed.includes(item.id) && isLevelUnlocked(item.order, next.levels, completed))
       ?? next.levels[0];
     setLevelId(firstOpen?.id ?? '');
     setPlayerBotId(firstOpen?.playerBotIds?.[0] ?? 'player');
@@ -367,6 +429,7 @@ function App() {
   }
 
   function updateRoster(allyCount: number, enemyCount: number) {
+    detachStrategy();
     const allies = Math.min(4, Math.max(1, allyCount || 1));
     const enemies = Math.min(4, Math.max(1, enemyCount || 1));
     setLabSetup(previous => {
@@ -468,43 +531,44 @@ function App() {
     : Boolean(level && isLevelUnlocked(level.order, levels, completed) && campaignCodesReady);
 
   return (
-    <main>
-      <header>
-        <span>{text.brand}</span>
-        <nav className="mode-switch" aria-label="Режим">
-          {(['campaign', 'lab'] as const).map(item => (
-            <button key={item} type="button" className={mode === item ? 'mode active' : 'mode'}
-              aria-pressed={mode === item} onClick={() => selectMode(item)}>
-              {text.modes[item]}
-            </button>
-          ))}
-        </nav>
-        <span className="muted">{text.modeHint[mode]}</span>
+    <main className={`platform-app${expanded ? ' editor-expanded' : ''}`}>
+      <header className="platform-header">
+        <button className="platform-brand" onClick={() => navigate('home')}>◈ <span>{text.brand}<small>CODE · SIMULATE · EVOLVE</small></span></button>
+        <nav aria-label="Основная навигация">{Object.entries(ui.nav).map(([id, label]) =>
+          <button key={id} type="button" aria-current={page === id ? 'page' : undefined}
+            disabled={loading} onClick={() => navigate(id as Page)}>{label}</button>)}</nav>
+        <div className="platform-account"><small>{ui.local}</small><button onClick={() => setSettings(true)}>{ui.settings}</button></div>
       </header>
-
+      {settings && <SettingsDialog onClose={() => setSettings(false)} />}
+      <div className="platform-content">
+      <div className="ux-breadcrumb">BotArena / {ui.nav[page]}{page === 'learn' && track ? ` / ${track.name}` : ''}</div>
+      {page === 'home' ? <><Home tracks={tracks} completed={completed} languages={languages} navigate={navigate} onContinue={() => {
+          navigate('learn');
+          const next = tracks.find(t => t.available && t.levels.some(l => !completed.includes(l.id) && isLevelUnlocked(l.order, t.levels, completed)));
+          if (next) openTrack(next);
+        }} />{error && <p role="alert" className="error-card">{error}</p>}</>
+      : page === 'workshop' ? <Workshop items={library} onOpen={openStrategy}
+          onRemove={removeStrategy}
+          onArena={() => { setLibraryId(undefined); setStrategyName(ui.defaultName); navigate('arena'); }} />
+      : page === 'community' ? <Community />
+      : <>
+        <div className="ux-page-heading"><div><small>{page === 'learn' ? 'ACADEMY / BOT PATH' : 'MATCH LAB / PVE'}</small><h1>{ui.nav[page]}</h1><p>{page === 'learn' ? ui.learnIntro : ui.arenaIntro}</p></div></div>
+        {page === 'arena' && <div className="ux-tabs"><button aria-pressed={!rooms} onClick={() => setRooms(false)}>{ui.pve}</button><button aria-pressed={rooms} onClick={() => setRooms(true)}>{ui.rooms}</button></div>}
+        {page === 'arena' && rooms ? <ComingSoon>{ui.roomsNote}</ComingSoon> : <>
+        {!inCampaignHub && <div className="ux-stages">{[ui.preparation, ui.battle, ui.result].map((label, i) => <span key={label} className={(loading ? 1 : replay ? 2 : 0) === i ? 'active' : ''}>{i + 1} · {label}</span>)}</div>}
       {inCampaignHub ? (
-        <section className="panel campaign-hub">
-          <h1>{text.campaign.hubTitle}</h1>
-          <p className="campaign-hub-intro">{text.campaign.hubIntro}</p>
+        <>
           {error && <p role="alert" className="error-card">{error}</p>}
-          <div className="campaign-tracks">
-            {tracks.map(item => (
-              <button key={item.id} type="button" className="campaign-track"
-                disabled={!item.available || item.levels.length === 0}
-                onClick={() => openTrack(item)}>
-                <div className="campaign-track-top">
-                  <strong>{item.name}</strong>
-                  <span className="muted">{trackProgress(item)}</span>
-                </div>
-                <p>{item.summary}</p>
-                <span className="muted">{text.campaign.levelCount(item.levelCount)}</span>
-              </button>
-            ))}
-          </div>
-        </section>
+          <LearningMap tracks={tracks} completed={completed} onOpen={(item, nextId) => {
+            openTrack(item);
+            setLevelId(nextId);
+            setPlayerBotId(item.levels.find(l => l.id === nextId)?.playerBotIds?.[0] ?? 'player');
+          }} />
+        </>
       ) : (
         <div className="layout">
-          <form className="panel editor" onSubmit={run}>
+          <form ref={editorPanel} className="panel editor" onSubmit={run}>
+            <div className="ux-editor-heading"><small>{ui.editor}</small><button type="button" onClick={() => setExpanded(!expanded)}>{expanded ? ui.collapse : ui.focus}</button></div>
             {mode === 'campaign' && (
               <button type="button" className="campaign-back" onClick={backToHub}>
                 {text.campaign.backToHub}
@@ -512,7 +576,7 @@ function App() {
             )}
             <h1>{mode === 'campaign' ? (level?.name ?? track?.name ?? text.campaign.levelsTitle) : text.strategy}</h1>
             {mode === 'campaign' && (
-              <section className="campaign-levels" aria-label={text.campaign.levelsTitle}>
+              <details className="campaign-levels"><summary>{ui.levels}</summary>
                 {levels.length === 0 && <p className="muted">{text.campaign.emptyTrack}</p>}
                 {levels.map(item => {
                   const unlocked = isLevelUnlocked(item.order, levels, completed);
@@ -538,7 +602,7 @@ function App() {
                     </button>
                   );
                 })}
-              </section>
+              </details>
             )}
             {mode === 'campaign' && level && (
               <div className="campaign-brief">
@@ -553,7 +617,7 @@ function App() {
             )}
 
             {mode === 'lab' && (
-              <section className="lab-roster" aria-label={text.lab.roster}>
+              <details className="lab-roster"><summary>{ui.roster}</summary>
                 <div className="lab-counts">
                   <label>
                     {text.lab.allies}
@@ -566,6 +630,7 @@ function App() {
                       onChange={event => updateRoster(labSetup.allyCount, Number(event.target.value))} />
                   </label>
                   <button type="button" onClick={() => {
+                    detachStrategy();
                     setLabSetup(defaultLabSetup());
                     setSelectedWall(null);
                     setEditorEpoch(value => value + 1);
@@ -604,12 +669,13 @@ function App() {
                         <select
                           value={bot.source === 'code' ? 'code' : bot.presetId}
                           onChange={event => {
+                            detachStrategy();
                             const value = event.target.value;
                             setLabSetup(previous => {
                               const bots = previous.bots.map(item => {
                                 if (item.id !== bot.id) return item;
                                 if (value === 'code') return { ...item, source: 'code' as const };
-                                return { ...item, source: 'preset' as const, presetId: value };
+                                return { ...item, source: 'preset' as const, presetId: value, movement: 'tracked' as const };
                               });
                               const custom = bots.filter(item => item.source === 'code');
                               return {
@@ -639,13 +705,14 @@ function App() {
                     </li>
                   ))}
                 </ul>
-              </section>
+              </details>
             )}
 
             <div className="strategy-language">
               <span className="muted" id="strategy-label">{text.strategyLanguage(language)}</span>
               <select aria-label={text.languageLabel} value={language} disabled={loading}
                 onChange={event => {
+                  detachStrategy();
                   setLanguage(event.target.value as StrategyLanguage);
                   setEditorEpoch(value => value + 1);
                 }}>
@@ -654,11 +721,16 @@ function App() {
             </div>
             <div className="strategy-language">
               <label htmlFor="movement">{text.movementLabel}</label>
-              <select id="movement" value={movement} disabled={loading}
-                onChange={event => setMovement(event.target.value as Movement)}>
+              <select id="movement" value={movement}
+                disabled={loading || mode === 'campaign' || !labActiveBot}
+                onChange={event => setLabSetup(previous => ({ ...previous, bots: previous.bots.map(bot => bot.id === labActiveBot?.id ? { ...bot, movement: event.target.value as Movement } : bot) }))}>
                 {modelOptions}
               </select>
             </div>
+            {mode === 'lab' && labActiveBot && <button type="button" onClick={() => {
+              updateCode(({ tracked: trackedExamples, hover: hoverExamples, wheeled: wheeledExamples, omni: omniExamples })[movement][language]);
+              setEditorEpoch(value => value + 1);
+            }}>{ui.chassisExample}</button>}
             <details className="movement-help">
               <summary>{text.movementHelpTitle}</summary>
               <p>{text.movementDescriptions[movement]}</p>
@@ -692,6 +764,7 @@ function App() {
                     className={bot.id === labActiveBot?.id ? 'tank-tab active' : 'tank-tab'}
                     aria-selected={bot.id === labActiveBot?.id}
                     onClick={() => {
+                      detachStrategy();
                       setLabSetup(previous => ({ ...previous, activeBotId: bot.id }));
                       setEditorEpoch(value => value + 1);
                     }}
@@ -714,6 +787,12 @@ function App() {
             {mode === 'lab' && labCustomBots.length === 0 && (
               <p className="muted">{text.lab.sourcePreset}: {text.lab.customCode.toLowerCase()} не выбран — все на пресетах.</p>
             )}
+            <button className="primary" disabled={loading || !canRun}>
+              {loading ? text.working : text.start}
+            </button>
+            {code.length > 16384 && <p role="alert" className="error">{text.strategyTooLong}</p>}
+            {jobStatus?.state === 'queued' && <p role="status">{text.queuePosition(jobStatus.position)}</p>}
+            {mode === 'lab' && labCustomBots.length > 0 && <div className="ux-save"><input aria-label={ui.name} value={strategyName} maxLength={100} onChange={e => setStrategyName(e.target.value)} /><button type="button" onClick={saveCurrentStrategy}>{ui.save}</button>{libraryNote && <small role="status">{libraryNote}</small>}</div>}
             {error && <p role="alert" className="error-card">{error}</p>}
             {campaignNote && <p role="status" className="success-card">{campaignNote}</p>}
             {scriptError && (
@@ -759,15 +838,12 @@ function App() {
                 </ul>
               )}
             </details>
-            <button className="primary" disabled={loading || !canRun}>
-              {loading ? text.working : text.start}
-            </button>
-            {code.length > 16384 && <p role="alert" className="error">{text.strategyTooLong}</p>}
-            {jobStatus?.state === 'queued' && <p role="status">{text.queuePosition(jobStatus.position)}</p>}
+
           </form>
           <section className="panel replay">
             <div className="arena-panel-heading">
               <h2>{text.arena}</h2>
+              {replay && <button type="button" onClick={() => { setExpanded(false); editorPanel.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>{ui.backCode}</button>}
               {mode === 'lab' && (
                 <div className="lab-arena-tabs" role="tablist" aria-label={text.arena}>
                   <button
@@ -864,6 +940,11 @@ function App() {
           </section>
         </div>
       )}
+        </>}
+      </>}
+      {page === 'workshop' && libraryNote && <p role="status" className="ux-notice">{libraryNote}</p>}
+      <footer className="platform-footer">BOTARENA · {ui.local} · JavaScript / Python · REST + Replay</footer>
+      </div>
     </main>
   );
 }
