@@ -6,7 +6,7 @@
 
 Нужны .NET SDK 10, Node.js 22.12+ и npm.
 
-Сначала настройте PostgreSQL и Yandex ID по инструкции ниже. Затем соберите
+Сначала настройте PostgreSQL и нужные OAuth-провайдеры по инструкции ниже. Затем соберите
 клиент и запустите сервер:
 
 ```sh
@@ -17,7 +17,7 @@ dotnet run --project server
 
 Откройте [http://127.0.0.1:5050](http://127.0.0.1:5050). Для разработки фронтенда запустите `npm --prefix frontend run dev` в отдельном терминале с работающим сервером и откройте [http://127.0.0.1:5173](http://127.0.0.1:5173).
 
-## PostgreSQL и Yandex ID
+## PostgreSQL, Yandex ID и GitHub OAuth
 
 Раздел «Сообщество» хранит пользователей, стратегии, версии и библиотеку манёвров в PostgreSQL. Для локального запуска поднимите базу и укажите настройки авторизации:
 
@@ -40,6 +40,14 @@ Callback URL в настройках Yandex задайте **точно** как
 и correlation cookie. В production используйте HTTPS и соответствующий публичный
 адрес. Никогда не добавляйте Client secret или реальные пароли в Git.
 
+Для входа через GitHub откройте **Settings → Developer settings → OAuth Apps →
+New OAuth App**. Укажите Homepage URL `http://127.0.0.1:5050`, а Authorization
+callback URL — **точно** `http://127.0.0.1:5050/auth/github/callback`. После
+создания приложения перенесите Client ID и сгенерированный Client secret в
+`Authentication:GitHub`. Для production создайте отдельное OAuth-приложение с
+публичным HTTPS-адресом. Пользователь, вошедший по локальному логину, может
+привязать Yandex ID и GitHub в настройках профиля.
+
 Те же настройки можно передать переменными среды:
 
 ```text
@@ -48,13 +56,17 @@ Database__MigrateOnStartup=true
 Authentication__Yandex__ClientId=...
 Authentication__Yandex__ClientSecret=...
 Authentication__Yandex__CallbackPath=/auth/callback
+Authentication__GitHub__ClientId=...
+Authentication__GitHub__ClientSecret=...
+Authentication__GitHub__CallbackPath=/auth/github/callback
 ```
 
 При `Database:MigrateOnStartup=true` сервер создаёт отсутствующую базу и применяет
 миграции EF Core, если роль PostgreSQL имеет право `CREATE DATABASE`. Если права
 роли ограничены, создайте базу заранее и выдайте ей права на применение миграций.
-После первого входа через Yandex ID пользователь обязан выбрать уникальный ник.
-Имя, фамилия и фотография профиля обновляются из Yandex ID при последующих входах.
+После первого OAuth-входа пользователь обязан выбрать уникальный ник. Также можно
+зарегистрироваться по локальному логину и паролю; пароль хранится только как
+стойкий хэш ASP.NET Core Identity. Имя, фамилию, ник и пароль можно менять в профиле.
 
 Новый пользователь получает 1000 виртуальных кредитов. Кредиты можно получить за победы в дружеских боях на ставку и продажу опубликованных стратегий. Все списания и начисления записываются в журнал операций PostgreSQL; при ничьей или техническом сбое боя ставки возвращаются обоим игрокам.
 

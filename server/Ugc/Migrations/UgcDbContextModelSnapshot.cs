@@ -45,6 +45,10 @@ namespace BotArena.Ugc.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("GitHubId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<DateTimeOffset>("LastLoginAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -53,20 +57,37 @@ namespace BotArena.Ugc.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("Login")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
                     b.Property<string>("Nickname")
                         .HasMaxLength(24)
                         .HasColumnType("character varying(24)");
+
+                    b.Property<string>("NormalizedLogin")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
 
                     b.Property<string>("NormalizedNickname")
                         .HasMaxLength(24)
                         .HasColumnType("character varying(24)");
 
+                    b.Property<string>("PasswordHash")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("YandexId")
-                        .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("GitHubId")
+                        .IsUnique();
+
+                    b.HasIndex("NormalizedLogin")
+                        .IsUnique();
 
                     b.HasIndex("NormalizedNickname")
                         .IsUnique();

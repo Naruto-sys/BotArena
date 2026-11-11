@@ -30,9 +30,9 @@ import {
 import { MatchDiagnosticError, buildCustomMatchPayload, runMatch } from './matchApi';
 import { StrategyHelp } from './StrategyHelp';
 import { AuthPanel } from './AuthPanel';
-import { login, ugcApi, type AuthNotice } from './ugcApi';
+import { ugcApi, type AuthNotice } from './ugcApi';
 import { text } from './text';
-import { Home, Workshop, LearningMap, SettingsDialog, type Page } from './PlatformPages';
+import { FirstRunDialog, Home, Workshop, LearningMap, SettingsDialog, SystemTour, type Page } from './PlatformPages';
 import { platformText as ui } from './text';
 import { loadStrategies, saveStrategies, type SavedStrategy } from './strategyLibrary';
 import './style.css';
@@ -43,6 +43,13 @@ const UgcHub = lazy(() => import('./UgcHub').then(module => ({ default: module.U
 const RoomsPanel = lazy(() => import('./RoomsPanel').then(module => ({ default: module.RoomsPanel })));
 const StrategyEditor = lazy(() => import('./StrategyEditor'));
 const ReplayPlayer = lazy(() => import('./ReplayPlayer').then(module => ({ default: module.ReplayPlayer })));
+
+const quickDemoCode = `function tick({ self, enemy }) {
+  if (!enemy) return { leftTrack: 0.4, rightTrack: -0.4 };
+  const x = enemy.position.x - self.position.x;
+  const y = enemy.position.y - self.position.y;
+  return { aimDirection: { x, y }, shoot: self.canShoot };
+}`;
 
 function formatErrorSnippet(source: string, line?: number | null, column?: number | null) {
   if (line == null || line < 1) return '';
@@ -203,6 +210,8 @@ function App() {
   const [training, setTraining] = useState(location.hash === '#learn/pve');
   const [rooms, setRooms] = useState(location.hash === '#arena/rooms');
   const [settings, setSettings] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
+  const [firstRunOpen, setFirstRunOpen] = useState(() => localStorage.getItem('botarena-first-run-v2') !== 'done');
   const [expanded, setExpanded] = useState(false);
   const [library, setLibrary] = useState(loadStrategies);
   const [strategyName, setStrategyName] = useState<string>(ui.defaultName);
@@ -361,6 +370,24 @@ function App() {
     if (next === 'arena') { setRooms(false); selectMode('lab'); }
   }
 
+  function closeFirstRun() {
+    localStorage.setItem('botarena-first-run-v2', 'done');
+    setFirstRunOpen(false);
+  }
+
+  function startQuickDemo() {
+    const setup = loadLabSetup();
+    const player = setup.bots.find(bot => bot.teamId === 'player') ?? setup.bots[0];
+    setLabSetup({ ...setup, activeBotId: player.id, bots: setup.bots.map(bot => bot.id === player.id
+      ? { ...bot, source: 'code', code: { ...bot.code, javascript: quickDemoCode } }
+      : bot) });
+    setLanguage('javascript'); setMode('lab'); setPage('arena'); setRooms(false); setLabArenaView('edit');
+    setEditorEpoch(value => value + 1);
+    history.replaceState(null, '', '#arena');
+    setAuthNotice({ message: 'Пример вставлен. Нажмите «Запустить», чтобы посмотреть первый бой.', canLogin: false });
+    closeFirstRun();
+  }
+
   useEffect(() => {
     const refresh = () => setLibrary(loadStrategies());
     window.addEventListener('storage', refresh);
@@ -488,7 +515,7 @@ function App() {
 
   async function run(event: FormEvent) {
     event.preventDefault();
-    if (activeRun.current || !session?.authenticated) return;
+    if (activeRun.current) return;
     if (mode === 'campaign' && level && !isLevelUnlocked(level.order, levels, completed)) return;
     setExpanded(false);
     const controller = new AbortController();
@@ -530,10 +557,14 @@ function App() {
       setLogs(match.logs ?? []);
       setScriptError(match.error ?? undefined);
       if (mode === 'campaign' && level && !match.error && teamWon(match.replay.result)) {
-        const nextCompleted = markLevelCompleted(level.id);
+        const nextCompleted = session?.authenticated
+          ? markLevelCompleted(level.id)
+          : completed.includes(level.id) ? completed : [...completed, level.id];
         setCompleted(nextCompleted);
         const nextLevel = levels.find(item => item.order === level.order + 1);
-        setCampaignNote(nextLevel ? text.campaign.success : text.campaign.finished);
+        setCampaignNote(session?.authenticated
+          ? nextLevel ? text.campaign.success : text.campaign.finished
+          : 'Уровень пройден в гостевом режиме. Войдите или зарегистрируйтесь, чтобы сохранить прогресс.');
       }
     } catch (problem) {
       if (problem instanceof MatchDiagnosticError) {
@@ -565,9 +596,9 @@ function App() {
       const value = bot.code[language] ?? '';
       return value.trim().length > 0 && value.length <= 16384;
     });
-  const canRun = session?.authenticated && (mode === 'lab'
+  const canRun = mode === 'lab'
     ? labSetup.bots.length >= 2 && labCodesReady
-    : Boolean(level && isLevelUnlocked(level.order, levels, completed) && campaignCodesReady));
+    : Boolean(level && isLevelUnlocked(level.order, levels, completed) && campaignCodesReady);
 
   return (
     <main className={`platform-app${expanded ? ' editor-expanded' : ''}`}>
@@ -576,12 +607,15 @@ function App() {
         <nav aria-label="Основная навигация">{Object.entries(ui.nav).map(([id, label]) =>
           <button key={id} type="button" aria-current={page === id ? 'page' : undefined}
             disabled={loading} onClick={() => navigate(id as Page)}>{label}</button>)}</nav>
-        <div className="platform-account"><AuthPanel session={session} onChange={setSession} /><button onClick={() => setSettings(true)}>{ui.settings}</button></div>
+        <div className="platform-account"><button className="tour-launch" onClick={() => setTourOpen(true)}>？ Обзор</button><AuthPanel session={session} onChange={setSession} /><button onClick={() => setSettings(true)}>{ui.settings}</button></div>
       </header>
       {settings && <SettingsDialog onClose={() => setSettings(false)} />}
+      {tourOpen && <SystemTour onClose={() => setTourOpen(false)} onNavigate={navigate} />}
+      {firstRunOpen && session && !session.authenticated && <FirstRunDialog onStart={startQuickDemo} onClose={closeFirstRun} />}
       <div className="platform-content">
       <div className="ux-breadcrumb">BotArena / {ui.nav[page]}{page === 'learn' && track ? ` / ${track.name}` : ''}</div>
-      {authNotice && <div className="auth-callout auth-feedback" role="status"><p>{authNotice.message}</p><div className="ux-actions">{authNotice.canLogin && <button className="yandex-login" onClick={login}>{ui.signIn}</button>}<button type="button" onClick={() => setAuthNotice(undefined)}>{ui.close}</button></div></div>}
+      {session && !session.authenticated && <div className="guest-banner"><b>Гостевой режим</b><span>Можно запускать одиночные бои, но прогресс не сохраняется.</span><button onClick={() => window.dispatchEvent(new CustomEvent('botarena-open-auth'))}>Войти или зарегистрироваться</button></div>}
+      {authNotice && <div className="auth-callout auth-feedback" role="status"><p>{authNotice.message}</p><div className="ux-actions">{authNotice.canLogin && <button className="account-login" onClick={() => window.dispatchEvent(new CustomEvent('botarena-open-auth'))}>Войти / Регистрация</button>}<button type="button" onClick={() => setAuthNotice(undefined)}>{ui.close}</button></div></div>}
       <Suspense fallback={<div className="empty">{ui.loadingSection}</div>}>
       {page === 'home' ? <><Home tracks={tracks} completed={completed} languages={languages} navigate={navigate} onContinue={() => {
           navigate('learn');
@@ -597,7 +631,7 @@ function App() {
         {page === 'learn' && <div className="ux-tabs"><button aria-pressed={!training} onClick={() => { setTraining(false); history.replaceState(null, '', '#learn'); }}>{ui.learningLab}</button><button aria-pressed={training} onClick={() => { setTraining(true); history.replaceState(null, '', '#learn/pve'); }}>{ui.pveProgress}</button></div>}
         {page === 'learn' && training ? <PveMap session={session} /> : <>
         {page === 'arena' && <div className="ux-tabs"><button aria-pressed={!rooms} onClick={() => { setRooms(false); history.replaceState(null, '', '#arena'); }}>{ui.pve}</button><button aria-pressed={rooms} onClick={() => { setRooms(true); history.replaceState(null, '', '#arena/rooms'); }}>{ui.rooms}</button></div>}
-        {page === 'arena' && rooms ? session?.authenticated ? <RoomsPanel /> : <section className="panel auth-required"><h2>{ui.roomsTitle}</h2><p>{ui.roomsAuth}</p><button className="yandex-login" onClick={login}><b aria-hidden="true">Я</b><span>{ui.signIn}</span></button></section> : <>
+        {page === 'arena' && rooms ? session?.authenticated ? <RoomsPanel /> : <section className="panel auth-required"><h2>{ui.roomsTitle}</h2><p>{ui.roomsAuth}</p><button className="account-login" onClick={() => window.dispatchEvent(new CustomEvent('botarena-open-auth'))}>Войти / Регистрация</button></section> : <>
         {!inCampaignHub && <div className="ux-stages">{[ui.preparation, ui.battle, ui.result].map((label, i) => <span key={label} className={(loading ? 1 : replay ? 2 : 0) === i ? 'active' : ''}>{i + 1} · {label}</span>)}</div>}
       {inCampaignHub ? (
         <>
@@ -832,7 +866,7 @@ function App() {
             {mode === 'lab' && labCustomBots.length === 0 && (
               <p className="muted">{text.lab.sourcePreset}: {text.lab.customCode.toLowerCase()} не выбран — все на пресетах.</p>
             )}
-            {!session?.authenticated && <div className="auth-callout"><div className="auth-callout-copy"><strong>{ui.authTitle}</strong><p>{ui.authDescription}</p></div><button className="yandex-login" type="button" onClick={login}><b aria-hidden="true">Я</b><span>{ui.signIn}</span><span className="login-arrow" aria-hidden="true">→</span></button></div>}
+            {!session?.authenticated && <div className="auth-callout"><div className="auth-callout-copy"><strong>Гостевой бой доступен</strong><p>Результат можно посмотреть, но прогресс сохранится только после входа или регистрации.</p></div></div>}
             <button className="primary" disabled={loading || !canRun}>
               {loading ? text.working : text.start}
             </button>

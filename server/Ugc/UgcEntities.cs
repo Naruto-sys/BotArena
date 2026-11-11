@@ -9,9 +9,13 @@ public enum GameRoomStatus { Open, Running, Completed, Cancelled }
 public sealed class AppUser
 {
     public Guid Id { get; set; } = Guid.NewGuid();
-    public required string YandexId { get; set; }
-    public required string FirstName { get; set; }
-    public required string LastName { get; set; }
+    public string? YandexId { get; set; }
+    public string? GitHubId { get; set; }
+    public string? Login { get; set; }
+    public string? NormalizedLogin { get; set; }
+    public string? PasswordHash { get; set; }
+    public string FirstName { get; set; } = "";
+    public string LastName { get; set; } = "";
     public string? AvatarUrl { get; set; }
     public string? Nickname { get; set; }
     public string? NormalizedNickname { get; set; }

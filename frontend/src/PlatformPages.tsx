@@ -55,3 +55,35 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
     <h2 id="settings-title">{ui.settings}</h2><p>{ui.settingsNote}</p><button autoFocus onClick={onClose}>{ui.close}</button>
   </dialog>;
 }
+
+const tourStages: { page: Page; title: string; tips: string[] }[] = [
+  { page: 'home', title: 'Главная', tips: ['Продолжайте с ближайшего доступного испытания.', 'Карточка прогресса показывает пройденные уровни.', 'Быстрые переходы ведут в обучение, арену и мастерскую.'] },
+  { page: 'learn', title: 'Обучение', tips: ['Уровни открываются по порядку.', 'В редакторе задаются команды робота.', 'Запустите испытание и изучите запись боя.'] },
+  { page: 'arena', title: 'Арена', tips: ['Здесь можно менять код и состав участников.', 'Карту и препятствия можно редактировать перед боем.', 'PvP-комнаты доступны зарегистрированным игрокам.'] },
+  { page: 'workshop', title: 'Мастерская', tips: ['Локальные стратегии остаются на этом устройстве.', 'Опубликованные стратегии доступны после входа.', 'Платный код открывается после покупки.'] },
+  { page: 'community', title: 'Сообщество', tips: ['Добавляйте игроков в друзья.', 'Отправляйте друзьям копии стратегий.', 'Приглашайте друзей в PvP-бои со ставкой.'] },
+];
+
+export function SystemTour({ onClose, onNavigate }: { onClose: () => void; onNavigate: (page: Page) => void }) {
+  const [stage, setStage] = useState(0);
+  const current = tourStages[stage];
+  useEffect(() => { onNavigate(current.page); }, [current.page, onNavigate]);
+  function finish() { localStorage.setItem('botarena-system-tour', 'completed'); onClose(); }
+  return <div className="tour-backdrop" role="presentation"><section className="tour-dialog" role="dialog" aria-modal="true" aria-labelledby="tour-title">
+    <button className="tour-close" onClick={onClose} aria-label="Закрыть">×</button>
+    <small>ЭТАП {stage + 1} ИЗ {tourStages.length}</small><h2 id="tour-title">{current.title}</h2>
+    <div className="tour-progress">{tourStages.map((_, index) => <span key={index} className={index <= stage ? 'done' : ''} />)}</div>
+    <ol>{current.tips.map(tip => <li key={tip}>{tip}</li>)}</ol>
+    <div className="tour-actions"><button disabled={stage === 0} onClick={() => setStage(value => value - 1)}>← Назад</button>{stage === tourStages.length - 1 ? <button className="primary" onClick={finish}>Завершить</button> : <button className="primary" onClick={() => setStage(value => value + 1)}>Далее →</button>}</div>
+  </section></div>;
+}
+
+export function FirstRunDialog({ onStart, onClose }: { onStart: () => void; onClose: () => void }) {
+  return <div className="tour-backdrop"><section className="tour-dialog first-run-dialog" role="dialog" aria-modal="true" aria-labelledby="first-run-title">
+    <small>ПЕРВЫЙ ЗАПУСК · 1 МИНУТА</small><h2 id="first-run-title">Посмотрите, как оживает код</h2>
+    <p>Мы уже подготовили простую стратегию: робот найдёт противника, наведёт башню и выстрелит. Откроем Арену — останется нажать «Запустить».</p>
+    <pre><code>{'function tick({ self, enemy }) {\n  if (!enemy) return { leftTrack: 0.4, rightTrack: -0.4 };\n  const x = enemy.position.x - self.position.x;\n  const y = enemy.position.y - self.position.y;\n  return { aimDirection: { x, y }, shoot: self.canShoot };\n}'}</code></pre>
+    <p className="guest-progress-note">Играть можно без аккаунта. Гостевой прогресс не сохраняется — войдите или зарегистрируйтесь, чтобы продолжить с того же места позже.</p>
+    <div className="tour-actions"><button onClick={onClose}>Не сейчас</button><button className="primary" onClick={onStart}>Вставить пример и открыть Арену →</button></div>
+  </section></div>;
+}

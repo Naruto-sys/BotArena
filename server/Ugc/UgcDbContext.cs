@@ -24,8 +24,14 @@ public sealed class UgcDbContext(DbContextOptions<UgcDbContext> options) : DbCon
         users.ToTable("users");
         users.HasKey(user => user.Id);
         users.HasIndex(user => user.YandexId).IsUnique();
+        users.HasIndex(user => user.GitHubId).IsUnique();
+        users.HasIndex(user => user.NormalizedLogin).IsUnique();
         users.HasIndex(user => user.NormalizedNickname).IsUnique();
         users.Property(user => user.YandexId).HasMaxLength(64);
+        users.Property(user => user.GitHubId).HasMaxLength(64);
+        users.Property(user => user.Login).HasMaxLength(40);
+        users.Property(user => user.NormalizedLogin).HasMaxLength(40);
+        users.Property(user => user.PasswordHash).HasMaxLength(500);
         users.Property(user => user.FirstName).HasMaxLength(100);
         users.Property(user => user.LastName).HasMaxLength(100);
         users.Property(user => user.Nickname).HasMaxLength(24);

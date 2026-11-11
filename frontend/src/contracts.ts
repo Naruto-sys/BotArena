@@ -132,10 +132,13 @@ export interface ArenaUser {
   avatarUrl: string | null;
   nickname: string | null;
   balance: number;
+  login: string | null;
 }
 export type AuthSession =
-  | { authenticated: false; loginAvailable?: boolean }
-  | { authenticated: true; user: ArenaUser; needsNickname: boolean; loginAvailable?: boolean };
+  | { authenticated: false; loginAvailable?: boolean; yandexAvailable?: boolean; githubAvailable?: boolean }
+  | { authenticated: true; user: ArenaUser; needsNickname: boolean; loginAvailable?: boolean;
+      yandexAvailable?: boolean; githubAvailable?: boolean; hasPassword: boolean;
+      yandexLinked: boolean; githubLinked: boolean };
 export type UgcVisibility = 'Private' | 'Unlisted' | 'Public';
 export interface UgcAuthor { id: string; nickname: string; avatarUrl: string | null }
 export interface UgcStrategyCard {

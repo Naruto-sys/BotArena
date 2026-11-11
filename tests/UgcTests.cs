@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.Identity;
 
 namespace BotArena.Tests;
 
@@ -68,5 +69,28 @@ public class UgcTests
 
         Assert.Equal(CookieAuthenticationDefaults.AuthenticationScheme, authentication.DefaultChallengeScheme);
         Assert.NotEqual(YandexAuthentication.Scheme, authentication.DefaultChallengeScheme);
+    }
+
+    [Theory]
+    [InlineData("pilot_17")]
+    [InlineData("tank.master")]
+    public void AcceptsSafeLocalLogins(string login) => Assert.True(LoginRules.Valid(login));
+
+    [Theory]
+    [InlineData("ab")]
+    [InlineData("логин")]
+    [InlineData("has spaces")]
+    public void RejectsUnsafeLocalLogins(string login) => Assert.False(LoginRules.Valid(login));
+
+    [Fact]
+    public void LocalPasswordsAreStoredAsOneWayHashes()
+    {
+        var user = new AppUser { FirstName = "Test", LastName = "Pilot" };
+        var hasher = new PasswordHasher<AppUser>();
+        var hash = hasher.HashPassword(user, "correct-horse-battery");
+
+        Assert.DoesNotContain("correct-horse-battery", hash, StringComparison.Ordinal);
+        Assert.Equal(PasswordVerificationResult.Success, hasher.VerifyHashedPassword(user, hash, "correct-horse-battery"));
+        Assert.Equal(PasswordVerificationResult.Failed, hasher.VerifyHashedPassword(user, hash, "wrong-password"));
     }
 }

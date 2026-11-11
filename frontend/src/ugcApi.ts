@@ -17,7 +17,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const ugcApi = {
   session: () => request<AuthSession>('/api/auth/session'),
+  register: (value: { login: string; password: string; firstName: string; lastName: string; nickname: string }) =>
+    request<ArenaUser>('/api/auth/register', { method: 'POST', body: JSON.stringify(value) }),
+  passwordLogin: (login: string, password: string) => request<ArenaUser>('/api/auth/password-login', {
+    method: 'POST', body: JSON.stringify({ login, password }),
+  }),
   nickname: (nickname: string) => request<ArenaUser>('/api/auth/nickname', { method: 'POST', body: JSON.stringify({ nickname }) }),
+  profile: (firstName: string, lastName: string) => request<ArenaUser>('/api/auth/profile', {
+    method: 'PUT', body: JSON.stringify({ firstName, lastName }),
+  }),
+  changePassword: (currentPassword: string, newPassword: string) => request<void>('/api/auth/change-password', {
+    method: 'POST', body: JSON.stringify({ currentPassword, newPassword }),
+  }),
   logout: () => request<void>('/api/auth/logout', { method: 'POST' }),
   catalog: (query = '', language = '', sort = 'popular') => request<UgcStrategyCard[]>(`/api/ugc/strategies?${new URLSearchParams({ q: query, language, sort })}`),
   mine: () => request<UgcStrategyCard[]>('/api/ugc/me/strategies'),
@@ -87,20 +98,26 @@ export function requireLogin() {
   announceAuth({ message: ui.authRequiredNotice, canLogin: true });
 }
 
-export async function login() {
+export async function login(provider: 'yandex' | 'github' = 'yandex') {
   const origin = location.href;
   try {
     const session = await ugcApi.session();
     if (location.href !== origin) return;
-    if (!session.loginAvailable) {
+    const available = provider === 'github' ? session.githubAvailable : session.yandexAvailable ?? session.loginAvailable;
+    if (!available) {
       announceAuth({ message: ui.authUnavailable, canLogin: false });
       return;
     }
-    location.assign(`/api/auth/login?returnUrl=${encodeURIComponent(location.pathname + location.search + location.hash)}`);
+    const path = provider === 'github' ? '/api/auth/login/github' : '/api/auth/login';
+    location.assign(`${path}?returnUrl=${encodeURIComponent(location.pathname + location.search + location.hash)}`);
   } catch {
     if (location.href !== origin) return;
     announceAuth({ message: ui.authCheckFailed, canLogin: false });
   }
+}
+
+export function linkProvider(provider: 'yandex' | 'github') {
+  location.assign(`/api/auth/link/${provider}?returnUrl=${encodeURIComponent(location.pathname + location.search + location.hash)}`);
 }
 
 export function isUnauthorized(error: unknown) {
