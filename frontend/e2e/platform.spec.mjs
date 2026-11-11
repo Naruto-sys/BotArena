@@ -308,3 +308,66 @@ test('light theme keeps unified home and arena text readable', async ({page}) =>
   await page.getByRole('navigation',{name:'Основная навигация'}).getByRole('button',{name:'Арена',exact:true}).click();
   assert(await contrast('.editor h1','.editor')>=4.5);
 });
+
+test('protected community sections never redirect a guest; missing OAuth stays inside the app', async ({page,request}) => {
+  const session=await request.get('/api/auth/session').then(r=>r.json());
+  test.skip(session.authenticated,'Guest authorization regression');
+  const navigations=[]; const errors=[];
+  page.on('request',r=>{if(r.isNavigationRequest()&&r.url().includes('/api/auth/login'))navigations.push(r.url());});
+  page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('/#ugc');
+  const tabs=page.locator('.ugc-tabs');
+  for(const name of ['Друзья','Мои стратегии','Комнаты','Карты']) {
+    await tabs.getByRole('button',{name,exact:true}).click();
+    await page.locator('.auth-feedback').filter({hasText:'Для этого раздела нужен вход через Яндекс.'}).waitFor();
+    assert(page.url().endsWith('#ugc'));
+  }
+  if(!session.loginAvailable) {
+    await page.locator('.platform-header .yandex-login').click();
+    await page.locator('.auth-feedback').filter({hasText:'Вход через Яндекс пока не настроен на сервере.'}).waitFor();
+    assert(page.url().endsWith('#ugc'));
+  }
+  await page.getByRole('navigation',{name:'Основная навигация'}).getByRole('button',{name:'Главная',exact:true}).click();
+  await page.locator('.ux-hero').waitFor();
+  assert.deepEqual(navigations,[]);
+  assert.deepEqual(errors,[]);
+});
+
+test('maneuver copy reports success, and clipboard rejection reports an error', async ({page}) => {
+  await page.route('**/api/ugc/maneuvers?*',route=>route.fulfill({json:[{
+    id:'copy-test',name:'Проверка копирования',description:'Тест',category:'combat',language:'javascript',
+    code:'function preciseAim() { return {}; }',usage:'preciseAim(state)',tags:[],
+  }]}));
+  await page.addInitScript(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.__copiedManeuver=text;}}}));
+  await page.goto('/#ugc');
+  await page.locator('.ugc-tabs').getByRole('button',{name:'Манёвры',exact:true}).click();
+  await page.getByRole('button',{name:'Копировать код',exact:true}).click();
+  const success=page.getByRole('status').filter({hasText:'Код манёвра скопирован.'});
+  await success.waitFor();
+  assert.equal(await success.getAttribute('class'),'ugc-notice');
+  assert.equal(await page.evaluate(()=>window.__copiedManeuver),'function preciseAim() { return {}; }');
+  await page.evaluate(()=>navigator.clipboard.writeText=async()=>{throw new Error('Clipboard denied');});
+  await page.getByRole('button',{name:'Копировать код',exact:true}).click();
+  await page.getByRole('alert').filter({hasText:'Не удалось скопировать код.'}).waitFor();
+  assert.equal(await page.locator('.ugc-notice').count(),0);
+});
+
+test('late unauthorized responses do not show login prompts after leaving a section', async ({page}) => {
+  let release;
+  const held=new Promise(resolve=>release=resolve);
+  let requested;
+  const started=new Promise(resolve=>requested=resolve);
+  await page.route('**/api/friends/',async route=>{
+    requested(); await held; await route.fulfill({status:401,json:{}});
+  });
+  await page.goto('/#ugc');
+  await page.locator('.ugc-tabs').getByRole('button',{name:'Друзья',exact:true}).click();
+  await started;
+  await page.getByRole('navigation',{name:'Основная навигация'}).getByRole('button',{name:'Главная',exact:true}).click();
+  const response=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/friends/'&&r.status()===401);
+  release(); await response;
+  // Let the completed fetch and its React updates drain.
+  await page.waitForTimeout(100);
+  assert.equal(await page.locator('.auth-feedback').count(),0);
+  await page.locator('.ux-hero').waitFor();
+});

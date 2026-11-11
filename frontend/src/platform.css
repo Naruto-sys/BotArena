@@ -145,3 +145,6 @@ dialog.ux-modal::backdrop { background: #020a13bb; backdrop-filter: blur(8px); }
 [data-theme="light"] .auth-callout-copy strong { color: #203b49; }
 [data-theme="light"] .auth-callout-copy p { color: #526b7b; }
 [data-theme="light"] .login-arrow { color: #326f62; }
+.auth-feedback { position: fixed; right: 24px; bottom: 24px; z-index: 150; width: min(420px, calc(100vw - 32px)); margin: 0; color: #bcd6e3; line-height: 1.5; box-shadow: 0 12px 40px #0005; }
+.auth-feedback .ux-actions { margin: 0; }
+[data-theme="light"] .auth-feedback { color: #385667; }

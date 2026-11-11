@@ -65,22 +65,23 @@ public static class YandexAuthentication
 
     public static void MapAuthenticationEndpoints(this WebApplication app)
     {
-        app.MapGet("/api/auth/login", (string? returnUrl, IConfiguration configuration) =>
+        app.MapGet("/api/auth/login", async (string? returnUrl, IConfiguration configuration, IAuthenticationSchemeProvider schemes) =>
         {
-            if (string.IsNullOrWhiteSpace(configuration["Authentication:Yandex:ClientId"])
-                || string.IsNullOrWhiteSpace(configuration["Authentication:Yandex:ClientSecret"]))
+            if (!await IsLoginAvailableAsync(configuration, schemes))
                 return Results.Problem("Yandex ID не настроен на сервере.", statusCode: 503);
             var destination = IsLocal(returnUrl) ? returnUrl! : "/";
             return Results.Challenge(new AuthenticationProperties { RedirectUri = destination }, [Scheme]);
         }).AllowAnonymous();
 
-        app.MapGet("/api/auth/session", async (ClaimsPrincipal principal, UgcDbContext database) =>
+        app.MapGet("/api/auth/session", async (ClaimsPrincipal principal, UgcDbContext database, IAuthenticationSchemeProvider schemes, IConfiguration configuration) =>
         {
-            if (principal.UserId() is not { } id) return Results.Ok(new { authenticated = false });
+            var loginAvailable = await IsLoginAvailableAsync(configuration, schemes);
+            if (principal.UserId() is not { } id) return Results.Ok(new { authenticated = false, loginAvailable });
             var user = await database.Users.AsNoTracking().SingleOrDefaultAsync(item => item.Id == id);
-            return user is null ? Results.Ok(new { authenticated = false }) : Results.Ok(new
+            return user is null ? Results.Ok(new { authenticated = false, loginAvailable }) : Results.Ok(new
             {
                 authenticated = true,
+                loginAvailable,
                 user = new { user.Id, user.FirstName, user.LastName, user.AvatarUrl, user.Nickname, user.Balance },
                 needsNickname = user.Nickname is null
             });
@@ -109,6 +110,11 @@ public static class YandexAuthentication
             return Results.NoContent();
         }).RequireAuthorization();
     }
+
+    internal static async Task<bool> IsLoginAvailableAsync(IConfiguration configuration, IAuthenticationSchemeProvider schemes) =>
+        !string.IsNullOrWhiteSpace(configuration["Authentication:Yandex:ClientId"])
+        && !string.IsNullOrWhiteSpace(configuration["Authentication:Yandex:ClientSecret"])
+        && await schemes.GetSchemeAsync(Scheme) is not null;
 
     private static async Task CreateTicket(OAuthCreatingTicketContext context)
     {

@@ -30,7 +30,7 @@ import {
 import { MatchDiagnosticError, buildCustomMatchPayload, runMatch } from './matchApi';
 import { StrategyHelp } from './StrategyHelp';
 import { AuthPanel } from './AuthPanel';
-import { login, ugcApi } from './ugcApi';
+import { login, ugcApi, type AuthNotice } from './ugcApi';
 import { text } from './text';
 import { Home, Workshop, LearningMap, SettingsDialog, type Page } from './PlatformPages';
 import { platformText as ui } from './text';
@@ -198,6 +198,7 @@ const modelOptions = Object.entries(text.movements).map(([id, label]) =>
 function App() {
   const [page, setPage] = useState<Page>(() => location.hash === '#ugc' ? 'community' : Object.hasOwn(ui.nav, location.hash.slice(1).split('/')[0]) ? location.hash.slice(1).split('/')[0] as Page : new URLSearchParams(location.search).has('share') ? 'community' : 'home');
   const [session, setSession] = useState<AuthSession>();
+  const [authNotice, setAuthNotice] = useState<AuthNotice>();
   const [onlineWorkshop, setOnlineWorkshop] = useState(location.hash === '#workshop/online');
   const [training, setTraining] = useState(location.hash === '#learn/pve');
   const [rooms, setRooms] = useState(location.hash === '#arena/rooms');
@@ -321,6 +322,12 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const notify = (event: Event) => setAuthNotice((event as CustomEvent<AuthNotice>).detail);
+    window.addEventListener('botarena-auth-notice', notify);
+    return () => window.removeEventListener('botarena-auth-notice', notify);
+  }, []);
+
   function resetRunState() {
     activeRun.current?.abort();
     setError('');
@@ -343,6 +350,7 @@ function App() {
 
   function navigate(next: Page) {
     if (loading) return;
+    setAuthNotice(undefined);
     setPage(next);
     const destination = new URL(location.href);
     destination.hash = next === 'community' ? '#ugc' : next === 'workshop' && onlineWorkshop ? '#workshop/online' : `#${next}`;
@@ -573,6 +581,7 @@ function App() {
       {settings && <SettingsDialog onClose={() => setSettings(false)} />}
       <div className="platform-content">
       <div className="ux-breadcrumb">BotArena / {ui.nav[page]}{page === 'learn' && track ? ` / ${track.name}` : ''}</div>
+      {authNotice && <div className="auth-callout auth-feedback" role="status"><p>{authNotice.message}</p><div className="ux-actions">{authNotice.canLogin && <button className="yandex-login" onClick={login}>{ui.signIn}</button>}<button type="button" onClick={() => setAuthNotice(undefined)}>{ui.close}</button></div></div>}
       <Suspense fallback={<div className="empty">{ui.loadingSection}</div>}>
       {page === 'home' ? <><Home tracks={tracks} completed={completed} languages={languages} navigate={navigate} onContinue={() => {
           navigate('learn');
