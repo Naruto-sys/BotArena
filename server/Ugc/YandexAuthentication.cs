@@ -17,7 +17,9 @@ public static class YandexAuthentication
         services.AddAuthentication(options =>
         {
             options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-            options.DefaultChallengeScheme = Scheme;
+            // Protected API endpoints challenge the session cookie and therefore
+            // return 401. The login endpoint explicitly challenges Yandex below.
+            options.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme;
         })
         .AddCookie(options =>
         {

@@ -1,4 +1,9 @@
 using Xunit;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace BotArena.Tests;
 
@@ -49,5 +54,19 @@ public class UgcTests
         Assert.All(states.Zip(states.Skip(1)), pair =>
             Assert.Equal(1, RoomEndpoints.ChangedCharacters(pair.First, pair.Second)));
         Assert.Equal(4, RoomEndpoints.ChangedCharacters("", "func"));
+    }
+
+    [Fact]
+    public void ProtectedApisChallengeTheSessionCookie()
+    {
+        var services = new ServiceCollection();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection().Build();
+        services.AddYandexAuthentication(configuration);
+        using var provider = services.BuildServiceProvider();
+
+        var authentication = provider.GetRequiredService<IOptions<AuthenticationOptions>>().Value;
+
+        Assert.Equal(CookieAuthenticationDefaults.AuthenticationScheme, authentication.DefaultChallengeScheme);
+        Assert.NotEqual(YandexAuthentication.Scheme, authentication.DefaultChallengeScheme);
     }
 }
