@@ -8,6 +8,13 @@ internal readonly record struct Hitbox(Vec2 Center, double Angle, double Length,
     public double Extent(Vec2 axis) =>
         Length * 0.5 * Math.Abs(Forward.Dot(axis)) + Width * 0.5 * Math.Abs(Side.Dot(axis));
 
+    public Bounds Bounds()
+    {
+        var x = Extent(new(1, 0));
+        var y = Extent(new(0, 1));
+        return new(Center.X - x, Center.Y - y, Center.X + x, Center.Y + y);
+    }
+
     // Swept separating-axis test. Both boxes keep their orientation throughout the segment.
     public double Impact(Hitbox target, Vec2 relativeMotion)
     {
