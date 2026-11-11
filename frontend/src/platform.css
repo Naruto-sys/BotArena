@@ -102,7 +102,8 @@ body { background: radial-gradient(ellipse at 40% -25%, #153c50 0, transparent 5
 .lab-team-bots .lab-bot-card p { font-size:11px; line-height:1.45; }
 .strategy-help-content>p { color:#a8bfcd; line-height:1.6; }
 .strategy-help-content .strategy-fields { margin-top:18px; }
-.lab-wall-add { min-width:42px; font-size:20px; font-weight:800; }
+.lab-walls-toolbar>button { min-height:42px; }
+.lab-wall-add { min-width:42px; padding-block:0; font-size:20px; line-height:1; font-weight:800; }
 .wall-delete-icon { display:grid; place-items:center; align-self:stretch; min-width:44px; padding:8px; color:#ff776d!important; background:#351c20!important; border-color:#743d42!important; }
 .wall-delete-icon:hover:not(:disabled) { color:#fff!important; background:#9b302f!important; border-color:#e65b53!important; }
 .wall-delete-icon svg,.lab-walls-toolbar .danger-button svg { width:19px; height:19px; fill:currentColor; }
