@@ -77,6 +77,30 @@ function cornerPoint(wall: Wall, corner: Corner) {
   }
 }
 
+function placeBesideWalls(bot: LabBot, x: number, y: number, arena: Arena) {
+  const extentX = .34 * Math.abs(Math.cos(bot.bodyAngle)) + .29 * Math.abs(Math.sin(bot.bodyAngle));
+  const extentY = .34 * Math.abs(Math.sin(bot.bodyAngle)) + .29 * Math.abs(Math.cos(bot.bodyAngle));
+  let position = { x, y };
+  for (let pass = 0; pass < arena.walls.length; pass++) {
+    const wall = arena.walls.find(item => wallOverlapsBot(item, { ...bot, position }));
+    if (!wall) break;
+    const candidates = [
+      { x: wall.x - extentX - .02, y: position.y },
+      { x: wall.x + wall.width + extentX + .02, y: position.y },
+      { x: position.x, y: wall.y - extentY - .02 },
+      { x: position.x, y: wall.y + wall.height + extentY + .02 },
+    ];
+    position = candidates.reduce((closest, candidate) =>
+      Math.hypot(candidate.x - position.x, candidate.y - position.y)
+        < Math.hypot(closest.x - position.x, closest.y - position.y) ? candidate : closest);
+    position = {
+      x: Math.min(arena.width - extentX, Math.max(extentX, position.x)),
+      y: Math.min(arena.height - extentY, Math.max(extentY, position.y)),
+    };
+  }
+  return position;
+}
+
 export function LabArenaEditor({
   arena,
   bots,
@@ -130,14 +154,11 @@ export function LabArenaEditor({
   function moveBot(botId: string, x: number, y: number) {
     const bot = bots.find(item => item.id === botId);
     if (!bot) return;
-    const candidate = { ...bot, position: { x, y } };
+    const position = placeBesideWalls(bot, x, y, arena);
+    const candidate = { ...bot, position };
     if (bots.some(other => other.id !== botId && botsOverlap(candidate, other))) return;
-    if (arena.walls.some(wall => wallOverlapsBot(wall, { ...bot, position: { x, y } }))) {
-      setPlacementError(text.lab.botOverlapsWall);
-      return;
-    }
     setPlacementError('');
-    onMoveBot(botId, x, y);
+    onMoveBot(botId, position.x, position.y);
   }
   const dragging = useRef(false);
 
