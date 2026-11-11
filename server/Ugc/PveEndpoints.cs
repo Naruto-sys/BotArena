@@ -84,35 +84,44 @@ public static class PveEndpoints
             var rewardAwarded = 0L;
 
             await using var transaction = await database.Database.BeginTransactionAsync(cancellation);
-            var progress = await database.PveLevelProgress.Include(item => item.User).SingleOrDefaultAsync(item =>
+            var progress = await database.PveLevelProgress.SingleOrDefaultAsync(item =>
                 item.UserId == userId && item.LevelId == level.Id, cancellation);
             if (progress is null)
             {
                 var user = await database.Users.SingleAsync(item => item.Id == userId, cancellation);
                 progress = new() { User = user, UserId = userId, LevelId = level.Id, Reward = level.Reward };
                 database.PveLevelProgress.Add(progress);
+                // The row must exist before the conditional completion claim below.
+                await database.SaveChangesAsync(cancellation);
             }
             progress.Attempts++;
             progress.LastDurationTicks = durationTicks;
             progress.LastDamageTaken = damageTaken;
             if (completed)
             {
-                var firstCompletion = progress.CompletedAt is null;
-                progress.CompletedAt ??= DateTimeOffset.UtcNow;
                 progress.BestDurationTicks = progress.BestDurationTicks is null
                     ? durationTicks : Math.Min(progress.BestDurationTicks.Value, durationTicks);
                 progress.LowestDamageTaken = progress.LowestDamageTaken is null
                     ? damageTaken : Math.Min(progress.LowestDamageTaken.Value, damageTaken);
-                if (firstCompletion)
+                if (progress.CompletedAt is null)
                 {
-                    var user = progress.User;
-                    user.Balance = checked(user.Balance + level.Reward);
-                    database.BalanceTransactions.Add(new()
+                    var completedAt = DateTimeOffset.UtcNow;
+                    var claimed = await database.PveLevelProgress
+                        .Where(item => item.Id == progress.Id && item.CompletedAt == null)
+                        .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.CompletedAt, completedAt), cancellation);
+                    if (claimed == 1)
                     {
-                        User = user, UserId = userId, Amount = level.Reward,
-                        Type = "pve_level_reward", ReferenceId = progress.Id
-                    });
-                    rewardAwarded = level.Reward;
+                        progress.CompletedAt = completedAt;
+                        var credited = await FriendEndpoints.Credit(database, userId, level.Reward, cancellation);
+                        if (credited != 1) throw new InvalidOperationException("PvE reward recipient no longer exists.");
+                        var user = await database.Users.SingleAsync(item => item.Id == userId, cancellation);
+                        database.BalanceTransactions.Add(new()
+                        {
+                            User = user, UserId = userId, Amount = level.Reward,
+                            Type = "pve_level_reward", ReferenceId = progress.Id
+                        });
+                        rewardAwarded = level.Reward;
+                    }
                 }
             }
             await database.SaveChangesAsync(cancellation);

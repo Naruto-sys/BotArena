@@ -37,7 +37,11 @@ public static class UgcEndpoints
             var strategy = await FullStrategy(database).SingleOrDefaultAsync(item => item.Id == id);
             if (strategy is null || strategy.Visibility != StrategyVisibility.Public && strategy.OwnerId != principal.UserId())
                 return Results.NotFound();
-            return Results.Ok(Detail(strategy, principal.UserId()));
+            var viewerId = principal.UserId();
+            var purchased = viewerId is { } buyerId && await database.StrategyPurchases.AsNoTracking()
+                .AnyAsync(item => item.StrategyId == strategy.Id && item.BuyerId == buyerId);
+            var canReadCode = CanReadCode(strategy, viewerId, purchased);
+            return Results.Ok(Detail(strategy, viewerId, canReadCode));
         });
 
         group.MapGet("/shared/{token}", async (string token, UgcDbContext database) =>
@@ -155,6 +159,10 @@ public static class UgcEndpoints
             if (await Author(database, principal) is not { } owner) return Results.BadRequest(new { error = "Сначала выберите ник." });
             var source = await database.Strategies.SingleOrDefaultAsync(item => item.Id == id && item.Visibility == StrategyVisibility.Public);
             if (source is null) return Results.NotFound();
+            var purchased = await database.StrategyPurchases.AsNoTracking()
+                .AnyAsync(item => item.StrategyId == source.Id && item.BuyerId == owner.Id);
+            if (!CanReadCode(source, owner.Id, purchased))
+                return Results.Forbid();
             source.ForkCount++;
             var fork = new UserStrategy
             {
@@ -296,15 +304,18 @@ public static class UgcEndpoints
         item.ForkedFromId, forkedFromName = item.ForkedFrom?.Name, item.SalePrice,
         isPublished = item.Visibility == StrategyVisibility.Public, item.IsActive, item.ValidationError, item.UpdatedAt
     };
-    private static object Detail(UserStrategy item, Guid? viewerId = null) => new
+    private static object Detail(UserStrategy item, Guid? viewerId = null, bool includeCode = true) => new
     {
-        item.Id, item.Name, item.Description, item.Language, item.Code, item.Tags, item.Visibility, item.ShareToken,
+        item.Id, item.Name, item.Description, item.Language, code = includeCode ? item.Code : null,
+        item.Tags, item.Visibility, item.ShareToken,
         author = new { item.Owner.Id, item.Owner.Nickname, item.Owner.AvatarUrl },
         versions = item.Versions.OrderBy(version => version.Number).Select(version => new { version.Number, version.PublishedAt }),
         item.ForkedFromId, forkedFromName = item.ForkedFrom?.Name, item.SalePrice,
         isPublished = item.Visibility == StrategyVisibility.Public, item.IsActive, item.ValidationError,
-        isOwner = viewerId == item.OwnerId, item.UpdatedAt
+        isOwner = viewerId == item.OwnerId, canReadCode = includeCode, item.UpdatedAt
     };
+    internal static bool CanReadCode(UserStrategy strategy, Guid? viewerId, bool purchased) =>
+        strategy.SalePrice is null || viewerId == strategy.OwnerId || purchased;
     private static async Task<AppUser?> Author(UgcDbContext database, ClaimsPrincipal principal) => principal.UserId() is { } id
         ? await database.Users.SingleOrDefaultAsync(user => user.Id == id && user.Nickname != null) : null;
     private static IResult? Validate(SaveStrategyRequest request)

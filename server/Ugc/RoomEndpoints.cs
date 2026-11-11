@@ -133,16 +133,20 @@ public static class RoomEndpoints
             if (!validation.Active) return Results.BadRequest(new { error = validation.Error ?? "Стратегия неактивна." });
             participant.IsReady = true;
             await database.SaveChangesAsync(cancellation);
-            if (room.GuestId is null || room.Participants.Count != 2 || room.Participants.Any(item => !item.IsReady))
-                return Results.Ok(new { waiting = true });
 
             await using (var payment = await database.Database.BeginTransactionAsync(cancellation))
             {
-                var claimed = await database.GameRooms.Where(item => item.Id == id && item.Status == GameRoomStatus.Open)
+                // Re-check readiness in the database and let exactly one request claim the launch.
+                // This avoids both concurrent /ready calls observing a stale participant collection.
+                var claimed = await database.GameRooms.Where(item => item.Id == id
+                        && item.Status == GameRoomStatus.Open && item.GuestId != null
+                        && database.RoomParticipants.Count(participant => participant.RoomId == id) == 2
+                        && !database.RoomParticipants.Any(participant => participant.RoomId == id && !participant.IsReady))
                     .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Status, GameRoomStatus.Running), cancellation);
-                if (claimed == 0) return Results.Conflict(new { error = "Бой в комнате уже начался." });
+                if (claimed == 0) return Results.Ok(new { waiting = true });
+                var guestId = room.GuestId ?? throw new InvalidOperationException("Claimed room has no guest.");
                 var first = await FriendEndpoints.Debit(database, room.CreatorId, room.Stake, cancellation);
-                var second = await FriendEndpoints.Debit(database, room.GuestId.Value, room.Stake, cancellation);
+                var second = await FriendEndpoints.Debit(database, guestId, room.Stake, cancellation);
                 if (!first || !second)
                 {
                     await payment.RollbackAsync(cancellation);
@@ -154,6 +158,13 @@ public static class RoomEndpoints
                 await database.SaveChangesAsync(cancellation);
                 await payment.CommitAsync(cancellation);
             }
+
+            // ExecuteUpdate bypasses tracked entities; reload the winning launch request with fresh drafts.
+            database.ChangeTracker.Clear();
+            room = await database.GameRooms.Include(item => item.Creator).Include(item => item.Guest)
+                .Include(item => item.Participants).ThenInclude(item => item.User)
+                .SingleAsync(item => item.Id == id, cancellation);
+            var activeGuestId = room.GuestId ?? throw new InvalidOperationException("Running room has no guest.");
 
             var creator = room.Participants.Single(item => item.UserId == room.CreatorId);
             var guest = room.Participants.Single(item => item.UserId == room.GuestId);
@@ -195,7 +206,7 @@ public static class RoomEndpoints
             else
             {
                 await FriendEndpoints.Credit(database, room.CreatorId, room.Stake, CancellationToken.None);
-                await FriendEndpoints.Credit(database, room.GuestId.Value, room.Stake, CancellationToken.None);
+                await FriendEndpoints.Credit(database, activeGuestId, room.Stake, CancellationToken.None);
                 database.BalanceTransactions.AddRange(
                     FriendEndpoints.Ledger(room.Creator, room.Stake, "room_draw_refund", room.Id),
                     FriendEndpoints.Ledger(room.Guest!, room.Stake, "room_draw_refund", room.Id));
@@ -223,7 +234,7 @@ public static class RoomEndpoints
         if (stake is < 0 or > 100_000) return Results.BadRequest(new { error = "Ставка должна быть от 0 до 100 000 кредитов." });
         return null;
     }
-    private static int ChangedCharacters(string previous, string current)
+    internal static int ChangedCharacters(string previous, string current)
     {
         var prefix = 0;
         while (prefix < previous.Length && prefix < current.Length && previous[prefix] == current[prefix]) prefix++;

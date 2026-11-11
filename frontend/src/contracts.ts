@@ -146,7 +146,8 @@ export interface UgcStrategyCard {
   isPublished: boolean; isActive: boolean; validationError: string | null;
 }
 export interface UgcStrategy extends Omit<UgcStrategyCard, 'version' | 'forks' | 'runs' | 'likes'> {
-  code: string; shareToken: string | null; versions: { number: number; publishedAt: string }[]; isOwner: boolean;
+  code: string | null; shareToken: string | null; versions: { number: number; publishedAt: string }[];
+  isOwner: boolean; canReadCode: boolean;
 }
 export interface ManeuverSnippet {
   id: string; name: string; description: string; category: string; language: StrategyLanguage;

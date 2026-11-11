@@ -27,6 +27,7 @@ export function RoomsPanel() {
   const [currentUserId, setCurrentUserId] = useState('');
   const inputTimes = useRef<number[]>([]);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const draftQueue = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => { void refresh(); void ugcApi.maps().then(setMaps).catch(handleError); }, [filters.clipboard, filters.presets, filters.maxCharactersPerSecond, filters.maxStake]);
   useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
@@ -51,6 +52,7 @@ export function RoomsPanel() {
   }
   async function enter(next: GameRoom) {
     setBusy(true); setError(''); setNotice(''); setMatch(undefined); setWaiting(false);
+    draftQueue.current = Promise.resolve();
     try {
       const session = await ugcApi.session();
       if (session.authenticated) setCurrentUserId(session.user.id);
@@ -64,6 +66,7 @@ export function RoomsPanel() {
     if (!form.name.trim() || form.maxCharactersPerSecond < 1 || form.maxCharactersPerSecond > 1000 || form.stake < 0 || form.stake > 100000) return;
     setBusy(true); setError('');
     try {
+      draftQueue.current = Promise.resolve();
       const created = await ugcApi.createRoom(form);
       const session = await ugcApi.session(); if (session.authenticated) setCurrentUserId(session.user.id);
       const mine = (await ugcApi.mine()).filter(item => item.isActive);
@@ -95,6 +98,16 @@ export function RoomsPanel() {
     inputTimes.current.push(...Array.from({ length: cost }, () => now));
     setCode(next); setStrategyId(''); setError('');
     if (saveTimer.current) clearTimeout(saveTimer.current);
+    if (!room.allowClipboard) {
+      // Preserve every accepted keystroke in order. Debouncing would turn several
+      // legitimate one-character edits into one server-side bulk insertion.
+      const save = draftQueue.current.catch(() => undefined)
+        .then(() => ugcApi.updateRoomDraft(room.id, { code: next, language }))
+        .then(() => undefined);
+      draftQueue.current = save;
+      void save.catch(handleError);
+      return;
+    }
     saveTimer.current = setTimeout(() => {
       void ugcApi.updateRoomDraft(room.id, { code: next, language }).catch(handleError);
     }, 120);
@@ -113,6 +126,7 @@ export function RoomsPanel() {
     if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = undefined; }
     setBusy(true); setError(''); setNotice('');
     try {
+      await draftQueue.current;
       if (!strategyId) await ugcApi.updateRoomDraft(room.id, { code, language });
       const result = await ugcApi.readyRoom(room.id);
       if (result.match) { setMatch(result.match); window.dispatchEvent(new Event('botarena-balance-changed')); }
