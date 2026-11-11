@@ -970,7 +970,7 @@ function App() {
       </>}
       {page === 'workshop' && libraryNote && <p role="status" className="ux-notice">{libraryNote}</p>}
       </Suspense>
-      <footer className="platform-footer"><strong>BotArena</strong><span>{ui.footer}</span></footer>
+      <footer className="platform-footer"><strong><img src="/botarena-forge-icon.png" alt="" />BotArena</strong><span>{ui.footer}</span></footer>
       </div>
     </main>
   );

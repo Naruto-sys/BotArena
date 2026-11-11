@@ -136,7 +136,8 @@ dialog.ux-modal::backdrop { background: #020a13bb; backdrop-filter: blur(8px); }
 .replay-settings { display: flex; flex-direction: column; }
 .replay-controls { order: -1; }
 .platform-footer { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 24px; letter-spacing: 0; }
-.platform-footer strong { color: #9bb8c8; font-size: 14px; }
+.platform-footer strong { display:inline-flex; align-items:center; gap:8px; color: #9bb8c8; font-size: 14px; }
+.platform-footer strong img { width:26px; height:26px; border-radius:7px; object-fit:cover; }
 .platform-footer span { font-size: 12px; }
 .map-placement-error { margin-bottom: 12px; }
 /* Match the unified shell to the theme supplied by the profile menu. */
