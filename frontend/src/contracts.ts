@@ -124,3 +124,76 @@ export type MatchJobStatus =
   | { state: 'completed'; match: MatchResponse | null; error: string | null; diagnostic?: ScriptError | null };
 
 export type StrategyLanguage = "javascript" | "python";
+
+export interface ArenaUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  avatarUrl: string | null;
+  nickname: string | null;
+  balance: number;
+}
+export type AuthSession =
+  | { authenticated: false }
+  | { authenticated: true; user: ArenaUser; needsNickname: boolean };
+export type UgcVisibility = 'Private' | 'Unlisted' | 'Public';
+export interface UgcAuthor { id: string; nickname: string; avatarUrl: string | null }
+export interface UgcStrategyCard {
+  id: string; name: string; description: string; language: StrategyLanguage; tags: string[];
+  visibility: UgcVisibility; author: UgcAuthor; version: number; forks: number; runs: number; likes: number;
+  forkedFromId: string | null; forkedFromName: string | null; updatedAt: string;
+  salePrice: number | null;
+  isPublished: boolean; isActive: boolean; validationError: string | null;
+}
+export interface UgcStrategy extends Omit<UgcStrategyCard, 'version' | 'forks' | 'runs' | 'likes'> {
+  code: string | null; shareToken: string | null; versions: { number: number; publishedAt: string }[];
+  isOwner: boolean; canReadCode: boolean;
+}
+export interface ManeuverSnippet {
+  id: string; name: string; description: string; category: string; language: StrategyLanguage;
+  code: string; usage: string; tags: string[];
+}
+export interface FriendUser { id: string; nickname: string; avatarUrl: string | null }
+export interface Friendship { id: string; status: 'incoming' | 'outgoing' | 'accepted'; user: FriendUser }
+export interface FriendStrategy { id: string; name: string; language: StrategyLanguage }
+export interface BattleChallenge {
+  id: string; status: 'Pending' | 'Running' | 'Completed' | 'Declined' | 'Cancelled'; stake: number; incoming: boolean;
+  challenger: FriendUser; opponent: FriendUser; challengerStrategy: { id: string; name: string };
+  opponentStrategy: { id: string; name: string } | null; winnerId: string | null;
+  createdAt: string; completedAt: string | null;
+}
+export interface StrategyTransfer {
+  id: string; status: 'Pending' | 'Accepted' | 'Declined'; sender: FriendUser;
+  strategy: { id: string; name: string; language: StrategyLanguage }; createdAt: string;
+}
+export interface GameRoom {
+  id: string; name: string; creator: FriendUser; allowClipboard: boolean; allowPresetStrategies: boolean;
+  maxCharactersPerSecond: number; stake: number; status: 'Open' | 'Running' | 'Completed' | 'Cancelled';
+  occupied: boolean; createdAt: string; mapName: string; arena: Arena;
+}
+export interface BattleMap {
+  id: string; name: string; width: number; height: number; walls: Wall[]; createdAt: string; updatedAt: string;
+}
+export interface PveLevel {
+  id: string; order: number; blockId: string; blockOrder: number; stage: number; isTraining: boolean;
+  title: string; command: string; description: string; goal: string; hints: string[]; reward: number;
+  starterCode: Record<StrategyLanguage, string>; solutionCode: Record<StrategyLanguage, string>;
+  completed: boolean; locked: boolean; stats: PveStats | null;
+}
+export interface PveBlock {
+  id: string; order: number; title: string; description: string; isTraining: boolean;
+  completed: number; total: number; locked: boolean; levels: PveLevel[];
+}
+export interface PveCourse { completed: number; total: number; blocks: PveBlock[] }
+export interface PveStats {
+  attempts: number; bestDurationSeconds: number | null; lowestDamageTaken: number | null;
+  lastDurationSeconds: number | null; lastDamageTaken: number | null;
+}
+export interface PveAttemptResult {
+  match: MatchResponse; completed: boolean; techniquePassed: boolean; won: boolean;
+  rewardAwarded: number; message: string; stats: PveStats;
+}
+export interface PveLeaderboardEntry {
+  rank: number; user: FriendUser; durationSeconds: number; damageTaken: number; attempts: number; completedAt: string;
+}
+export interface PveLeaderboard { enabled: boolean; entries: PveLeaderboardEntry[] }

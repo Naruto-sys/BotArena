@@ -76,7 +76,9 @@ function ReplayEffectsOverlay({ arena, marker, damageNumbers, finished }: {
   );
 }
 
-export function ReplayPlayer({ replay, botNames }: { replay: Replay; botNames?: Record<string, string> }) {
+export function ReplayPlayer({ replay, botNames, onComplete }: {
+  replay: Replay; botNames?: Record<string, string>; onComplete?: () => void;
+}) {
   const [position, setPosition] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [speed, setSpeed] = useState(0.5);
@@ -87,6 +89,7 @@ export function ReplayPlayer({ replay, botNames }: { replay: Replay; botNames?: 
   const [traceBotId, setTraceBotId] = useState(replay.frames[0]?.bots[0]?.id ?? '');
   const heldChronoShots = useRef(new Set<string>());
   const chronoHoldUntil = useRef(0);
+  const completionReported = useRef(false);
   const shotPlan = useMemo(() => buildShotPlan(replay), [replay]);
   const botIds = useMemo(() => [...new Set(replay.frames.flatMap(frame => frame.bots.map(bot => bot.id)))], [replay]);
   const multiple = botIds.length > 2;
@@ -107,6 +110,7 @@ export function ReplayPlayer({ replay, botNames }: { replay: Replay; botNames?: 
   }));
 
   useEffect(() => {
+    completionReported.current = false;
     heldChronoShots.current.clear();
     chronoHoldUntil.current = 0;
     setPosition(0);
@@ -115,6 +119,12 @@ export function ReplayPlayer({ replay, botNames }: { replay: Replay; botNames?: 
     setCameraMode('auto');
     setTraceBotId(replay.frames[0]?.bots[0]?.id ?? '');
   }, [replay]);
+
+  useEffect(() => {
+    if (!finished || completionReported.current) return;
+    completionReported.current = true;
+    onComplete?.();
+  }, [finished, onComplete]);
 
   useEffect(() => {
     if (cameraMode.startsWith('bot:') && !botIds.includes(cameraMode.slice(4))) {

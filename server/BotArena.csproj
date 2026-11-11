@@ -8,5 +8,10 @@
     <InternalsVisibleTo Include="BotArena.Tests" />
     <ProjectReference Include="../modules/Simulation/BotArena.Simulation.csproj" />
     <ProjectReference Include="../modules/Strategies/BotArena.Strategies.csproj" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
   </ItemGroup>
 </Project>

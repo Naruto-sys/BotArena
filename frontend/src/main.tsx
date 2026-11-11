@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
 import type {
   AppMode,
+  AuthSession,
   CampaignTrack,
   MatchJobStatus,
   Movement,
@@ -27,6 +28,10 @@ import {
 } from './labDraft';
 import { MatchDiagnosticError, buildCustomMatchPayload, runMatch } from './matchApi';
 import { StrategyHelp } from './StrategyHelp';
+import { AuthPanel } from './AuthPanel';
+import { PveMap } from './PveMap';
+import { UgcHub } from './UgcHub';
+import { login, ugcApi } from './ugcApi';
 import { text } from './text';
 import './style.css';
 
@@ -184,7 +189,7 @@ const omniExamples = {
 const modelOptions = Object.entries(text.movements).map(([id, label]) =>
   <option key={id} value={id}>{label}</option>);
 
-function App() {
+function ArenaApp() {
   const [mode, setMode] = useState<AppMode>('campaign');
   const [languages, setLanguages] = useState<StrategyLanguage[]>(['javascript']);
   const [language, setLanguage] = useState<StrategyLanguage>('javascript');
@@ -866,6 +871,46 @@ function App() {
       )}
     </main>
   );
+}
+
+type Workspace = 'learn' | 'arena' | 'community';
+
+function App() {
+  const [workspace, setWorkspace] = useState<Workspace>(() =>
+    location.hash === '#ugc' ? 'community' : location.hash === '#arena' ? 'arena' : 'learn');
+  const [session, setSession] = useState<AuthSession>();
+
+  useEffect(() => {
+    const reload = () => void ugcApi.session().then(setSession).catch(() => setSession({ authenticated: false }));
+    reload();
+    window.addEventListener('botarena-auth-changed', reload);
+    window.addEventListener('botarena-balance-changed', reload);
+    return () => {
+      window.removeEventListener('botarena-auth-changed', reload);
+      window.removeEventListener('botarena-balance-changed', reload);
+    };
+  }, []);
+
+  function open(next: Workspace, hash: string) {
+    setWorkspace(next);
+    history.replaceState(null, '', hash);
+  }
+
+  return <main className="app-shell">
+    <header className="app-header">
+      <button className="brand-button" onClick={() => open('learn', '#learn')}><span className="brand-mark">B</span><span><b>{text.brand}</b><small>CODE · FIGHT · EVOLVE</small></span></button>
+      <nav aria-label="Разделы">
+        <button className={workspace === 'learn' ? 'active' : ''} onClick={() => open('learn', '#learn')}><span>◫</span> Обучение</button>
+        <button className={workspace === 'arena' ? 'active' : ''} onClick={() => open('arena', '#arena')}><span>⌁</span> Арена</button>
+        <button className={workspace === 'community' ? 'active' : ''} onClick={() => open('community', '#ugc')}><span>♧</span> Сообщество</button>
+      </nav>
+      <AuthPanel session={session} onChange={setSession} />
+    </header>
+    {workspace === 'learn' ? <PveMap session={session} />
+      : workspace === 'community' ? <UgcHub />
+        : session?.authenticated ? <ArenaApp />
+          : <section className="panel auth-required arena-auth"><b>Для запуска матчей нужна авторизация</b><p>Войдите через Yandex ID, чтобы использовать новый Match Lab и кампании.</p><button className="yandex-login" onClick={login}><b>Я</b> Войти через Яндекс</button></section>}
+  </main>;
 }
 
 document.title = text.title;

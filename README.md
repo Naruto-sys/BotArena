@@ -6,6 +6,9 @@
 
 Нужны .NET SDK 10, Node.js 22.12+ и npm.
 
+Сначала настройте PostgreSQL и Yandex ID по инструкции ниже. Затем соберите
+клиент и запустите сервер:
+
 ```sh
 npm --prefix frontend ci
 npm --prefix frontend run build
@@ -13,6 +16,47 @@ dotnet run --project server
 ```
 
 Откройте [http://127.0.0.1:5050](http://127.0.0.1:5050). Для разработки фронтенда запустите `npm --prefix frontend run dev` в отдельном терминале с работающим сервером и откройте [http://127.0.0.1:5173](http://127.0.0.1:5173).
+
+## PostgreSQL и Yandex ID
+
+Раздел «Сообщество» хранит пользователей, стратегии, версии и библиотеку манёвров в PostgreSQL. Для локального запуска поднимите базу и укажите настройки авторизации:
+
+```sh
+docker compose -f server/compose.postgres.yml up -d
+```
+
+Docker Compose создаёт пользователя `botarena` и базу `botarena`, заданную через
+`POSTGRES_DB`, только при инициализации нового volume. Скопируйте
+`server/appsettings.Local.example.json` в `server/appsettings.Local.json` и укажите
+пароль `botarena` для конфигурации из Compose либо параметры своей PostgreSQL.
+`appsettings.Local.json` исключён из Git.
+
+Создайте OAuth-приложение Yandex ID, запросите права `login:info` и
+`login:avatar`, затем перенесите значения полей ClientID и Client secret приложения
+в `Authentication:Yandex:ClientId` и `Authentication:Yandex:ClientSecret`.
+Callback URL в настройках Yandex задайте **точно** как
+`http://127.0.0.1:5050/auth/callback`. Открывайте локальное приложение через
+`http://127.0.0.1:5050`: `localhost` и `127.0.0.1` не взаимозаменяемы для OAuth
+и correlation cookie. В production используйте HTTPS и соответствующий публичный
+адрес. Никогда не добавляйте Client secret или реальные пароли в Git.
+
+Те же настройки можно передать переменными среды:
+
+```text
+ConnectionStrings__BotArena=Host=127.0.0.1;Port=5432;Database=botarena;Username=botarena;Password=...
+Database__MigrateOnStartup=true
+Authentication__Yandex__ClientId=...
+Authentication__Yandex__ClientSecret=...
+Authentication__Yandex__CallbackPath=/auth/callback
+```
+
+При `Database:MigrateOnStartup=true` сервер создаёт отсутствующую базу и применяет
+миграции EF Core, если роль PostgreSQL имеет право `CREATE DATABASE`. Если права
+роли ограничены, создайте базу заранее и выдайте ей права на применение миграций.
+После первого входа через Yandex ID пользователь обязан выбрать уникальный ник.
+Имя, фамилия и фотография профиля обновляются из Yandex ID при последующих входах.
+
+Новый пользователь получает 1000 виртуальных кредитов. Кредиты можно получить за победы в дружеских боях на ставку и продажу опубликованных стратегий. Все списания и начисления записываются в журнал операций PostgreSQL; при ничьей или техническом сбое боя ставки возвращаются обоим игрокам.
 
 ## Python в редакторе
 

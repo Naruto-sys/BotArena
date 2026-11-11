@@ -1,7 +1,11 @@
 **/bin/
 **/obj/
+**/.dotnet/
 frontend/node_modules/
 server/wwwroot/
 .DS_Store
 
 .botarena/
+
+# Local configuration may contain PostgreSQL and OAuth secrets.
+server/appsettings.Local.json
