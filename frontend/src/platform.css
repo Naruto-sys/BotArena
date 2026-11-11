@@ -11,7 +11,6 @@ body { background: radial-gradient(ellipse at 40% -25%, #153c50 0, transparent 5
 .platform-account { margin-left: auto; display: flex; align-items: center; gap: 15px; color: #85a7ba; }
 .platform-content { width: 100%; max-width: 1640px; padding: 24px 32px 0; margin: 0 auto; }
 .platform-content .learning-shell { max-width:none; }
-.ux-breadcrumb { font-size: 12px; color: #7d9aac; margin-bottom: 24px; }
 .platform-content h1 { font-size: 32px; letter-spacing: -1px; }
 .ux-page-heading { margin-bottom: 24px; }
 .ux-page-heading small, .ux-editor-heading small { color: var(--neon); letter-spacing: 1.5px; font-size: 10px; }
@@ -150,7 +149,7 @@ dialog.ux-modal::backdrop { background: #020a13bb; backdrop-filter: blur(8px); }
 [data-theme="light"] .ux-hero { background: #e8f5f4; border-color: #bad7d7; }
 [data-theme="light"] .ux-hero p, [data-theme="light"] .ux-path p,
 [data-theme="light"] .ux-page-heading p, [data-theme="light"] .ux-lead,
-[data-theme="light"] .ux-stats span, [data-theme="light"] .ux-breadcrumb,
+[data-theme="light"] .ux-stats span,
 [data-theme="light"] .lesson-stop p, [data-theme="light"] .chapter-route > summary p,
 [data-theme="light"] .platform-footer, [data-theme="light"] .platform-footer strong { color: #526b7b; }
 [data-theme="light"] .chapter-route > summary strong { color: #172634; }
