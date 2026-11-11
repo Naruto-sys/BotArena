@@ -737,6 +737,7 @@ main { padding: 0 1.2rem 1.2rem; }
   display: grid; gap: .4rem; padding: .55rem; border: 1px solid #293f57; border-radius: .45rem; background: #0e1824;
 }
 .lab-walls { display: grid; gap: .7rem; }
+.lab-wall-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.7rem; }
 .lab-walls-toolbar { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-bottom: .15rem; }
 .lab-wall-row {
   display: grid; grid-template-columns: auto repeat(4, minmax(3.5rem, 1fr)) auto; gap: .35rem; align-items: end;
@@ -757,4 +758,7 @@ main { padding: 0 1.2rem 1.2rem; }
 .lab-wall-handle-ne, .lab-wall-handle-sw { cursor: nesw-resize; }
 @media (max-width: 800px) {
   .lab-wall-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 1500px) {
+  .lab-wall-list { grid-template-columns:1fr; }
 }

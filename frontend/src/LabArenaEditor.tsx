@@ -375,7 +375,7 @@ export function LabArenaEditor({
         </div>
         {arena.walls.length > 1 && <small className="lab-wall-selection-hint">Нажимайте номера стен, чтобы выбрать несколько.</small>}
         {arena.walls.length === 0 && <p className="muted">{text.lab.noWalls}</p>}
-        {arena.walls.map((wall, index) => (
+        {arena.walls.length > 0 && <div className="lab-wall-list">{arena.walls.map((wall, index) => (
           <div key={index} className={selectedWalls.includes(index) ? 'lab-wall-row selected' : 'lab-wall-row'}>
             <button
               type="button"
@@ -403,7 +403,7 @@ export function LabArenaEditor({
             ))}
             <button type="button" className="wall-delete-icon" title={text.lab.removeWall} aria-label={`${text.lab.removeWall} #${index + 1}`} onClick={() => { setPlacementError(''); onRemoveWalls([index]); }}><TrashIcon /></button>
           </div>
-        ))}
+        ))}</div>}
       </div>
     </div>
   );
