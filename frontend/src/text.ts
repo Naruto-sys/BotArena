@@ -2,6 +2,25 @@ import type { StrategyLanguage } from './contracts';
 
 const languages = { javascript: 'JavaScript', python: 'Python' } as const;
 
+export const roomText = {
+  round: (number: number) => `Раунд ${number}`,
+  ready: (number: number, stake: number) => `Готов к раунду ${number} · ◈ ${stake}`,
+  readyCount: (count: number, ready: boolean) => `Готовы ${count} из 2 · ${ready ? 'вы готовы' : 'подтвердите готовность'}`,
+  waiting: 'Ждём готовности соперника…',
+  waitingGuest: 'Ждём второго игрока',
+  calculating: 'Рассчитываем бой…',
+  completed: 'Раунд завершён',
+  nextRound: 'Раунд завершён. Можно изменить код и подтвердить готовность к следующему.',
+  accepted: 'Стратегия принята. Ждём готовности второго игрока…',
+  closed: 'Комната закрыта',
+  closedNotice: 'Комната закрыта. Можно выбрать другую комнату.',
+  continue: 'Продолжить в этой комнате',
+  record: (number: number) => `Посмотреть запись раунда ${number}`,
+  hideRecord: 'Скрыть запись',
+  result: (number: number, outcome: string) => `Раунд ${number}: ${outcome}`,
+  win: 'Победа', loss: 'Поражение', draw: 'Ничья',
+};
+
 export const text = {
   language: 'ru',
   title: 'BotArena · Match Lab',

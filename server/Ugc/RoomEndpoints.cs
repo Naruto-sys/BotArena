@@ -28,20 +28,22 @@ public static class RoomEndpoints
         {
             var rooms = await database.GameRooms.AsNoTracking().Include(item => item.Creator)
                 .Where(item => (item.CreatorId == principal.UserId() || item.GuestId == principal.UserId()) &&
-                    (item.Status == GameRoomStatus.Open || item.Status == GameRoomStatus.Running))
+                    (item.Status == GameRoomStatus.Open || item.Status == GameRoomStatus.Running || item.Status == GameRoomStatus.Completed))
                 .OrderByDescending(item => item.CreatedAt).ToListAsync();
             return Results.Ok(rooms.Select(RoomView));
         });
 
-        group.MapGet("/{id:guid}", async (Guid id, ClaimsPrincipal principal, UgcDbContext database) =>
+        group.MapGet("/{id:guid}", async (Guid id, int? afterMatchRoundNumber, ClaimsPrincipal principal, UgcDbContext database) =>
         {
             if (principal.UserId() is not { } userId) return Results.Unauthorized();
             var room = await database.GameRooms.AsNoTracking().Include(item => item.Creator).Include(item => item.Participants)
                 .SingleOrDefaultAsync(item => item.Id == id && (item.CreatorId == userId || item.GuestId == userId));
             if (room is null) return Results.NotFound();
-            var match = room.MatchResultJson is null ? null : JsonSerializer.Deserialize<MatchResponse>(room.MatchResultJson);
+            var matchRoundNumber = room.MatchRoundNumber ?? (room.MatchResultJson is null ? (int?)null : room.RoundNumber);
+            var match = room.MatchResultJson is null || matchRoundNumber <= afterMatchRoundNumber
+                ? null : JsonSerializer.Deserialize<MatchResponse>(room.MatchResultJson);
             var own = room.Participants.SingleOrDefault(item => item.UserId == userId);
-            return Results.Ok(new { room = RoomView(room), match, room.WinnerId, draft = own is null ? null : new { own.Code, own.Language, own.SourceStrategyId, own.IsReady } });
+            return Results.Ok(new { room = RoomView(room), match, matchRoundNumber, room.WinnerId, readyCount = room.Participants.Count(item => item.IsReady), draft = own is null ? null : new { own.Code, own.Language, own.SourceStrategyId, own.IsReady } });
         });
 
         group.MapPost("/", async (CreateRoomRequest request, ClaimsPrincipal principal, UgcDbContext database) =>
@@ -104,6 +106,10 @@ public static class RoomEndpoints
         group.MapPut("/{id:guid}/draft", async (Guid id, RoomDraftRequest request, ClaimsPrincipal principal, UgcDbContext database) =>
         {
             if (principal.UserId() is not { } userId) return Results.Unauthorized();
+            await using var editing = await database.Database.BeginTransactionAsync();
+            var room = await LockRoom(database, id);
+            if (room is null || (room.CreatorId != userId && room.GuestId != userId)) return Results.NotFound();
+            if (room.RoundNumber != request.RoundNumber) return StaleRound();
             var participant = await database.RoomParticipants.Include(item => item.Room)
                 .SingleOrDefaultAsync(item => item.RoomId == id && item.UserId == userId);
             if (participant is null) return Results.NotFound();
@@ -139,50 +145,66 @@ public static class RoomEndpoints
                 participant.Code = request.Code; participant.Language = request.Language; participant.SourceStrategyId = null;
             }
             await database.SaveChangesAsync();
+            await editing.CommitAsync();
             return Results.Ok(new { participant.Code, participant.Language, participant.IsReady });
         });
 
-        group.MapPost("/{id:guid}/ready", async (Guid id, ClaimsPrincipal principal, UgcDbContext database,
+        // Upgrade old one-shot rooms on demand; never reopen a cancelled room.
+        group.MapPost("/{id:guid}/next-round", async (Guid id, RoomRoundRequest request, ClaimsPrincipal principal, UgcDbContext database) =>
+        {
+            if (principal.UserId() is not { } userId) return Results.Unauthorized();
+            await using var reopening = await database.Database.BeginTransactionAsync();
+            var room = await LockRoom(database, id);
+            if (room is null || (room.CreatorId != userId && room.GuestId != userId)) return Results.NotFound();
+            if (room.RoundNumber != request.RoundNumber) return StaleRound();
+            await database.Entry(room).Reference(item => item.Creator).LoadAsync();
+            if (room.Status == GameRoomStatus.Open) return Results.Ok(RoomView(room));
+            if (room.Status != GameRoomStatus.Completed) return Results.Conflict(new { error = "Дождитесь завершения раунда." });
+            // Same account lock as room creation: reopening cannot bypass the one-active-room limit.
+            await database.Users.FromSqlInterpolated($"SELECT * FROM users WHERE \"Id\" = {room.CreatorId} FOR UPDATE").SingleAsync();
+            if (await database.GameRooms.AnyAsync(item => item.Id != id && item.CreatorId == room.CreatorId &&
+                (item.Status == GameRoomStatus.Open || item.Status == GameRoomStatus.Running)))
+                return Results.Conflict(new { error = "У создателя уже есть другая активная комната. Сначала закройте её." });
+            await database.Entry(room).Reference(item => item.Creator).LoadAsync();
+            await database.Entry(room).Collection(item => item.Participants).LoadAsync();
+            room.MatchRoundNumber ??= room.MatchResultJson is null ? null : room.RoundNumber;
+            BeginNextRound(room);
+            await database.SaveChangesAsync(); await reopening.CommitAsync();
+            return Results.Ok(RoomView(room));
+        });
+
+        group.MapPost("/{id:guid}/ready", async (Guid id, RoomRoundRequest? request, ClaimsPrincipal principal, UgcDbContext database,
             MatchQueue queue, CancellationToken cancellation) =>
         {
             if (principal.UserId() is not { } userId) return Results.Unauthorized();
-            var room = await database.GameRooms.Include(item => item.Creator).Include(item => item.Guest)
-                .Include(item => item.Participants).ThenInclude(item => item.User)
-                .SingleOrDefaultAsync(item => item.Id == id);
-            if (room is null || room.Status != GameRoomStatus.Open) return Results.Conflict(new { error = "Комната уже закрыта." });
-            var participant = room.Participants.SingleOrDefault(item => item.UserId == userId);
-            if (participant is null) return Results.Forbid();
-            var validation = StrategyValidator.Validate(participant.Language, participant.Code);
-            if (!validation.Active) return Results.BadRequest(new { error = validation.Error ?? "Стратегия неактивна." });
-            participant.IsReady = true;
-            await database.SaveChangesAsync(cancellation);
-
+            GameRoom room;
             await using (var payment = await database.Database.BeginTransactionAsync(cancellation))
             {
-                // Re-check readiness in the database and let exactly one request claim the launch.
-                // This avoids both concurrent /ready calls observing a stale participant collection.
-                var claimed = await database.GameRooms.Where(item => item.Id == id
-                        && item.Status == GameRoomStatus.Open && item.GuestId != null
-                        && database.RoomParticipants.Count(participant => participant.RoomId == id) == 2
-                        && !database.RoomParticipants.Any(participant => participant.RoomId == id && !participant.IsReady))
-                    .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Status, GameRoomStatus.Running), cancellation);
-                if (claimed == 0) return Results.Ok(new { waiting = true });
-                database.ChangeTracker.Clear();
-                room = await database.GameRooms.Include(item => item.Creator).Include(item => item.Guest)
-                    .SingleAsync(item => item.Id == id, cancellation);
-                var guestId = room.GuestId ?? throw new InvalidOperationException("Claimed room has no guest.");
-                var first = await FriendEndpoints.Debit(database, room.CreatorId, room.Stake, cancellation);
-                var second = await FriendEndpoints.Debit(database, guestId, room.Stake, cancellation);
-                if (!first || !second)
+                // Serialize draft/ready/round transitions on the room row, not just launch claiming.
+                var locked = await LockRoom(database, id, cancellation);
+                if (locked is null || locked.Status != GameRoomStatus.Open) return Results.Conflict(new { error = "Комната уже закрыта или рассчитывается." });
+                room = locked;
+                if (room.RoundNumber != (request?.RoundNumber ?? 1)) return StaleRound();
+                await database.Entry(room).Collection(item => item.Participants).Query().Include(item => item.User).LoadAsync(cancellation);
+                var participant = room.Participants.SingleOrDefault(item => item.UserId == userId);
+                if (participant is null) return Results.Forbid();
+                if (participant.IsReady) return Results.Ok(new { waiting = true, room.RoundNumber });
+                var validation = StrategyValidator.Validate(participant.Language, participant.Code);
+                if (!validation.Active) return Results.BadRequest(new { error = validation.Error ?? "Стратегия неактивна." });
+                participant.IsReady = true;
+                if (room.GuestId is null || room.Participants.Count != 2 || room.Participants.Any(item => !item.IsReady))
                 {
-                    await payment.RollbackAsync(cancellation);
-                    return Results.BadRequest(new { error = "У одного из игроков недостаточно кредитов для ставки." });
+                    await database.SaveChangesAsync(cancellation); await payment.CommitAsync(cancellation);
+                    return Results.Ok(new { waiting = true, room.RoundNumber });
                 }
-                database.BalanceTransactions.AddRange(
-                    FriendEndpoints.Ledger(room.Creator, -room.Stake, "room_stake", room.Id),
-                    FriendEndpoints.Ledger(room.Guest!, -room.Stake, "room_stake", room.Id));
-                await database.SaveChangesAsync(cancellation);
-                await payment.CommitAsync(cancellation);
+                // Lock balances in a stable order even if users occupy several different rooms.
+                foreach (var player in room.Participants.OrderBy(item => item.UserId))
+                    if (!await FriendEndpoints.Debit(database, player.UserId, room.Stake, cancellation))
+                        return Results.BadRequest(new { error = "У одного из игроков недостаточно кредитов для ставки." });
+                room.Status = GameRoomStatus.Running;
+                database.BalanceTransactions.AddRange(room.Participants.Select(player =>
+                    FriendEndpoints.Ledger(player.User, -room.Stake, "room_stake", room.Id)));
+                await database.SaveChangesAsync(cancellation); await payment.CommitAsync(cancellation);
             }
 
             // Once stakes are committed, finish the match even if the browser disconnects.
@@ -201,9 +223,9 @@ public static class RoomEndpoints
                 var walls = JsonSerializer.Deserialize<List<Wall>>(arenaJson, BattleMapEndpoints.Json) ?? [];
                 customArena = BattleMapEndpoints.Arena(walls);
             }
-            var request = new MatchRequest(creator.Code, "room", creator.Language, guest.Code, guest.Language,
+            var matchRequest = new MatchRequest(creator.Code, "room", creator.Language, guest.Code, guest.Language,
                 CustomArena: customArena);
-            if (queue.Enqueue(request, CancellationToken.None) is not { } job)
+            if (queue.Enqueue(matchRequest, CancellationToken.None) is not { } job)
             {
                 await Refund(database, room, "room_queue_refund");
                 return Results.Json(new { error = "Очередь заполнена. Ставки возвращены." }, statusCode: 429);
@@ -237,10 +259,12 @@ public static class RoomEndpoints
                     FriendEndpoints.Ledger(room.Creator, room.Stake, "room_draw_refund", room.Id),
                     FriendEndpoints.Ledger(room.Guest!, room.Stake, "room_draw_refund", room.Id));
             }
-            room.Status = GameRoomStatus.Completed; room.WinnerId = winnerId;
+            var completedRoundNumber = room.RoundNumber;
+            room.WinnerId = winnerId; room.MatchRoundNumber = completedRoundNumber;
             room.MatchResultJson = JsonSerializer.Serialize(result.Response); room.CompletedAt = DateTimeOffset.UtcNow;
+            BeginNextRound(room);
             await database.SaveChangesAsync(CancellationToken.None); await settlement.CommitAsync(CancellationToken.None);
-            return Results.Ok(new { waiting = false, match = result.Response, winnerId });
+            return Results.Ok(new { waiting = false, match = result.Response, winnerId, roundNumber = completedRoundNumber });
         });
 
         group.MapDelete("/{id:guid}", async (Guid id, ClaimsPrincipal principal, UgcDbContext database) =>
@@ -250,6 +274,23 @@ public static class RoomEndpoints
                 .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Status, GameRoomStatus.Cancelled));
             return updated == 0 ? Results.NotFound() : Results.NoContent();
         });
+    }
+
+    private static Task<GameRoom?> LockRoom(UgcDbContext database, Guid id, CancellationToken cancellation = default) =>
+        database.GameRooms.FromSqlInterpolated($"SELECT * FROM game_rooms WHERE \"Id\" = {id} FOR UPDATE").SingleOrDefaultAsync(cancellation);
+
+    private static IResult StaleRound() => Results.Conflict(new { error = "Раунд уже изменился. Обновите состояние комнаты и подтвердите готовность заново." });
+
+    private static void BeginNextRound(GameRoom room)
+    {
+        room.Status = GameRoomStatus.Open;
+        room.RoundNumber = checked(room.RoundNumber + 1);
+        foreach (var player in room.Participants)
+        {
+            player.IsReady = false;
+            player.CharactersInWindow = 0;
+            player.RateWindowStartedAt = DateTimeOffset.UtcNow;
+        }
     }
 
     private static IResult? ValidateSettings(string? name, int speed, long stake)
@@ -278,7 +319,7 @@ public static class RoomEndpoints
         mapName = room.MapName ?? "Классическая арена",
         arena = room.ArenaJson is null ? MatchConfig.Classic.Arena : BattleMapEndpoints.Arena(
             JsonSerializer.Deserialize<List<Wall>>(room.ArenaJson, BattleMapEndpoints.Json) ?? []),
-        room.Status, occupied = room.GuestId != null, room.CreatedAt
+        room.Status, room.RoundNumber, occupied = room.GuestId != null, room.CreatedAt
     };
     private static async Task Refund(UgcDbContext database, GameRoom room, string type)
     {
@@ -295,6 +336,7 @@ public static class RoomEndpoints
 
 public sealed record CreateRoomRequest(
     string Name, bool AllowClipboard, bool AllowPresetStrategies, int MaxCharactersPerSecond, long Stake, Guid? MapId = null, bool IsPrivate = false, string? Password = null);
-public sealed record RoomDraftRequest(string Code, string Language, Guid? StrategyId = null);
+public sealed record RoomDraftRequest(string Code, string Language, Guid? StrategyId = null, int RoundNumber = 1);
+public sealed record RoomRoundRequest(int RoundNumber);
 
 public sealed record JoinRoomRequest(string? Password);

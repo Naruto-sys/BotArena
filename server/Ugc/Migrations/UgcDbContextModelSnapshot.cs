@@ -292,6 +292,9 @@ namespace BotArena.Ugc.Migrations
                     b.Property<string>("MatchResultJson")
                         .HasColumnType("text");
 
+                    b.Property<int?>("MatchRoundNumber")
+                        .HasColumnType("integer");
+
                     b.Property<int>("MaxCharactersPerSecond")
                         .HasColumnType("integer");
 
@@ -303,6 +306,11 @@ namespace BotArena.Ugc.Migrations
                     b.Property<string>("PasswordHash")
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
+
+                    b.Property<int>("RoundNumber")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
                     b.Property<long>("Stake")
                         .HasColumnType("bigint");

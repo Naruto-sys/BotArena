@@ -185,6 +185,12 @@ export interface GameRoom {
   id: string; name: string; creator: FriendUser; allowClipboard: boolean; allowPresetStrategies: boolean;
   maxCharactersPerSecond: number; stake: number; status: 'Open' | 'Running' | 'Completed' | 'Cancelled';
   occupied: boolean; createdAt: string; mapName: string; arena: Arena; isPrivate: boolean;
+  roundNumber: number;
+}
+export interface RoomDetails {
+  room: GameRoom; match: MatchResponse | null; matchRoundNumber: number | null;
+  winnerId: string | null; readyCount: number;
+  draft: { code: string; language: StrategyLanguage; sourceStrategyId: string | null; isReady: boolean } | null;
 }
 export interface BattleMap {
   id: string; name: string; width: number; height: number; walls: Wall[]; createdAt: string; updatedAt: string;

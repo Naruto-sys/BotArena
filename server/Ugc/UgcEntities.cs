@@ -152,6 +152,8 @@ public sealed class GameRoom
     public string? MapName { get; set; }
     public string? ArenaJson { get; set; }
     public GameRoomStatus Status { get; set; }
+    public int RoundNumber { get; set; } = 1;
+    public int? MatchRoundNumber { get; set; }
     public Guid? WinnerId { get; set; }
     public string? MatchResultJson { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
