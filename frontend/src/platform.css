@@ -71,7 +71,6 @@ body { background: radial-gradient(ellipse at 40% -25%, #153c50 0, transparent 5
 .replay-toolbox { margin-top: 12px; border-top: 1px solid #294253; padding-top: 12px; }
 .replay-toolbox > summary { font-size: 13px; color: var(--neon); margin-bottom: 10px; }
 @media(max-width: 1050px) { .platform-header { flex-wrap: wrap; padding: 12px 18px; gap: 10px; } .platform-header nav { order: 3; width: 100%; } .platform-content { padding: 20px 18px 0; } .platform-content .layout { grid-template-columns: minmax(300px, .9fr) minmax(0, 1.2fr); } .ux-radar { width: 150px; height: 150px; } }
-@media(max-width: 760px) { .platform-content .layout { grid-template-columns: 1fr; } .platform-header nav { flex-wrap: nowrap; overflow-x: auto; } .platform-header nav button { padding: 8px; font-size: 12px; } .platform-account small { display: none; } .ux-hero { padding: 26px; } .ux-radar { display: none; } .ux-stats { gap: 20px; flex-wrap: wrap; } .ux-stats b { font-size: 20px; } .ux-stages { gap: 14px; } }
 
 .arena-workspace-toolbar { display:flex; justify-content:flex-end; gap:10px; width:100%; margin:-2px 0 12px; }
 .arena-title { display:flex; align-items:center; gap:9px; }
@@ -181,6 +180,7 @@ dialog.ux-modal::backdrop { background: #020a13bb; backdrop-filter: blur(8px); }
   font-size: 14px; font-weight: 650; line-height: 1.3; text-align: left;
 }
 .account-login { white-space: nowrap; border-color: #4b8d80; color: var(--neon); background: #12342f; }
+.login-short { display: none; }
 .github-login { display: flex; align-items: center; justify-content: center; gap: .65rem; width: 100%; min-height: 42px; border: 1px solid #506375; border-radius: 9px; background: #172433; color: #e8f1f7; font-weight: 700; }
 .github-login b { font-size: .72rem; border: 1px solid #71869a; border-radius: 50%; width: 1.8rem; height: 1.8rem; display: grid; place-items: center; }
 .oauth-login { display:flex; align-items:center; justify-content:flex-start; gap:.7rem; width:100%; min-height:44px; padding:7px 12px; border:1px solid #506375; border-radius:9px; background:#172433; color:#e8f1f7; font-weight:700; }
@@ -213,7 +213,23 @@ dialog.ux-modal::backdrop { background: #020a13bb; backdrop-filter: blur(8px); }
 [data-theme="light"] .auth-feedback { color: #385667; }
 .guest-banner { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 16px; margin-bottom:16px; border:1px solid #725f31; border-radius:11px; background:#2b2618; color:#d9c995; }
 .guest-banner b { color:#ffd879; }.guest-banner span { flex:1; min-width:220px; }.guest-banner button { border-color:#8a7338; }
-.tour-launch { white-space:nowrap; }
+.platform-account .tour-launch,
+.platform-account .account-login {
+  display: inline-flex; align-items: center; justify-content: center;
+  box-sizing: border-box; height: 38px; margin: 0; padding: 0 12px;
+  line-height: 1; white-space: nowrap;
+  color: inherit; background: #0b1422; border-color: #39526f;
+  font-size: inherit; font-weight: inherit; letter-spacing: normal;
+}
+.platform-account .account-login span {
+  color: inherit; font-size: inherit; font-weight: inherit; letter-spacing: inherit;
+}
+.platform-account .account-login:hover,
+.platform-account .tour-launch:hover { border-color: #6f8ea3; }
+[data-theme="light"] .platform-account .tour-launch,
+[data-theme="light"] .platform-account .account-login {
+  color: #203443; background: #fff; border-color: #aebfcb;
+}
 .tour-backdrop { position:fixed; inset:0; z-index:300; pointer-events:none; background:linear-gradient(110deg,transparent 35%,#02080d30); }
 .tour-dialog { pointer-events:auto; position:absolute; right:22px; bottom:22px; width:min(440px,calc(100% - 28px)); max-height:calc(100dvh - 44px); overflow:auto; padding:24px; border:1px solid #3e6275; border-radius:18px; background:#102235f2; box-shadow:0 28px 90px #000a; backdrop-filter:blur(14px); }
 .tour-dialog>small { color:var(--neon); letter-spacing:.13em; font-weight:800; }.tour-dialog h2 { font-size:30px; margin:8px 0 14px; }.tour-dialog p,.tour-dialog li { color:#abc1cf; line-height:1.6; }.tour-dialog ol { display:grid; gap:10px; padding-left:22px; }
@@ -407,3 +423,144 @@ dialog.arena-modal-native::backdrop { background: #020a13c7; backdrop-filter: bl
 .rooms-panel > .room-advanced[open] > summary::after { transform:rotate(180deg); }
 .rooms-panel > .room-advanced > .room-filters { margin-top:.6rem; }
 [data-theme="light"] .rooms-panel > .room-advanced > summary { background:#fff; color:#315365; border-color:#b7cbd5; }
+
+@media(max-width: 760px) {
+  .platform-header {
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+    min-height: 0;
+    padding: max(8px, env(safe-area-inset-top)) 12px 8px;
+    background: #091521;
+    backdrop-filter: none;
+  }
+  .platform-brand { gap: 8px; min-width: 0; }
+  .platform-brand > img { width: 32px; height: 32px; }
+  .platform-brand span { font-size: 17px !important; }
+  .platform-brand small, .login-long, .platform-account small, .profile-menu .profile-name { display: none; }
+  .login-short { display: inline; }
+  .platform-account { gap: 6px; }
+  .platform-account .account-login { height: 38px; padding: 0 12px; }
+  .profile-menu { gap: 4px; }
+  .profile-balance { padding: 4px 6px; font-size: 12px; }
+  .platform-header nav {
+    position: fixed;
+    z-index: 45;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0;
+    width: auto;
+    margin: 0;
+    padding: 2px 4px calc(4px + env(safe-area-inset-bottom));
+    overflow: visible;
+    background: #091521f8;
+    border-top: 1px solid #294454;
+    backdrop-filter: blur(16px);
+  }
+  .platform-header nav button {
+    min-height: 52px;
+    padding: 6px 2px;
+    border-radius: 8px;
+    font-size: 11px;
+    line-height: 1.15;
+    text-align: center;
+    white-space: normal;
+  }
+  .platform-content {
+    padding: 14px 14px calc(84px + env(safe-area-inset-bottom));
+    overflow-x: clip;
+  }
+  .platform-content h1, .ux-hero h1 { overflow-wrap: anywhere; }
+  .guest-banner {
+    display: grid;
+    gap: 8px;
+    align-items: stretch;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+  }
+  .guest-banner span { min-width: 0; font-size: 14px; line-height: 1.4; }
+  .guest-banner button { width: 100%; min-height: 44px; }
+  .ux-hero { padding: 18px 16px; border-radius: 16px; }
+  .ux-hero h1 { font-size: 1.75rem; margin: 8px 0; }
+  .ux-hero p { font-size: 15px; }
+  .ux-radar { display: none; }
+  .ux-actions { flex-direction: column; align-items: stretch; }
+  .ux-actions > button { width: 100%; min-height: 46px; }
+  .ux-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px 8px;
+    padding: 16px 0;
+  }
+  .ux-stats b { font-size: 16px; overflow-wrap: anywhere; }
+  .ux-stats span { font-size: 11px; line-height: 1.3; }
+  .ux-stages { gap: 14px; flex-wrap: wrap; }
+  .ux-grid, .platform-content .layout, .learning-map { grid-template-columns: minmax(0, 1fr); }
+  .platform-content .panel { padding: 14px; }
+  .platform-content .code-editor { height: min(38dvh, 280px); }
+  .platform-content button.primary, .editor > button.primary { min-height: 48px; }
+  .arena-workspace-toolbar { flex-wrap: wrap; }
+  .arena-workspace-toolbar button { flex: 1 1 8rem; min-height: 44px; }
+  .ux-editor-heading { align-items: flex-start; flex-wrap: wrap; }
+  .ux-save { flex-direction: column; align-items: stretch; }
+  .ux-page-heading h1 { font-size: 1.6rem; }
+  .ux-tabs, .ugc-tabs { flex-wrap: wrap; overflow: visible; }
+  .ux-tabs button, .ugc-tabs button { min-height: 44px; white-space: normal; text-align: center; }
+  .ugc-hero { min-height: 0; }
+  .ugc-hero h1 { font-size: 1.85rem; }
+  .ugc-tabs { top: calc(52px + env(safe-area-inset-top)); }
+  input, select, textarea { font-size: 16px; }
+  .auth-feedback {
+    left: 12px;
+    right: 12px;
+    width: auto;
+    bottom: calc(78px + env(safe-area-inset-bottom));
+  }
+  .tour-dialog { bottom: calc(78px + env(safe-area-inset-bottom)); max-height: min(42dvh, 360px); }
+  .nickname-backdrop { padding: 12px; align-items: end; }
+  .nickname-dialog, .auth-dialog { max-height: calc(100dvh - 24px); }
+  .platform-footer { gap: 8px; }
+  [data-theme="light"] .platform-header,
+  [data-theme="light"] .platform-header nav { background: #fff; border-color: #cad8e2; }
+}
+
+@media (max-width: 800px) {
+  .lab-wall-list {
+    align-items: start;
+    grid-auto-rows: auto;
+    max-height: none;
+    overflow: visible;
+  }
+  .lab-wall-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "id remove"
+      "x y"
+      "w h";
+    align-items: stretch;
+  }
+  .lab-wall-row > .lab-wall-select { grid-area: id; min-height: 44px; }
+  .lab-wall-row > .wall-delete-icon { grid-area: remove; width: auto; min-height: 44px; }
+  .lab-wall-row > label:nth-child(2) { grid-area: x; }
+  .lab-wall-row > label:nth-child(3) { grid-area: y; }
+  .lab-wall-row > label:nth-child(4) { grid-area: w; }
+  .lab-wall-row > label:nth-child(5) { grid-area: h; }
+  .lab-wall-row input { min-width: 0; }
+  .lab-walls-toolbar .danger-button { flex: 1 1 100%; margin-left: 0; justify-content: center; min-height: 44px; }
+  .team-hp-control { grid-template-columns: minmax(0, 1fr); }
+  .team-hp-control button { min-height: 44px; }
+  .lab-team > header { align-items: stretch; flex-wrap: wrap; }
+  .lab-team > header label { width: auto; min-width: 0; }
+}
+
+/* Keep the account menu and guest theme control within the mobile header. */
+@media (max-width: 760px) {
+  .platform-account { flex-wrap:nowrap; margin-left:auto; }
+  .platform-account > .theme-toggle b { display:none; }
+  .platform-account > .theme-toggle { width:38px; min-height:38px; padding:6px; }
+  .profile-menu { flex-wrap:nowrap; }
+  .profile-menu .profile-trigger { gap:4px; padding:3px; }
+}

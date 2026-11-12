@@ -474,3 +474,18 @@ test('strategy card counters stay grouped beside labels and footer wraps without
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   }
 });
+
+test('merged mobile header keeps bottom navigation, guest login and account avatar', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 }); await page.goto('/');
+  await expect(page.locator('.account-login .login-short')).toBeVisible();
+  await expect(page.locator('.account-login .login-long')).toBeHidden();
+  const navigation = await page.getByRole('navigation', { name: 'Основная навигация' }).boundingBox();
+  expect(navigation.y).toBeGreaterThan(760); expect(navigation.y + navigation.height).toBeLessThanOrEqual(845);
+  await signup(page.request); await page.reload();
+  await expect(page.locator('.profile-fallback')).toBeVisible();
+  const avatar = await page.locator('.profile-fallback').boundingBox(); expect(avatar.width).toBeGreaterThan(20);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+  await page.getByRole('button', { name: 'Меню аккаунта', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Настройки профиля', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Включить светлую тему', exact: true })).toBeVisible();
+});

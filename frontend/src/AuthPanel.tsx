@@ -142,7 +142,7 @@ export function AuthPanel({ session, onChange }: { session: AuthSession | undefi
   if (!session) return <span className="auth-loading" aria-label="Загрузка профиля" />;
   if (!session.authenticated) return <>
     {themeButton}
-    <button className="account-login" onClick={() => { setError(''); setAuthOpen(true); }}>Войти / Регистрация</button>
+    <button className="account-login" onClick={() => { setError(''); setAuthOpen(true); }}><span className="login-long">Войти / Регистрация</span><span className="login-short">Войти</span></button>
     {authOpen && createPortal(<div className="nickname-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setAuthOpen(false); }}>
       <section className="nickname-dialog auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title">
         <button type="button" className="ugc-close" onClick={() => setAuthOpen(false)}>×</button>
