@@ -213,7 +213,23 @@ dialog.ux-modal::backdrop { background: #020a13bb; backdrop-filter: blur(8px); }
 [data-theme="light"] .auth-feedback { color: #385667; }
 .guest-banner { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 16px; margin-bottom:16px; border:1px solid #725f31; border-radius:11px; background:#2b2618; color:#d9c995; }
 .guest-banner b { color:#ffd879; }.guest-banner span { flex:1; min-width:220px; }.guest-banner button { border-color:#8a7338; }
-.tour-launch { white-space:nowrap; }
+.platform-account .tour-launch,
+.platform-account .account-login {
+  display: inline-flex; align-items: center; justify-content: center;
+  box-sizing: border-box; height: 38px; margin: 0; padding: 0 12px;
+  line-height: 1; white-space: nowrap;
+  color: inherit; background: #0b1422; border-color: #39526f;
+  font-size: inherit; font-weight: inherit; letter-spacing: normal;
+}
+.platform-account .account-login span {
+  color: inherit; font-size: inherit; font-weight: inherit; letter-spacing: inherit;
+}
+.platform-account .account-login:hover,
+.platform-account .tour-launch:hover { border-color: #6f8ea3; }
+[data-theme="light"] .platform-account .tour-launch,
+[data-theme="light"] .platform-account .account-login {
+  color: #203443; background: #fff; border-color: #aebfcb;
+}
 .tour-backdrop { position:fixed; inset:0; z-index:300; pointer-events:none; background:linear-gradient(110deg,transparent 35%,#02080d30); }
 .tour-dialog { pointer-events:auto; position:absolute; right:22px; bottom:22px; width:min(440px,calc(100% - 28px)); max-height:calc(100dvh - 44px); overflow:auto; padding:24px; border:1px solid #3e6275; border-radius:18px; background:#102235f2; box-shadow:0 28px 90px #000a; backdrop-filter:blur(14px); }
 .tour-dialog>small { color:var(--neon); letter-spacing:.13em; font-weight:800; }.tour-dialog h2 { font-size:30px; margin:8px 0 14px; }.tour-dialog p,.tour-dialog li { color:#abc1cf; line-height:1.6; }.tour-dialog ol { display:grid; gap:10px; padding-left:22px; }
@@ -358,10 +374,10 @@ dialog.ux-modal::backdrop { background: #020a13bb; backdrop-filter: blur(8px); }
   .platform-brand { gap: 8px; min-width: 0; }
   .platform-brand > img { width: 32px; height: 32px; }
   .platform-brand span { font-size: 17px !important; }
-  .platform-brand small, .tour-label, .login-long, .platform-account small, .profile-menu span { display: none; }
+  .platform-brand small, .login-long, .platform-account small, .profile-menu span { display: none; }
   .login-short { display: inline; }
   .platform-account { gap: 6px; }
-  .tour-launch, .account-login { min-height: 40px; padding: 8px 10px; }
+  .platform-account .account-login { height: 38px; padding: 0 12px; }
   .profile-menu { gap: 4px; }
   .profile-balance { padding: 4px 6px; font-size: 12px; }
   .platform-header nav {
