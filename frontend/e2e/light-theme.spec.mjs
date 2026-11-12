@@ -246,3 +246,29 @@ test('guest sign-in remains above an open community editor after a real 401', as
   await page.locator('.auth-dialog .ugc-close').click();
   await expect(editor.getByLabel('Название', { exact: true })).toHaveValue('Guest theme draft');
 });
+
+test('saved profile notice retains the correct surface and text through theme changes', async ({ page }, info) => {
+  await signup(page.request);
+  await open(page, 'home');
+  await page.getByRole('button', { name: 'Меню аккаунта', exact: true }).click();
+  await page.getByRole('button', { name: 'Настройки профиля', exact: true }).click();
+  const profile = page.locator('.profile-settings');
+  await profile.getByLabel('Имя', { exact: true }).fill('Updated');
+  await profile.getByLabel('Фамилия', { exact: true }).fill('Profile');
+  await profile.getByRole('button', { name: 'Сохранить профиль', exact: true }).click();
+  const notice = profile.getByRole('status');
+  await expect(notice).toHaveText('Профиль сохранён.');
+  const session = await page.request.get('/api/auth/session').then(r => r.json());
+  expect(session.user.firstName).toBe('Updated');
+  expect(session.user.lastName).toBe('Profile');
+  for (const [index, theme] of ['light', 'dark', 'light'].entries()) {
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    await expect(notice).toHaveCSS('background-color', theme === 'light' ? 'rgb(230, 245, 237)' : 'rgb(23, 48, 40)');
+    await expect(notice).toHaveCSS('color', theme === 'light' ? 'rgb(38, 93, 70)' : 'rgb(215, 255, 232)');
+    await notice.hover();
+    await profile.getByRole('button', { name: 'Сохранить профиль', exact: true }).focus();
+    if (theme === 'light') await lightSurfaces(notice);
+    if (index < 2) await profile.locator('.theme-setting button').click();
+  }
+  await notice.screenshot({ path: info.outputPath('profile-saved-light.png') });
+});
