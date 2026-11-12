@@ -31,6 +31,6 @@ internal static class Match
             duel.Step(actions);
             frames.Add(duel.CaptureFrame());
         }
-        return new(new(config.TickRate, config.Arena, frames, duel.Result!), error);
+        return new(new(config.TickRate, config.Arena, frames, duel.Result!) { RandomSeed = config.RandomSeed }, error);
     }
 }

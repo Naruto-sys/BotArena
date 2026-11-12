@@ -76,11 +76,18 @@ public sealed class PythonBot : IBotRuntime
     public BotAction Decide(BotObservation observation)
     {
         var reply = Exchange(observation, TickLimit, observation.Tick);
-        if (reply.Action is not { } action ||
-            !double.IsFinite(action.LeftTrack) || !double.IsFinite(action.RightTrack) ||
-            !double.IsFinite(action.AimDirection.X) || !double.IsFinite(action.AimDirection.Y))
+        if (reply.Action is not { } value) throw new StrategyException("Некорректная команда Python.", observation.Tick);
+        var action = StrategyAction.Decode(value, observation);
+        if (!double.IsFinite(action.LeftTrack) || !double.IsFinite(action.RightTrack) ||
+            !double.IsFinite(action.AimDirection.X) || !double.IsFinite(action.AimDirection.Y) ||
+            (action.TurretTurn is { } turn && !double.IsFinite(turn)))
             throw new StrategyException("Некорректная команда Python.", observation.Tick);
-        return action with { LeftTrack = Math.Clamp(action.LeftTrack, -1, 1), RightTrack = Math.Clamp(action.RightTrack, -1, 1) };
+        return action with
+        {
+            LeftTrack = Math.Clamp(action.LeftTrack, -1, 1),
+            RightTrack = Math.Clamp(action.RightTrack, -1, 1),
+            TurretTurn = action.TurretTurn is { } rate ? Math.Clamp(rate, -1, 1) : null
+        };
     }
 
     private Reply Exchange<T>(T input, TimeSpan limit, int? tick)
@@ -148,5 +155,5 @@ public sealed class PythonBot : IBotRuntime
         directory.Delete(recursive: true);
     }
 
-    private sealed record Reply(bool Ready, BotAction? Action, string? Error, int? Line, int? Column);
+    private sealed record Reply(bool Ready, JsonElement? Action, string? Error, int? Line, int? Column);
 }

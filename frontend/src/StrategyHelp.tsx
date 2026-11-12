@@ -26,6 +26,9 @@ export function StrategyHelp({ language }: { language: StrategyLanguage }) {
       <p>{language === 'python' ? text.help.pythonIntro : text.help.intro}</p>
       <Fields title={text.help.input} rows={text.help.inputFields} />
       <Fields title={text.help.output} rows={text.help.outputFields} />
+      <p>{text.help.turretIntro}</p>
+      {language === 'python' && <p>{text.help.turretPythonImport}</p>}
+      <Fields title={text.help.turretFunctions} rows={text.help.turretRows} />
       <Fields title={text.help.nested} rows={text.help.nestedFields} />
     </details>
   );

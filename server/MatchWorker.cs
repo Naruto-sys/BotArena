@@ -20,7 +20,7 @@ internal static class MatchWorker
         {
             using var bot = StrategyLanguages.Create(request.Language, request.BotCode);
             using var opponent = StrategyLanguages.Create(StrategyLanguages.JavaScript, OpponentCatalog.GetCode(request.OpponentId));
-            result = new(Match.Run(MatchConfig.Classic, bot, opponent), null);
+            result = new(Match.Run(MatchConfig.Biomes with { RandomSeed = Random.Shared.Next() }, bot, opponent), null);
         }
         catch (StrategyException error)
         {

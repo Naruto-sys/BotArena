@@ -31,6 +31,19 @@ def check_replay(replay):
     assert replay["result"]["durationTicks"] == len(frames) - 1 <= 200
     assert frames[-1]["events"][-1]["type"] == "MatchFinished"
     assert all(len(frame["bots"]) == 2 for frame in frames)
+    arena = replay["arena"]
+    assert arena["cellSize"] == 1
+    assert {"Sand", "Snow", "Ice"} <= {cell["surface"] for cell in arena["cells"]}
+    assert any(cell["fog"] and cell["surface"] == "Sand" for cell in arena["cells"])
+    assert arena["terrainRules"]["sand"]["speedMultiplier"] == 0.75
+    assert arena["terrainRules"]["fogVisibilityRange"] == 4
+    assert all(bot["surface"] in {"Ground", "Sand", "Snow", "Ice"} and type(bot["inFog"]) is bool
+               for frame in frames for bot in frame["bots"])
+    assert type(replay["randomSeed"]) is int
+    assert len(frames[0]["items"]) == 3
+    assert all(len(frame["items"]) <= 6 and isinstance(frame["smokeClouds"], list) for frame in frames)
+    assert all(len(bot["inventory"]) <= 2 and bot["shieldHp"] >= 0 and isinstance(bot["activeEffects"], list)
+               for frame in frames for bot in frame["bots"])
 
 
 def main():
@@ -60,6 +73,16 @@ def main():
                                   for event in frame["events"])])
     assert shot_ticks[0][:3] == shot_ticks[1][:3] == [1, 13, 25], shot_ticks
 
+    status, match = run('''function tick(state) {
+      if (!Array.isArray(state.items) || !Array.isArray(state.smokeClouds) ||
+          !Array.isArray(state.self.inventory) || !state.consumableRules.enabled ||
+          state.consumableRules.inventoryCapacity !== 2) throw Error("missing consumable state");
+      if (state.enemy && state.enemy.inventory.length !== 0) throw Error("enemy stock leaked");
+      return {useItem: "Repair"};
+    }''')
+    assert status == 200 and match["error"] is None, match
+    check_replay(match["replay"])
+
     status, error = run("function tick( {")
     assert status == 422 and error["error"], error
     assert run("const other = 0;")[0] == 422
@@ -71,6 +94,7 @@ def main():
         ("function tick() { while(true) {} }", 0),
         ("function tick() { return { get leftTrack() { while(true) {} } }; }", 0),
         ("function tick() { return { aimDirection: { x: Infinity, y: 0 } }; }", 0),
+        ("function tick() { return { useItem: 'unknown' }; }", 0),
     ]:
         status, match = run(code)
         assert status == 200 and match["error"]["tick"] == failed_tick, match

@@ -8,6 +8,7 @@
     <ProjectReference Include="../Simulation/BotArena.Simulation.csproj" />
     <PackageReference Include="Jint" Version="4.17.0" />
     <EmbeddedResource Include="PythonBridge.py" LogicalName="BotArena.PythonBridge.py" />
+    <EmbeddedResource Include="BotApi.js" LogicalName="BotArena.BotApi.js" />
 
   </ItemGroup>
 </Project>

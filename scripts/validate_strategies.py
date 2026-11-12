@@ -57,7 +57,11 @@ def check_walls():
     check_displacements(states, replay["tickRate"])
 
     clamped = player_states(replay_for("clamped-tracks"))
-    assert len(clamped) > 40 and clamped[:41] == states[:41]
+    assert len(clamped) > 40
+    # Independent matches can pick up different random items; compare the movement under test.
+    movement = ("position", "bodyAngle", "turretAngle", "speed")
+    assert all({key: actual[key] for key in movement} == {key: expected[key] for key in movement}
+               for actual, expected in zip(clamped[:41], states[:41]))
 
     edge = replay_for("arena-edge")
     edge_states = player_states(edge)
