@@ -14,6 +14,7 @@ import type {
   StrategyLogLine,
 } from './contracts';
 import { ArenaPreview } from './ArenaPreview';
+import { scrollToPanel } from './scrollToPanel';
 import { botLabel, teamWon } from './botDisplay';
 import { isLevelUnlocked, loadCompletedLevels, markLevelCompleted } from './campaignProgress';
 import { wallOverlapsBot } from './mapGeometry';
@@ -41,6 +42,7 @@ import { platformText as ui } from './text';
 import { loadStrategies, saveStrategies, type SavedStrategy } from './strategyLibrary';
 import './style.css';
 import './platform.css';
+import './lightTheme.css';
 
 const PveMap = lazy(() => import('./PveMap').then(module => ({ default: module.PveMap })));
 const UgcHub = lazy(() => import('./UgcHub').then(module => ({ default: module.UgcHub })));
@@ -364,10 +366,7 @@ function App() {
   }
 
   useEffect(() => {
-    if (!loading || !replayPanel.current) return;
-    const header = document.querySelector('.platform-header')?.getBoundingClientRect().height ?? 0;
-    const top = replayPanel.current.getBoundingClientRect().top + window.scrollY - header - 12;
-    window.scrollTo({ top: Math.max(0, top), behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    if (loading) scrollToPanel(replayPanel.current);
   }, [loading]);
 
   function selectMode(next: AppMode) {

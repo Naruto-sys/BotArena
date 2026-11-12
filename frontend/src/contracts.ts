@@ -193,6 +193,7 @@ export interface PveLevel {
   id: string; order: number; blockId: string; blockOrder: number; stage: number; isTraining: boolean;
   title: string; command: string; description: string; goal: string; hints: string[]; reward: number;
   starterCode: Record<StrategyLanguage, string>; solutionCode: Record<StrategyLanguage, string>;
+  arena: Arena; spawns: CampaignSpawn[];
   completed: boolean; locked: boolean; stats: PveStats | null;
 }
 export interface PveBlock {
