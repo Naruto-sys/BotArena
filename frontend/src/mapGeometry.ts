@@ -14,3 +14,22 @@ export function wallOverlapsBot(wall: Wall, bot: Pick<LabBot, 'position' | 'body
     return Math.abs(dx * axis.x + dy * axis.y) <= robotExtent + wallExtent;
   });
 }
+
+export function botsOverlap(
+  first: Pick<LabBot, 'position' | 'bodyAngle'>,
+  second: Pick<LabBot, 'position' | 'bodyAngle'>,
+): boolean {
+  const firstForward = { x: Math.cos(first.bodyAngle), y: Math.sin(first.bodyAngle) };
+  const firstSide = { x: -firstForward.y, y: firstForward.x };
+  const secondForward = { x: Math.cos(second.bodyAngle), y: Math.sin(second.bodyAngle) };
+  const secondSide = { x: -secondForward.y, y: secondForward.x };
+  const dx = first.position.x - second.position.x;
+  const dy = first.position.y - second.position.y;
+  return [firstForward, firstSide, secondForward, secondSide].every(axis => {
+    const firstExtent = .34 * Math.abs(firstForward.x * axis.x + firstForward.y * axis.y)
+      + .29 * Math.abs(firstSide.x * axis.x + firstSide.y * axis.y);
+    const secondExtent = .34 * Math.abs(secondForward.x * axis.x + secondForward.y * axis.y)
+      + .29 * Math.abs(secondSide.x * axis.x + secondSide.y * axis.y);
+    return Math.abs(dx * axis.x + dy * axis.y) <= firstExtent + secondExtent;
+  });
+}

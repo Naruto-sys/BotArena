@@ -9,9 +9,13 @@ public enum GameRoomStatus { Open, Running, Completed, Cancelled }
 public sealed class AppUser
 {
     public Guid Id { get; set; } = Guid.NewGuid();
-    public required string YandexId { get; set; }
-    public required string FirstName { get; set; }
-    public required string LastName { get; set; }
+    public string? YandexId { get; set; }
+    public string? GitHubId { get; set; }
+    public string? Login { get; set; }
+    public string? NormalizedLogin { get; set; }
+    public string? PasswordHash { get; set; }
+    public string FirstName { get; set; } = "";
+    public string LastName { get; set; } = "";
     public string? AvatarUrl { get; set; }
     public string? Nickname { get; set; }
     public string? NormalizedNickname { get; set; }
@@ -19,6 +23,17 @@ public sealed class AppUser
     public DateTimeOffset LastLoginAt { get; set; } = DateTimeOffset.UtcNow;
     public long Balance { get; set; } = 1_000;
     public List<UserStrategy> Strategies { get; set; } = [];
+    public List<OAuthIdentity> OAuthIdentities { get; set; } = [];
+}
+
+public sealed class OAuthIdentity
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid UserId { get; set; }
+    public required AppUser User { get; set; }
+    public required string Provider { get; set; }
+    public required string Subject { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
 public sealed class Friendship

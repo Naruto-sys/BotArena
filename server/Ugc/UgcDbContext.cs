@@ -5,6 +5,7 @@ namespace BotArena;
 public sealed class UgcDbContext(DbContextOptions<UgcDbContext> options) : DbContext(options)
 {
     public DbSet<AppUser> Users => Set<AppUser>();
+    public DbSet<OAuthIdentity> OAuthIdentities => Set<OAuthIdentity>();
     public DbSet<UserStrategy> Strategies => Set<UserStrategy>();
     public DbSet<UserStrategyVersion> StrategyVersions => Set<UserStrategyVersion>();
     public DbSet<ManeuverSnippet> Maneuvers => Set<ManeuverSnippet>();
@@ -24,14 +25,30 @@ public sealed class UgcDbContext(DbContextOptions<UgcDbContext> options) : DbCon
         users.ToTable("users");
         users.HasKey(user => user.Id);
         users.HasIndex(user => user.YandexId).IsUnique();
+        users.HasIndex(user => user.GitHubId).IsUnique();
+        users.HasIndex(user => user.NormalizedLogin).IsUnique();
         users.HasIndex(user => user.NormalizedNickname).IsUnique();
         users.Property(user => user.YandexId).HasMaxLength(64);
+        users.Property(user => user.GitHubId).HasMaxLength(64);
+        users.Property(user => user.Login).HasMaxLength(40);
+        users.Property(user => user.NormalizedLogin).HasMaxLength(40);
+        users.Property(user => user.PasswordHash).HasMaxLength(500);
         users.Property(user => user.FirstName).HasMaxLength(100);
         users.Property(user => user.LastName).HasMaxLength(100);
         users.Property(user => user.Nickname).HasMaxLength(24);
         users.Property(user => user.NormalizedNickname).HasMaxLength(24);
         users.Property(user => user.AvatarUrl).HasMaxLength(500);
         users.Property(user => user.Balance).HasDefaultValue(1_000L);
+
+        var oauthIdentities = modelBuilder.Entity<OAuthIdentity>();
+        oauthIdentities.ToTable("oauth_identities");
+        oauthIdentities.HasKey(item => item.Id);
+        oauthIdentities.HasIndex(item => new { item.Provider, item.Subject }).IsUnique();
+        oauthIdentities.HasIndex(item => new { item.UserId, item.Provider }).IsUnique();
+        oauthIdentities.Property(item => item.Provider).HasMaxLength(40);
+        oauthIdentities.Property(item => item.Subject).HasMaxLength(200);
+        oauthIdentities.HasOne(item => item.User).WithMany(user => user.OAuthIdentities)
+            .HasForeignKey(item => item.UserId).OnDelete(DeleteBehavior.Cascade);
 
         var friendships = modelBuilder.Entity<Friendship>();
         friendships.ToTable("friendships");

@@ -50,12 +50,12 @@ app.MapPost("/api/match-jobs", (MatchRequest request, MatchQueue queue) =>
     var safeRequest = request with { OpponentCode = null, OpponentLanguage = null, PveLevelId = null, CustomArena = null };
     if (queue.Enqueue(safeRequest) is not { } job) return QueueFull();
     return Results.Accepted($"/api/match-jobs/{job.Id}", new { id = job.Id });
-}).RequireAuthorization();
+}).AllowAnonymous();
 app.MapGet("/api/match-jobs/{id:guid}", (Guid id, MatchQueue queue, HttpResponse response) =>
 {
     response.Headers.CacheControl = "no-store";
     return queue.GetStatus(id) is { } status ? Results.Ok(status) : Results.NotFound();
-}).RequireAuthorization();
+}).AllowAnonymous();
 app.MapPost("/api/matches", async (MatchRequest request, MatchQueue queue, CancellationToken cancellation) =>
 {
     if (Validate(request) is { } invalid) return invalid;
@@ -67,7 +67,7 @@ app.MapPost("/api/matches", async (MatchRequest request, MatchQueue queue, Cance
     return result.Response is { } response
         ? Results.Ok(response)
         : Results.UnprocessableEntity(new { error = result.Error });
-}).RequireAuthorization();
+}).AllowAnonymous();
 
 await app.RunAsync();
 return 0;

@@ -1,5 +1,5 @@
 import { platformText as ui } from './text';
-import type { ArenaUser, AuthSession, BattleChallenge, BattleMap, FriendStrategy, Friendship, FriendUser, GameRoom, ManeuverSnippet, MatchResponse, PveAttemptResult, PveCourse, PveLeaderboard, StrategyLanguage, StrategyTransfer, UgcStrategy, UgcStrategyCard, Wall } from './contracts';
+import type { ArenaUser, AuthSession, BattleChallenge, BattleMap, FriendStrategy, Friendship, FriendUser, GameRoom, ManeuverSnippet, MatchResponse, OAuthProvider, PveAttemptResult, PveCourse, PveLeaderboard, StrategyLanguage, StrategyTransfer, UgcStrategy, UgcStrategyCard, Wall } from './contracts';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -17,7 +17,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const ugcApi = {
   session: () => request<AuthSession>('/api/auth/session'),
+  oauthProviders: () => request<OAuthProvider[]>('/api/auth/providers'),
+  register: (value: { login: string; password: string; firstName: string; lastName: string; nickname: string }) =>
+    request<ArenaUser>('/api/auth/register', { method: 'POST', body: JSON.stringify(value) }),
+  passwordLogin: (login: string, password: string) => request<ArenaUser>('/api/auth/password-login', {
+    method: 'POST', body: JSON.stringify({ login, password }),
+  }),
   nickname: (nickname: string) => request<ArenaUser>('/api/auth/nickname', { method: 'POST', body: JSON.stringify({ nickname }) }),
+  profile: (firstName: string, lastName: string) => request<ArenaUser>('/api/auth/profile', {
+    method: 'PUT', body: JSON.stringify({ firstName, lastName }),
+  }),
+  changePassword: (currentPassword: string, newPassword: string) => request<void>('/api/auth/change-password', {
+    method: 'POST', body: JSON.stringify({ currentPassword, newPassword }),
+  }),
   logout: () => request<void>('/api/auth/logout', { method: 'POST' }),
   catalog: (query = '', language = '', sort = 'popular') => request<UgcStrategyCard[]>(`/api/ugc/strategies?${new URLSearchParams({ q: query, language, sort })}`),
   mine: () => request<UgcStrategyCard[]>('/api/ugc/me/strategies'),
@@ -87,20 +99,12 @@ export function requireLogin() {
   announceAuth({ message: ui.authRequiredNotice, canLogin: true });
 }
 
-export async function login() {
-  const origin = location.href;
-  try {
-    const session = await ugcApi.session();
-    if (location.href !== origin) return;
-    if (!session.loginAvailable) {
-      announceAuth({ message: ui.authUnavailable, canLogin: false });
-      return;
-    }
-    location.assign(`/api/auth/login?returnUrl=${encodeURIComponent(location.pathname + location.search + location.hash)}`);
-  } catch {
-    if (location.href !== origin) return;
-    announceAuth({ message: ui.authCheckFailed, canLogin: false });
-  }
+export function login(provider: string) {
+  location.assign(`/api/auth/oauth/${encodeURIComponent(provider)}/login?returnUrl=${encodeURIComponent(location.pathname + location.search + location.hash)}`);
+}
+
+export function linkProvider(provider: string) {
+  location.assign(`/api/auth/oauth/${encodeURIComponent(provider)}/link?returnUrl=${encodeURIComponent(location.pathname + location.search + location.hash)}`);
 }
 
 export function isUnauthorized(error: unknown) {

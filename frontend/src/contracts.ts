@@ -132,10 +132,13 @@ export interface ArenaUser {
   avatarUrl: string | null;
   nickname: string | null;
   balance: number;
+  login: string | null;
 }
+export interface OAuthProvider { id: string; displayName: string; badge: string; color: string }
 export type AuthSession =
   | { authenticated: false; loginAvailable?: boolean }
-  | { authenticated: true; user: ArenaUser; needsNickname: boolean; loginAvailable?: boolean };
+  | { authenticated: true; user: ArenaUser; needsNickname: boolean; loginAvailable?: boolean;
+      hasPassword: boolean; linkedOAuthProviders: string[] };
 export type UgcVisibility = 'Private' | 'Unlisted' | 'Public';
 export interface UgcAuthor { id: string; nickname: string; avatarUrl: string | null }
 export interface UgcStrategyCard {

@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { AuthSession, PveAttemptResult, PveBlock, PveCourse, PveLeaderboard, PveLevel, StrategyLanguage } from './contracts';
 import { ReplayPlayer } from './ReplayPlayer';
-import { login, ugcApi } from './ugcApi';
+import { ugcApi } from './ugcApi';
 
 const icons = ['⌁', '⌖', '↝', '◌', '✦'];
 const StrategyEditor = lazy(() => import('./StrategyEditor'));
@@ -90,10 +90,10 @@ export function PveMap({ session }: { session: AuthSession | undefined }) {
   const nextLevel = useMemo(() => course?.blocks.flatMap(block => block.levels).find(level => !level.completed && !level.locked), [course]);
 
   if (!session) return <section className="learning-shell"><div className="learning-loading" /></section>;
-  if (!session.authenticated) return <section className="learning-shell"><div className="learning-auth"><span className="learning-orb">⌁</span><p className="eyebrow">BOTARENA PVE</p><h1>От первой команды до чемпионской серии</h1><p>55 последовательных испытаний: обучение без рейтинга и 10 боевых глав с онлайн-таблицами.</p><button className="yandex-login" onClick={login}><b>Я</b> Войти и начать</button></div></section>;
+  if (!session.authenticated) return <section className="learning-shell"><div className="learning-auth"><span className="learning-orb">⌁</span><h1>От первой команды до чемпионской серии</h1><p>Рейтинговый PvE сохраняет награды и статистику в аккаунте. В гостевом режиме используйте учебные испытания — их можно запускать без входа, но прогресс не сохранится.</p><button className="account-login" onClick={() => window.dispatchEvent(new CustomEvent('botarena-open-auth'))}>Войти или зарегистрироваться</button></div></section>;
 
   return <section className="learning-shell">
-    <header className="learning-header"><div><p className="eyebrow">PVE · КАРТА КАМПАНИИ</p><h1>{activeBlock?.title ?? 'Обучение'}</h1><p>{activeBlock?.description}</p></div><div className="course-progress"><div><strong>{course?.completed ?? 0}/{course?.total ?? 55}</strong><span>испытаний пройдено</span></div><div className="progress-ring" style={{ '--progress': `${progress * 3.6}deg` } as CSSProperties}><b>{progress}%</b></div></div></header>
+    <header className="learning-header"><div><h1>{activeBlock?.title ?? 'Обучение'}</h1><p>{activeBlock?.description}</p></div><div className="course-progress"><div><strong>{course?.completed ?? 0}/{course?.total ?? 55}</strong><span>испытаний пройдено</span></div><div className="progress-ring" style={{ '--progress': `${progress * 3.6}deg` } as CSSProperties}><b>{progress}%</b></div></div></header>
     {error && !selected && <p className="error-card">{error}</p>}
     <div className="chapter-rail" aria-label="Главы PVE">{course?.blocks.map(block => <button key={block.id} disabled={block.locked} className={`${block.id === activeBlock?.id ? 'active' : ''} ${block.completed === block.total ? 'completed' : ''}`} onClick={() => setActiveBlockId(block.id)}><span>{block.locked ? '·' : block.completed === block.total ? '✓' : String(block.order).padStart(2, '0')}</span><div><b>{block.title}</b><small>{block.completed}/{block.total} {block.isTraining ? '· без рейтинга' : '· рейтинг'}</small></div></button>)}</div>
     <div className="learning-layout">

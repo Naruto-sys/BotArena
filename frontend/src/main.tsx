@@ -17,6 +17,8 @@ import { botLabel, teamWon } from './botDisplay';
 import { isLevelUnlocked, loadCompletedLevels, markLevelCompleted } from './campaignProgress';
 import { wallOverlapsBot } from './mapGeometry';
 import { LabArenaEditor } from './LabArenaEditor';
+import { LabSettingsDialog } from './LabSettingsDialog';
+import { ArenaModal } from './ArenaModal';
 import {
   classicWalls,
   customBots,
@@ -28,11 +30,11 @@ import {
   type LabSetup,
 } from './labDraft';
 import { MatchDiagnosticError, buildCustomMatchPayload, runMatch } from './matchApi';
-import { StrategyHelp } from './StrategyHelp';
+import { StrategyHelpContent } from './StrategyHelp';
 import { AuthPanel } from './AuthPanel';
-import { login, ugcApi, type AuthNotice } from './ugcApi';
+import { ugcApi, type AuthNotice } from './ugcApi';
 import { text } from './text';
-import { Home, Workshop, LearningMap, SettingsDialog, type Page } from './PlatformPages';
+import { Home, Workshop, LearningMap, SettingsDialog, SystemTour, type Page } from './PlatformPages';
 import { platformText as ui } from './text';
 import { loadStrategies, saveStrategies, type SavedStrategy } from './strategyLibrary';
 import './style.css';
@@ -43,6 +45,13 @@ const UgcHub = lazy(() => import('./UgcHub').then(module => ({ default: module.U
 const RoomsPanel = lazy(() => import('./RoomsPanel').then(module => ({ default: module.RoomsPanel })));
 const StrategyEditor = lazy(() => import('./StrategyEditor'));
 const ReplayPlayer = lazy(() => import('./ReplayPlayer').then(module => ({ default: module.ReplayPlayer })));
+
+const quickDemoCode = `function tick({ self, enemy }) {
+  if (!enemy) return { leftTrack: 0.4, rightTrack: -0.4 };
+  const x = enemy.position.x - self.position.x;
+  const y = enemy.position.y - self.position.y;
+  return { aimDirection: { x, y }, shoot: self.canShoot };
+}`;
 
 function formatErrorSnippet(source: string, line?: number | null, column?: number | null) {
   if (line == null || line < 1) return '';
@@ -203,19 +212,25 @@ function App() {
   const [training, setTraining] = useState(location.hash === '#learn/pve');
   const [rooms, setRooms] = useState(location.hash === '#arena/rooms');
   const [settings, setSettings] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
+  const [demoInvite, setDemoInvite] = useState(() => localStorage.getItem('botarena-first-run-v2') !== 'done');
+  const [demoStartPulse, setDemoStartPulse] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [library, setLibrary] = useState(loadStrategies);
   const [strategyName, setStrategyName] = useState<string>(ui.defaultName);
   const [libraryNote, setLibraryNote] = useState('');
   const [libraryId, setLibraryId] = useState<string>();
   const editorPanel = useRef<HTMLFormElement>(null);
+  const startButton = useRef<HTMLButtonElement>(null);
   const [mode, setMode] = useState<AppMode>(() => location.hash.startsWith('#arena') ? 'lab' : 'campaign');
   const [languages, setLanguages] = useState<StrategyLanguage[]>(['javascript']);
   const [language, setLanguage] = useState<StrategyLanguage>('javascript');
   const [labSetup, setLabSetup] = useState<LabSetup>(loadLabSetup);
   const [presets, setPresets] = useState<BehaviorPresetInfo[]>([]);
   const [mapError, setMapError] = useState('');
-  const [selectedWall, setSelectedWall] = useState<number | null>(null);
+  const [selectedWalls, setSelectedWalls] = useState<number[]>([]);
+  const [labSettingsOpen, setLabSettingsOpen] = useState(false);
+  const [strategyHelpOpen, setStrategyHelpOpen] = useState(false);
   const [labArenaView, setLabArenaView] = useState<'edit' | 'replay'>('edit');
   const [campaignDrafts, setCampaignDrafts] = useState<
     Record<string, Record<string, Partial<Record<StrategyLanguage, string>>>>
@@ -361,6 +376,24 @@ function App() {
     if (next === 'arena') { setRooms(false); selectMode('lab'); }
   }
 
+  function startQuickDemo() {
+    const setup = loadLabSetup();
+    const player = setup.bots.find(bot => bot.teamId === 'player') ?? setup.bots[0];
+    setLabSetup({ ...setup, activeBotId: player.id, bots: setup.bots.map(bot => bot.id === player.id
+      ? { ...bot, source: 'code', code: { ...bot.code, javascript: quickDemoCode } }
+      : bot) });
+    setLanguage('javascript'); setMode('lab'); setPage('arena'); setRooms(false); setLabArenaView('edit');
+    setEditorEpoch(value => value + 1);
+    history.replaceState(null, '', '#arena');
+    setAuthNotice({ message: 'Пример вставлен. Нажмите «Запустить», чтобы посмотреть первый бой.', canLogin: false });
+    localStorage.setItem('botarena-first-run-v2', 'done');
+    setDemoInvite(false);
+    window.setTimeout(() => {
+      startButton.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setDemoStartPulse(true);
+    }, 350);
+  }
+
   useEffect(() => {
     const refresh = () => setLibrary(loadStrategies());
     window.addEventListener('storage', refresh);
@@ -488,7 +521,8 @@ function App() {
 
   async function run(event: FormEvent) {
     event.preventDefault();
-    if (activeRun.current || !session?.authenticated) return;
+    if (activeRun.current) return;
+    setDemoStartPulse(false);
     if (mode === 'campaign' && level && !isLevelUnlocked(level.order, levels, completed)) return;
     setExpanded(false);
     const controller = new AbortController();
@@ -530,10 +564,14 @@ function App() {
       setLogs(match.logs ?? []);
       setScriptError(match.error ?? undefined);
       if (mode === 'campaign' && level && !match.error && teamWon(match.replay.result)) {
-        const nextCompleted = markLevelCompleted(level.id);
+        const nextCompleted = session?.authenticated
+          ? markLevelCompleted(level.id)
+          : completed.includes(level.id) ? completed : [...completed, level.id];
         setCompleted(nextCompleted);
         const nextLevel = levels.find(item => item.order === level.order + 1);
-        setCampaignNote(nextLevel ? text.campaign.success : text.campaign.finished);
+        setCampaignNote(session?.authenticated
+          ? nextLevel ? text.campaign.success : text.campaign.finished
+          : 'Уровень пройден в гостевом режиме. Войдите или зарегистрируйтесь, чтобы сохранить прогресс.');
       }
     } catch (problem) {
       if (problem instanceof MatchDiagnosticError) {
@@ -565,25 +603,59 @@ function App() {
       const value = bot.code[language] ?? '';
       return value.trim().length > 0 && value.length <= 16384;
     });
-  const canRun = session?.authenticated && (mode === 'lab'
+  const canRun = mode === 'lab'
     ? labSetup.bots.length >= 2 && labCodesReady
-    : Boolean(level && isLevelUnlocked(level.order, levels, completed) && campaignCodesReady));
+    : Boolean(level && isLevelUnlocked(level.order, levels, completed) && campaignCodesReady);
 
   return (
     <main className={`platform-app${expanded ? ' editor-expanded' : ''}`}>
       <header className="platform-header">
-        <button className="platform-brand" onClick={() => navigate('home')}>◈ <span>{text.brand}<small>CODE · SIMULATE · EVOLVE</small></span></button>
+        <button className="platform-brand" onClick={() => navigate('home')}><img src="/botarena-forge-icon.png" alt="" /><span>{text.brand}<small>CODE · SIMULATE · EVOLVE</small></span></button>
         <nav aria-label="Основная навигация">{Object.entries(ui.nav).map(([id, label]) =>
           <button key={id} type="button" aria-current={page === id ? 'page' : undefined}
             disabled={loading} onClick={() => navigate(id as Page)}>{label}</button>)}</nav>
-        <div className="platform-account"><AuthPanel session={session} onChange={setSession} /><button onClick={() => setSettings(true)}>{ui.settings}</button></div>
+        <div className="platform-account"><button className="tour-launch" onClick={() => setTourOpen(true)}>？ Обзор</button><AuthPanel session={session} onChange={setSession} /><button className="platform-settings-button" title={ui.settings} aria-label={ui.settings} onClick={() => setSettings(true)}>⚙</button></div>
       </header>
       {settings && <SettingsDialog onClose={() => setSettings(false)} />}
+      {tourOpen && <SystemTour onClose={() => setTourOpen(false)} onNavigate={navigate} />}
+      {labSettingsOpen && <ArenaModal title={ui.roster} wide onClose={() => setLabSettingsOpen(false)}>
+        <LabSettingsDialog
+          setup={labSetup}
+          presets={presets}
+          onRosterChange={updateRoster}
+          onReset={() => {
+            detachStrategy();
+            setMapError('');
+            setLabSetup(defaultLabSetup());
+            setSelectedWalls([]);
+            setEditorEpoch(value => value + 1);
+          }}
+          onBotChange={(id, patch) => setLabSetup(previous => ({
+            ...previous,
+            bots: previous.bots.map(bot => bot.id === id ? { ...bot, ...patch } : bot),
+          }))}
+          onBehaviorChange={(id, value) => {
+            detachStrategy();
+            setLabSetup(previous => {
+              const bots = previous.bots.map(bot => bot.id !== id ? bot : value === 'code'
+                ? { ...bot, source: 'code' as const }
+                : { ...bot, source: 'preset' as const, presetId: value, movement: 'tracked' as const });
+              const custom = bots.filter(bot => bot.source === 'code');
+              return { ...previous, bots, activeBotId: custom.some(bot => bot.id === previous.activeBotId)
+                ? previous.activeBotId : (custom[0]?.id ?? previous.activeBotId) };
+            });
+            setEditorEpoch(value => value + 1);
+          }}
+        />
+      </ArenaModal>}
+      {strategyHelpOpen && <ArenaModal title={text.help.title} wide onClose={() => setStrategyHelpOpen(false)}>
+        <StrategyHelpContent language={language} movement={movement} />
+      </ArenaModal>}
       <div className="platform-content">
-      <div className="ux-breadcrumb">BotArena / {ui.nav[page]}{page === 'learn' && track ? ` / ${track.name}` : ''}</div>
-      {authNotice && <div className="auth-callout auth-feedback" role="status"><p>{authNotice.message}</p><div className="ux-actions">{authNotice.canLogin && <button className="yandex-login" onClick={login}>{ui.signIn}</button>}<button type="button" onClick={() => setAuthNotice(undefined)}>{ui.close}</button></div></div>}
+      {session && !session.authenticated && <div className="guest-banner"><b>Гостевой режим</b><span>Можно запускать одиночные бои, но прогресс не сохраняется.</span><button onClick={() => window.dispatchEvent(new CustomEvent('botarena-open-auth'))}>Войти или зарегистрироваться</button></div>}
+      {authNotice && <div className="auth-callout auth-feedback" role="status"><p>{authNotice.message}</p><div className="ux-actions">{authNotice.canLogin && <button className="account-login" onClick={() => window.dispatchEvent(new CustomEvent('botarena-open-auth'))}>Войти / Регистрация</button>}<button type="button" onClick={() => setAuthNotice(undefined)}>{ui.close}</button></div></div>}
       <Suspense fallback={<div className="empty">{ui.loadingSection}</div>}>
-      {page === 'home' ? <><Home tracks={tracks} completed={completed} languages={languages} navigate={navigate} onContinue={() => {
+      {page === 'home' ? <><Home tracks={tracks} completed={completed} languages={languages} navigate={navigate} onDemo={startQuickDemo} demoInvite={demoInvite} onContinue={() => {
           navigate('learn');
           const next = tracks.find(t => t.available && t.levels.some(l => !completed.includes(l.id) && isLevelUnlocked(l.order, t.levels, completed)));
           if (next) openTrack(next);
@@ -593,12 +665,11 @@ function App() {
           onArena={() => { setLibraryId(undefined); setStrategyName(ui.defaultName); navigate('arena'); }} />}</>
       : page === 'community' ? <UgcHub />
       : <>
-        <div className="ux-page-heading"><div><small>{page === 'learn' ? 'ACADEMY / BOT PATH' : 'MATCH LAB / PVE'}</small><h1>{ui.nav[page]}</h1><p>{page === 'learn' ? ui.learnIntro : ui.arenaIntro}</p></div></div>
+        <div className="ux-page-heading"><div><h1>{ui.nav[page]}</h1><p>{page === 'learn' ? ui.learnIntro : ui.arenaIntro}</p></div></div>
         {page === 'learn' && <div className="ux-tabs"><button aria-pressed={!training} onClick={() => { setTraining(false); history.replaceState(null, '', '#learn'); }}>{ui.learningLab}</button><button aria-pressed={training} onClick={() => { setTraining(true); history.replaceState(null, '', '#learn/pve'); }}>{ui.pveProgress}</button></div>}
         {page === 'learn' && training ? <PveMap session={session} /> : <>
         {page === 'arena' && <div className="ux-tabs"><button aria-pressed={!rooms} onClick={() => { setRooms(false); history.replaceState(null, '', '#arena'); }}>{ui.pve}</button><button aria-pressed={rooms} onClick={() => { setRooms(true); history.replaceState(null, '', '#arena/rooms'); }}>{ui.rooms}</button></div>}
-        {page === 'arena' && rooms ? session?.authenticated ? <RoomsPanel /> : <section className="panel auth-required"><h2>{ui.roomsTitle}</h2><p>{ui.roomsAuth}</p><button className="yandex-login" onClick={login}><b aria-hidden="true">Я</b><span>{ui.signIn}</span></button></section> : <>
-        {!inCampaignHub && <div className="ux-stages">{[ui.preparation, ui.battle, ui.result].map((label, i) => <span key={label} className={(loading ? 1 : replay ? 2 : 0) === i ? 'active' : ''}>{i + 1} · {label}</span>)}</div>}
+        {page === 'arena' && rooms ? session?.authenticated ? <RoomsPanel /> : <section className="panel auth-required"><h2>{ui.roomsTitle}</h2><p>{ui.roomsAuth}</p><button className="account-login" onClick={() => window.dispatchEvent(new CustomEvent('botarena-open-auth'))}>Войти / Регистрация</button></section> : <>
       {inCampaignHub ? (
         <>
           {error && <p role="alert" className="error-card">{error}</p>}
@@ -609,6 +680,11 @@ function App() {
           }} />
         </>
       ) : (
+        <>
+        <div className="arena-workspace-toolbar">
+          {mode === 'lab' && <button type="button" onClick={() => setLabSettingsOpen(true)}>⚙ {ui.roster}</button>}
+          <button type="button" onClick={() => setStrategyHelpOpen(true)}>？ {text.help.title}</button>
+        </div>
         <div className="layout">
           <form ref={editorPanel} className="panel editor" onSubmit={run}>
             <div className="ux-editor-heading"><small>{ui.editor}</small><button type="button" onClick={() => setExpanded(!expanded)}>{expanded ? ui.collapse : ui.focus}</button></div>
@@ -657,99 +733,6 @@ function App() {
                 <p className="muted"><strong>{text.campaign.hint}: </strong>{level.hint}</p>
                 <button type="button" onClick={loadStarter}>{text.campaign.loadStarter}</button>
               </div>
-            )}
-
-            {mode === 'lab' && (
-              <details className="lab-roster"><summary>{ui.roster}</summary>
-                <div className="lab-counts">
-                  <label>
-                    {text.lab.allies}
-                    <input type="number" min={1} max={4} value={labSetup.allyCount}
-                      onChange={event => updateRoster(Number(event.target.value), labSetup.enemyCount)} />
-                  </label>
-                  <label>
-                    {text.lab.enemies}
-                    <input type="number" min={1} max={4} value={labSetup.enemyCount}
-                      onChange={event => updateRoster(labSetup.allyCount, Number(event.target.value))} />
-                  </label>
-                  <button type="button" onClick={() => {
-                    detachStrategy();
-                    setMapError('');
-                    setLabSetup(defaultLabSetup());
-                    setSelectedWall(null);
-                    setEditorEpoch(value => value + 1);
-                  }}>{text.lab.reset}</button>
-                </div>
-                <ul className="lab-bot-list">
-                  {labSetup.bots.map(bot => (
-                    <li key={bot.id} className="lab-bot-card">
-                      <label>
-                        {text.lab.name}
-                        <input
-                          type="text"
-                          maxLength={24}
-                          value={bot.name}
-                          placeholder={botLabel(bot.id, bot.teamId, labSetup.bots.map(item => ({ ...item, name: '' })))}
-                          onChange={event => setLabSetup(previous => ({
-                            ...previous,
-                            bots: previous.bots.map(item => item.id === bot.id
-                              ? { ...item, name: event.target.value }
-                              : item),
-                          }))}
-                        />
-                      </label>
-                      <label>
-                        {text.lab.hp}
-                        <input type="number" min={1} max={500} value={bot.hp}
-                          onChange={event => setLabSetup(previous => ({
-                            ...previous,
-                            bots: previous.bots.map(item => item.id === bot.id
-                              ? { ...item, hp: Number(event.target.value) }
-                              : item),
-                          }))} />
-                      </label>
-                      <label>
-                        {text.lab.behavior}
-                        <select
-                          value={bot.source === 'code' ? 'code' : bot.presetId}
-                          onChange={event => {
-                            detachStrategy();
-                            const value = event.target.value;
-                            setLabSetup(previous => {
-                              const bots = previous.bots.map(item => {
-                                if (item.id !== bot.id) return item;
-                                if (value === 'code') return { ...item, source: 'code' as const };
-                                return { ...item, source: 'preset' as const, presetId: value, movement: 'tracked' as const };
-                              });
-                              const custom = bots.filter(item => item.source === 'code');
-                              return {
-                                ...previous,
-                                bots,
-                                activeBotId: custom.some(item => item.id === previous.activeBotId)
-                                  ? previous.activeBotId
-                                  : (custom[0]?.id ?? previous.activeBotId),
-                              };
-                            });
-                            setEditorEpoch(value => value + 1);
-                          }}
-                        >
-                          <option value="code">{text.lab.customCode}</option>
-                          {presets.map(preset => (
-                            <option key={preset.id} value={preset.id}>
-                              {preset.name} ({preset.strength === 'weak' ? text.lab.weak : text.lab.standard})
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      {bot.source === 'preset' && (
-                        <p className="muted">
-                          {presets.find(item => item.id === bot.presetId)?.description}
-                        </p>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </details>
             )}
 
             {mode === 'lab' && labArenaView === 'replay' && mapError && <p role="alert" className="error-card">{mapError}</p>}
@@ -832,8 +815,8 @@ function App() {
             {mode === 'lab' && labCustomBots.length === 0 && (
               <p className="muted">{text.lab.sourcePreset}: {text.lab.customCode.toLowerCase()} не выбран — все на пресетах.</p>
             )}
-            {!session?.authenticated && <div className="auth-callout"><div className="auth-callout-copy"><strong>{ui.authTitle}</strong><p>{ui.authDescription}</p></div><button className="yandex-login" type="button" onClick={login}><b aria-hidden="true">Я</b><span>{ui.signIn}</span><span className="login-arrow" aria-hidden="true">→</span></button></div>}
-            <button className="primary" disabled={loading || !canRun}>
+            {!session?.authenticated && <div className="auth-callout"><div className="auth-callout-copy"><strong>Гостевой бой доступен</strong><p>Результат можно посмотреть, но прогресс сохранится только после входа или регистрации.</p></div></div>}
+            <button ref={startButton} data-tour-target="arena-run" className={`primary ${demoStartPulse ? 'demo-start-pulse' : ''}`} disabled={loading || !canRun}>
               {loading ? text.working : text.start}
             </button>
             {code.length > 16384 && <p role="alert" className="error">{text.strategyTooLong}</p>}
@@ -868,7 +851,6 @@ function App() {
                 )}
               </div>
             )}
-            <StrategyHelp language={language} movement={movement} />
             <details className="debug-panel" open={logs.length > 0}>
               <summary>{text.debug.title}</summary>
               {logs.length === 0 ? (
@@ -888,7 +870,7 @@ function App() {
           </form>
           <section className="panel replay">
             <div className="arena-panel-heading">
-              <h2>{text.arena}</h2>
+              <div className="arena-title"><h2>{text.arena}</h2>{mode === 'lab' && <span className="arena-info" tabIndex={0} role="img" aria-label={text.lab.mapHint} data-tooltip={text.lab.mapHint}>i</span>}</div>
               {replay && <button type="button" onClick={() => { setExpanded(false); editorPanel.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>{ui.backCode}</button>}
               {mode === 'lab' && (
                 <div className="lab-arena-tabs" role="tablist" aria-label={text.arena}>
@@ -918,10 +900,10 @@ function App() {
               <LabArenaEditor
                 arena={labSetup.arena}
                 bots={labSetup.bots}
-                selectedWall={selectedWall}
+                selectedWalls={selectedWalls}
                 placementError={mapError}
                 onPlacementError={setMapError}
-                onSelectWall={setSelectedWall}
+                onSelectWalls={setSelectedWalls}
                 onMoveBot={(botId, x, y) => setLabSetup(previous => ({
                   ...previous,
                   bots: previous.bots.map(bot => bot.id === botId
@@ -944,31 +926,25 @@ function App() {
                       walls: [...previous.arena.walls, wall],
                     },
                   }));
-                  setSelectedWall(labSetup.arena.walls.length);
+                  setSelectedWalls([labSetup.arena.walls.length]);
                 }}
-                onRemoveWall={index => {
+                onRemoveWalls={indices => {
+                  const removed = new Set(indices);
                   setLabSetup(previous => ({
                     ...previous,
                     arena: {
                       ...previous.arena,
-                      walls: previous.arena.walls.filter((_, wallIndex) => wallIndex !== index),
+                      walls: previous.arena.walls.filter((_, wallIndex) => !removed.has(wallIndex)),
                     },
                   }));
-                  setSelectedWall(null);
+                  setSelectedWalls([]);
                 }}
                 onClassicWalls={() => {
                   setLabSetup(previous => ({
                     ...previous,
                     arena: { ...previous.arena, walls: classicWalls.map(wall => ({ ...wall })) },
                   }));
-                  setSelectedWall(null);
-                }}
-                onClearWalls={() => {
-                  setLabSetup(previous => ({
-                    ...previous,
-                    arena: { ...previous.arena, walls: [] },
-                  }));
-                  setSelectedWall(null);
+                  setSelectedWalls([]);
                 }}
               />
             ) : replay ? (
@@ -987,13 +963,14 @@ function App() {
             )}
           </section>
         </div>
+        </>
       )}
         </>}
         </>}
       </>}
       {page === 'workshop' && libraryNote && <p role="status" className="ux-notice">{libraryNote}</p>}
       </Suspense>
-      <footer className="platform-footer"><strong>BotArena</strong><span>{ui.footer}</span></footer>
+      <footer className="platform-footer"><strong><img src="/botarena-forge-icon.png" alt="" />BotArena</strong><span>{ui.footer}</span></footer>
       </div>
     </main>
   );

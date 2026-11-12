@@ -4,7 +4,7 @@ import type { Arena, CampaignSpawn, Wall } from './contracts';
 import { ArenaCoordinates, arenaViewBox } from './ArenaCoordinates';
 import { botColor, botLabel } from './botDisplay';
 import { classicWalls, type LabBot } from './labDraft';
-import { wallOverlapsBot } from './mapGeometry';
+import { botsOverlap, wallOverlapsBot } from './mapGeometry';
 import { text } from './text';
 
 const MIN_WALL = 0.4;
@@ -77,34 +77,57 @@ function cornerPoint(wall: Wall, corner: Corner) {
   }
 }
 
+function placeBesideWalls(bot: LabBot, x: number, y: number, arena: Arena) {
+  const extentX = .34 * Math.abs(Math.cos(bot.bodyAngle)) + .29 * Math.abs(Math.sin(bot.bodyAngle));
+  const extentY = .34 * Math.abs(Math.sin(bot.bodyAngle)) + .29 * Math.abs(Math.cos(bot.bodyAngle));
+  let position = { x, y };
+  for (let pass = 0; pass < arena.walls.length; pass++) {
+    const wall = arena.walls.find(item => wallOverlapsBot(item, { ...bot, position }));
+    if (!wall) break;
+    const candidates = [
+      { x: wall.x - extentX - .02, y: position.y },
+      { x: wall.x + wall.width + extentX + .02, y: position.y },
+      { x: position.x, y: wall.y - extentY - .02 },
+      { x: position.x, y: wall.y + wall.height + extentY + .02 },
+    ];
+    position = candidates.reduce((closest, candidate) =>
+      Math.hypot(candidate.x - position.x, candidate.y - position.y)
+        < Math.hypot(closest.x - position.x, closest.y - position.y) ? candidate : closest);
+    position = {
+      x: Math.min(arena.width - extentX, Math.max(extentX, position.x)),
+      y: Math.min(arena.height - extentY, Math.max(extentY, position.y)),
+    };
+  }
+  return position;
+}
+
 export function LabArenaEditor({
   arena,
   bots,
-  selectedWall,
+  selectedWalls,
   placementError,
   onPlacementError: setPlacementError,
-  onSelectWall,
+  onSelectWalls,
   onMoveBot,
   onChangeWall,
   onAddWall,
-  onRemoveWall,
+  onRemoveWalls,
   onClassicWalls,
-  onClearWalls,
 }: {
   arena: Arena;
   bots: LabBot[];
-  selectedWall: number | null;
+  selectedWalls: number[];
   placementError: string;
   onPlacementError: (message: string) => void;
-  onSelectWall: (index: number | null) => void;
+  onSelectWalls: (indices: number[]) => void;
   onMoveBot: (botId: string, x: number, y: number) => void;
   onChangeWall: (index: number, wall: Wall) => void;
   onAddWall: (wall: Wall) => void;
-  onRemoveWall: (index: number) => void;
+  onRemoveWalls: (indices: number[]) => void;
   onClassicWalls: () => void;
-  onClearWalls: () => void;
 }) {
   const spawns = bots.map(toSpawn);
+  const activeWall = selectedWalls[selectedWalls.length - 1];
 
   function validWalls(walls: Wall[]) {
     for (const wall of walls) {
@@ -131,23 +154,22 @@ export function LabArenaEditor({
   function moveBot(botId: string, x: number, y: number) {
     const bot = bots.find(item => item.id === botId);
     if (!bot) return;
-    if (arena.walls.some(wall => wallOverlapsBot(wall, { ...bot, position: { x, y } }))) {
-      setPlacementError(text.lab.botOverlapsWall);
-      return;
-    }
+    const position = placeBesideWalls(bot, x, y, arena);
+    const candidate = { ...bot, position };
+    if (bots.some(other => other.id !== botId && botsOverlap(candidate, other))) return;
     setPlacementError('');
-    onMoveBot(botId, x, y);
+    onMoveBot(botId, position.x, position.y);
   }
   const dragging = useRef(false);
 
   useEffect(() => {
-    if (selectedWall == null) return;
+    if (selectedWalls.length === 0) return;
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onSelectWall(null);
+      if (event.key === 'Escape') onSelectWalls([]);
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onSelectWall, selectedWall]);
+  }, [onSelectWalls, selectedWalls.length]);
 
   function bindPointerDrag(
     svg: SVGSVGElement,
@@ -194,8 +216,9 @@ export function LabArenaEditor({
     const start = clientToArena(svg, event.clientX, event.clientY);
     const offsetX = start.x - wall0.x;
     const offsetY = start.y - wall0.y;
-    const wasSelected = selectedWall === index;
-    onSelectWall(index);
+    const wasSelected = selectedWalls.includes(index);
+    const additive = event.ctrlKey || event.metaKey || event.shiftKey;
+    if (!wasSelected) onSelectWalls(additive ? [...selectedWalls, index] : [index]);
 
     bindPointerDrag(
       svg,
@@ -208,7 +231,9 @@ export function LabArenaEditor({
         }, arena));
       },
       didMove => {
-        if (!didMove && wasSelected) onSelectWall(null);
+        if (!didMove && wasSelected && additive) {
+          onSelectWalls(selectedWalls.filter(item => item !== index));
+        }
       },
     );
   }
@@ -224,7 +249,7 @@ export function LabArenaEditor({
     if (!svg) return;
     const wall0 = arena.walls[index];
     if (!wall0) return;
-    onSelectWall(index);
+    if (!selectedWalls.includes(index)) onSelectWalls([index]);
 
     bindPointerDrag(
       svg,
@@ -247,7 +272,7 @@ export function LabArenaEditor({
           onClick={event => {
             if (dragging.current) return;
             if ((event.target as Element).closest('[data-bot], .lab-wall, .lab-wall-handle')) return;
-            onSelectWall(null);
+            onSelectWalls([]);
           }}
         >
           <defs>
@@ -258,7 +283,8 @@ export function LabArenaEditor({
           <rect width={arena.width} height={arena.height} fill="url(#lab-grid)" />
           <ArenaCoordinates width={arena.width} height={arena.height} />
           {arena.walls.map((wall, index) => {
-            const selected = selectedWall === index;
+            const selected = selectedWalls.includes(index);
+            const active = activeWall === index;
             return (
               <g key={index} className="lab-wall-group">
                 <rect
@@ -267,10 +293,10 @@ export function LabArenaEditor({
                   fill={selected ? '#3d5f82' : '#273e58'}
                   stroke={selected ? '#7be0ff' : '#476383'}
                   strokeWidth=".05"
-                  className="lab-wall"
+                  className={selected ? 'lab-wall selected' : 'lab-wall'}
                   onPointerDown={event => startMoveWall(index, event)}
                 />
-                {selected && (['nw', 'ne', 'sw', 'se'] as const).map(corner => {
+                {active && (['nw', 'ne', 'sw', 'se'] as const).map(corner => {
                   const point = cornerPoint(wall, corner);
                   return (
                     <rect
@@ -333,29 +359,31 @@ export function LabArenaEditor({
             );
           })}
         </svg>
-        <p role="status" className="outcome preview-caption">{text.lab.mapHint}</p>
       </div>
 
       <div className="lab-walls">
         <div className="lab-walls-toolbar">
           <strong>{text.lab.walls}</strong>
-          <button type="button" onClick={() => {
+          <button type="button" className="lab-wall-add" aria-label={text.lab.addWall} title={text.lab.addWall} onClick={() => {
             const wall = { x: 6, y: 4, width: 1.5, height: 1.5 };
             if (validWalls([wall])) onAddWall(wall);
-          }}>{text.lab.addWall}</button>
-          <button type="button" disabled={selectedWall == null} onClick={() => onSelectWall(null)}>
-            {text.lab.deselectWall}
-          </button>
+          }}>+</button>
           <button type="button" onClick={() => { if (validWalls(classicWalls)) onClassicWalls(); }}>{text.lab.classicWalls}</button>
-          <button type="button" onClick={() => { setPlacementError(''); onClearWalls(); }}>{text.lab.clearWalls}</button>
+          {selectedWalls.length > 1 && <button type="button" className="danger-button" onClick={() => { setPlacementError(''); onRemoveWalls(selectedWalls); }}>
+            <TrashIcon /> Удалить выбранные ({selectedWalls.length})
+          </button>}
         </div>
+        {arena.walls.length > 1 && <small className="lab-wall-selection-hint">Нажимайте номера стен, чтобы выбрать несколько.</small>}
         {arena.walls.length === 0 && <p className="muted">{text.lab.noWalls}</p>}
-        {arena.walls.map((wall, index) => (
-          <div key={index} className={selectedWall === index ? 'lab-wall-row selected' : 'lab-wall-row'}>
+        {arena.walls.length > 0 && <div className="lab-wall-list">{arena.walls.map((wall, index) => (
+          <div key={index} className={selectedWalls.includes(index) ? 'lab-wall-row selected' : 'lab-wall-row'}>
             <button
               type="button"
               className="lab-wall-select"
-              onClick={() => onSelectWall(selectedWall === index ? null : index)}
+              aria-pressed={selectedWalls.includes(index)}
+              onClick={() => onSelectWalls(selectedWalls.includes(index)
+                ? selectedWalls.filter(item => item !== index)
+                : [...selectedWalls, index])}
             >
               #{index + 1}
             </button>
@@ -369,14 +397,18 @@ export function LabArenaEditor({
                   max={key === 'width' || key === 'x' ? arena.width : arena.height}
                   value={wall[key]}
                   onChange={event => changeWall(index, { ...wall, [key]: Number(event.target.value) })}
-                  onFocus={() => onSelectWall(index)}
+                  onFocus={() => { if (!selectedWalls.includes(index)) onSelectWalls([...selectedWalls, index]); }}
                 />
               </label>
             ))}
-            <button type="button" onClick={() => { setPlacementError(''); onRemoveWall(index); }}>{text.lab.removeWall}</button>
+            <button type="button" className="wall-delete-icon" title={text.lab.removeWall} aria-label={`${text.lab.removeWall} #${index + 1}`} onClick={() => { setPlacementError(''); onRemoveWalls([index]); }}><TrashIcon /></button>
           </div>
-        ))}
+        ))}</div>}
       </div>
     </div>
   );
+}
+
+function TrashIcon() {
+  return <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 5V3h8v2h5v2h-2l-1 14H6L5 7H3V5h5Zm2 0h4V4h-4v1Zm-3 2 .85 12h8.3L17 7H7Zm3 2h2v8h-2V9Zm4 0h2v8h-2V9Z" /></svg>;
 }
