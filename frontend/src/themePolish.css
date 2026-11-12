@@ -141,3 +141,14 @@
 [data-theme="light"] .ugc-hub .strategy-card .ugc-tags span { color: #3a6c71; background: #e7f3f2; }
 .ugc-hub .strategy-card-stats dt { font-size: .68rem; }
 .ugc-hub .strategy-card-stats dd { font-size: .75rem; }
+
+/* Compact content-driven cards with closely grouped counters. */
+.ugc-hub .ugc-card.strategy-card { padding:.8rem; }
+.ugc-hub .strategy-card h3 { margin:.5rem 0 .2rem; font-size:1rem; }
+.ugc-hub .strategy-card-status, .ugc-hub .strategy-card .ugc-tags { margin-top:.45rem; }
+.ugc-hub .strategy-card footer { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.5rem .8rem; margin-top:.6rem; padding-top:.55rem; }
+.ugc-hub .strategy-card-author img, .ugc-hub .strategy-card-author .ugc-avatar { width:1.5rem; height:1.5rem; flex-basis:1.5rem; }
+.ugc-hub .strategy-card-stats { display:flex; flex-wrap:wrap; align-items:center; gap:.65rem; padding:0; background:transparent; }
+.ugc-hub .strategy-card-stats > div { flex-direction:row; align-items:baseline; justify-content:flex-start; gap:.25rem; }
+.ugc-hub .strategy-card-stats dt, .ugc-hub .strategy-card-stats dd { font-size:.68rem; }
+[data-theme="light"] .ugc-hub .strategy-card-stats { background:transparent; }

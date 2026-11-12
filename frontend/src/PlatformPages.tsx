@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { CampaignTrack, StrategyLanguage } from './contracts';
 import type { SavedStrategy } from './strategyLibrary';
 import { platformText as ui } from './text';
@@ -22,7 +23,7 @@ export function Workshop({ items, onOpen, onRemove, onArena }: { items: SavedStr
   const [language, setLanguage] = useState('all');
   const filtered = items.filter(item => item.name.toLowerCase().includes(query.toLowerCase()) && (language === 'all' || item.language === language));
   return <><h1>{ui.nav.workshop}</h1><p className="ux-lead">{ui.paths[2][1]}</p><div className="ux-tabs">{Object.entries(ui.tabs).map(([id, label]) => <button key={id} aria-pressed={tab === id} onClick={() => setTab(id as typeof tab)}>{label}</button>)}</div>
-    {tab === 'mine' ? <><div className="ux-actions"><input aria-label={ui.search} placeholder={ui.search} value={query} onChange={e => setQuery(e.target.value)} /><select aria-label={ui.all} value={language} onChange={e => setLanguage(e.target.value)}><option value="all">{ui.all}</option><option value="javascript">JavaScript</option><option value="python">Python</option></select><button className="primary" onClick={onArena}>{ui.copy} →</button></div><div className="ux-grid">{filtered.map(item => <article className="panel ux-path" key={item.id}><small>{item.language.toUpperCase()} · {item.movement}</small><h2>{item.name}</h2><p>{ui.saved}</p><div className="ux-actions"><button className="primary" onClick={() => onOpen(item)}>{ui.edit}</button><button onClick={() => onRemove(item.id)}>{ui.remove}</button></div></article>)}</div>{filtered.length === 0 && <div className="ux-placeholder">{ui.empty}</div>}</>
+    {tab === 'mine' ? <><div className="ux-actions"><input aria-label={ui.search} placeholder={ui.search} value={query} onChange={e => setQuery(e.target.value)} /><select aria-label={ui.all} value={language} onChange={e => setLanguage(e.target.value)}><option value="all">{ui.all}</option><option value="javascript">JavaScript</option><option value="python">Python</option></select><button className="primary" onClick={onArena}>{ui.copy} →</button></div><div data-tour-target="workshop-strategies"><div className="ux-grid">{filtered.map(item => <article className="panel ux-path" key={item.id}><small>{item.language.toUpperCase()} · {item.movement}</small><h2>{item.name}</h2><p>{ui.saved}</p><div className="ux-actions"><button className="primary" onClick={() => onOpen(item)}>{ui.edit}</button><button onClick={() => onRemove(item.id)}>{ui.remove}</button></div></article>)}</div>{filtered.length === 0 && <div className="ux-placeholder">{ui.empty}</div>}</div></>
     : tab === 'maps' ? <article className="panel ux-path"><h2>{ui.map}</h2><p>{ui.mapNote}</p><button onClick={onArena}>{ui.openMap} →</button></article>
     : <ComingSoon>{tab === 'catalog' ? ui.catalogNote : ui.movesNote}</ComingSoon>}
   </>;
@@ -67,7 +68,7 @@ const tourSteps: { page: Page; section: string; title: string; description: stri
   { page: 'arena', section: 'Арена', title: 'PvP-комнаты', description: 'Зарегистрированные игроки могут перейти к открытым сетевым комнатам.', target: '.platform-content > .ux-tabs' },
   { page: 'workshop', section: 'Мастерская', title: 'Разделы мастерской', description: 'Переключайтесь между локальными работами и онлайн-каталогом.', target: '.ux-tabs' },
   { page: 'workshop', section: 'Мастерская', title: 'Поиск и создание', description: 'Фильтруйте стратегии или создавайте новую копию для эксперимента.', target: '.ux-actions' },
-  { page: 'workshop', section: 'Мастерская', title: 'Ваши стратегии', description: 'Каждая сохранённая работа остаётся доступной для редактирования.', target: '.ux-grid' },
+  { page: 'workshop', section: 'Мастерская', title: 'Ваши стратегии', description: 'Сохранённые работы появляются здесь. Если список пуст, создайте первую стратегию на Арене.', target: '[data-tour-target="workshop-strategies"]' },
   { page: 'community', section: 'Сообщество', title: 'Стратегии сообщества', description: 'Изучайте публикации, покупайте код и создавайте собственные ремиксы.', target: '.ugc-hero' },
   { page: 'community', section: 'Сообщество', title: 'Навигация сообщества', description: 'Здесь находятся маркетплейс, друзья, комнаты и ваши публикации.', target: '.ugc-tabs' },
   { page: 'community', section: 'Сообщество', title: 'Общение и PvP', description: 'Добавляйте друзей, делитесь стратегиями и приглашайте их в бой.', target: '.ugc-hub' },
@@ -83,7 +84,10 @@ export function SystemTour({ onClose, onNavigate }: { onClose: () => void; onNav
     let highlighted: Element | null = null;
     let attempts = 0;
     const timer = window.setInterval(() => {
-      highlighted = document.querySelector(current.target);
+      highlighted = [...document.querySelectorAll(current.target)].find(node => {
+        const bounds = node.getBoundingClientRect();
+        return bounds.width > 0 && bounds.height > 0;
+      }) ?? null;
       if (highlighted || attempts++ > 12) {
         window.clearInterval(timer);
         highlighted?.classList.add('tour-highlight-pulse');
@@ -96,12 +100,12 @@ export function SystemTour({ onClose, onNavigate }: { onClose: () => void; onNav
     localStorage.setItem('botarena-system-tour', 'completed'); setFinishing(true);
     window.setTimeout(onClose, 1300);
   }
-  if (finishing) return <div className="tour-backdrop"><div className="tour-complete"><span>✓</span><h2>Обзор пройден!</h2><p>Можно переходить к первому бою.</p></div></div>;
-  return <div className="tour-backdrop" role="presentation"><section className="tour-dialog" role="dialog" aria-modal="true" aria-labelledby="tour-title">
+  if (finishing) return createPortal(<div className="tour-backdrop"><div className="tour-complete"><span>✓</span><h2>Обзор пройден!</h2><p>Можно переходить к первому бою.</p></div></div>, document.body);
+  return createPortal(<div className="tour-backdrop" role="presentation"><section className="tour-dialog" role="dialog" aria-labelledby="tour-title">
     <button className="tour-close" onClick={onClose} aria-label="Закрыть">×</button>
     <small>РАЗДЕЛ {section + 1} ИЗ 5 · ШАГ {step + 1} ИЗ {tourSteps.length}</small><h2 id="tour-title">{current.title}</h2>
     <div className="tour-progress">{[0, 1, 2, 3, 4].map(index => <span key={index} className={index <= section ? 'done' : ''} />)}</div>
     <p>{current.description}</p>
     <div className="tour-actions"><button disabled={step === 0} onClick={() => setStep(value => value - 1)}>← Назад</button>{step === tourSteps.length - 1 ? <button className="primary" onClick={finish}>Завершить</button> : <button className="primary" onClick={() => setStep(value => value + 1)}>Далее →</button>}</div>
-  </section></div>;
+  </section></div>, document.body);
 }

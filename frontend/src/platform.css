@@ -394,3 +394,16 @@ dialog.arena-modal-native::backdrop { background: #020a13c7; backdrop-filter: bl
 .room-toolbar-actions, .room-row-actions { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
 .room-row-actions { justify-content:flex-end; }
 .room-icon-button { display:grid; place-items:center; width:2.6rem; height:2.6rem; padding:.5rem; }
+
+.tour-backdrop { height:100dvh; }
+.tour-dialog { position:fixed; max-height:calc(100dvh - 28px); padding:20px; }
+.tour-dialog>small { display:block; padding-right:24px; font-size:10px; line-height:1.5; }
+.tour-dialog h2 { font-size:24px; }
+.tour-actions { position:sticky; bottom:-20px; padding:12px 0 0; background:inherit; }
+.rooms-panel > .room-advanced { border:0; border-radius:0; padding:0; background:transparent; }
+.rooms-panel > .room-advanced > summary { display:inline-flex; align-items:center; gap:.5rem; list-style:none; padding:.55rem .8rem; border:1px solid #345166; border-radius:.5rem; background:#102432; color:#c7e4ed; font-size:.8rem; }
+.rooms-panel > .room-advanced > summary::-webkit-details-marker { display:none; }
+.rooms-panel > .room-advanced > summary::after { content:'⌄'; transition:transform .15s; }
+.rooms-panel > .room-advanced[open] > summary::after { transform:rotate(180deg); }
+.rooms-panel > .room-advanced > .room-filters { margin-top:.6rem; }
+[data-theme="light"] .rooms-panel > .room-advanced > summary { background:#fff; color:#315365; border-color:#b7cbd5; }

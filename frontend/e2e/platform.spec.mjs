@@ -436,3 +436,41 @@ test('light theme covers battle mode in editor and roster dialog', async ({ page
   await expect(page.getByRole('dialog').locator('.lab-mode-control')).toHaveCSS('background-color', 'rgb(242, 247, 251)');
   await expect(page.getByRole('dialog').locator('.lab-mode-control select')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
 });
+
+for (const width of [1440, 390]) {
+  test(`tour highlights real content and stays inside viewport at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 780 });
+    await page.addInitScript(() => localStorage.setItem('botarena-theme', 'light'));
+    await page.goto('/'); await page.getByRole('button', { name: 'Обзор', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: /./ });
+    for (let index = 0; index < 15; index++) {
+      await expect(dialog.locator('small')).toContainText(`ШАГ ${index + 1} ИЗ 15`);
+      await expect(page.locator('.tour-highlight-pulse')).toHaveCount(1);
+      const bounds = await dialog.boundingBox();
+      expect(bounds.y).toBeGreaterThanOrEqual(0); expect(bounds.y + bounds.height).toBeLessThanOrEqual(781);
+      const target = await page.locator('.tour-highlight-pulse').boundingBox(); expect(target.height).toBeGreaterThan(15);
+      if (index === 11) await expect(page.locator('.tour-highlight-pulse')).toContainText('Пока нет сохранённых стратегий');
+      if (index < 14) await dialog.getByRole('button', { name: 'Далее →', exact: true }).click();
+    }
+    await dialog.getByRole('button', { name: 'Закрыть', exact: true }).click();
+    await expect(page.locator('.tour-highlight-pulse')).toHaveCount(0);
+  });
+}
+
+test('strategy card counters stay grouped beside labels and footer wraps without overflow', async ({ page }) => {
+  await signup(page.request);
+  await page.request.post('/api/ugc/strategies', { data: { name: 'QA compact', description: 'Short description', language: 'javascript', code: 'function tick(){return {};}', tags: ['test'], salePrice: null } });
+  await page.goto('/#ugc'); await page.locator('.ugc-tabs').getByRole('button', { name: 'Мои стратегии', exact: true }).click();
+  const card = page.locator('.strategy-card').filter({ hasText: 'QA compact' });
+  await expect(card).toBeVisible();
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const pair of await card.locator('.strategy-card-stats > div').all()) {
+      const label = await pair.locator('dt').boundingBox(), value = await pair.locator('dd').boundingBox();
+      expect(value.x - label.x - label.width).toBeLessThan(10);
+      expect(Math.abs(value.y - label.y)).toBeLessThan(3);
+    }
+    expect((await card.boundingBox()).height).toBeLessThan(280);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+  }
+});
