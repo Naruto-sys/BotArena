@@ -715,3 +715,11 @@ dialog.arena-modal-native::backdrop { background: #020a13c7; backdrop-filter: bl
 [data-theme="light"] .pve-workspace .lesson-stats { background:#eaf7f1; color:#204e42; border-color:#97bdae; }
 [data-theme="light"] .pve-workspace .lesson-stats span, [data-theme="light"] .pve-workspace .lesson-stats > b { color:#246455; }
 [data-theme="light"] .pve-workspace .lesson-stats small { color:#53796e; }
+
+[data-theme="light"] .success-card { background:#e6f5ed; color:#265d46; border-color:#9cc7b2; border-left-color:#45a47b; }
+[data-theme="light"] .lab-settings .lab-bot-card label { color:#526f80; }
+[data-theme="light"] .lab-settings .lab-bot-card input[type="text"],
+[data-theme="light"] .lab-settings .lab-bot-card select { background:#fff; color:#294d60; border-color:#b4cbd7; }
+[data-theme="light"] .lab-settings .lab-bot-card input[type="text"]::placeholder { color:#748d9c; }
+[data-theme="light"] .lab-settings .lab-bot-card input[type="text"]:focus-visible,
+[data-theme="light"] .lab-settings .lab-bot-card select:focus-visible { outline:2px solid #74b6a7; outline-offset:2px; }

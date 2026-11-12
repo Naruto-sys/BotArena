@@ -644,6 +644,9 @@ test('roster number controls support buttons, typed HP, limits and both themes',
   for (const theme of ['dark', 'light']) {
     await page.evaluate(theme => { document.documentElement.dataset.theme=theme; }, theme);
     await expect(teamHp).toHaveCSS('appearance', 'textfield');
+    const fieldBackground = theme === 'light' ? 'rgb(255, 255, 255)' : 'rgb(21, 37, 54)';
+    await expect(team.getByRole('textbox', { name:'Имя', exact:true })).toHaveCSS('background-color', fieldBackground);
+    await expect(team.getByRole('combobox', { name:'Поведение', exact:true })).toHaveCSS('background-color', fieldBackground);
     expect(await page.evaluate(() => document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
   }
   await page.getByRole('dialog').getByRole('button', { name:'Сбросить', exact:true }).click();
@@ -837,6 +840,11 @@ test('PvE uses the standard workspace with preview, retained drafts, next level 
   await workspace.getByRole('button',{name:'Вставить правильный код',exact:true}).click();
   await start(page).click();
   await expect(workspace.locator('.pve-attempt-result.success-card')).toBeVisible({timeout:30000});
+  for (const theme of ['light','dark','light']) {
+    await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
+    await expect(workspace.locator('.pve-attempt-result.success-card')).toHaveCSS('background-color',theme === 'light' ? 'rgb(230, 245, 237)' : 'rgb(23, 48, 40)');
+    await expect(workspace.locator('.pve-attempt-result.success-card')).toHaveCSS('color',theme === 'light' ? 'rgb(38, 93, 70)' : 'rgb(215, 255, 232)');
+  }
   await expect(workspace.getByRole('button',{name:'Следующий уровень →',exact:true})).toBeVisible();
   await workspace.getByRole('button',{name:'Следующий уровень →',exact:true}).click();
   await expect(workspace.locator('.editor h1')).toHaveText(next.title);
