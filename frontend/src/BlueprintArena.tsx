@@ -47,6 +47,7 @@ interface TankRig {
   materials: THREE.Material[];
   winnerHalo: THREE.Mesh;
   winnerMaterial: THREE.MeshBasicMaterial;
+  health: ReturnType<typeof createHealthBar>;
 }
 
 interface ReplayEffect {
@@ -182,6 +183,36 @@ function blueprintWall(width: number, height: number, depth: number): WallRig {
   return { group, surface, edges: edgeMaterial, section: sectionMaterial, box: new THREE.Box3() };
 }
 
+function createHealthBar(color: THREE.Color) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256; canvas.height = 32;
+  const context = canvas.getContext('2d')!;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false, depthWrite: false, toneMapped: false }));
+  sprite.scale.set(0.95, 0.12, 1);
+  sprite.position.y = 0.48;
+  // Billboard offset keeps the bar above the hull even in the overhead camera.
+  sprite.center.set(0.5, -2.5);
+  sprite.renderOrder = 12;
+  let previous = '';
+  return { sprite, update(hp: number, maxHp: number, light: boolean) {
+    const ratio = THREE.MathUtils.clamp(hp / Math.max(1, maxHp), 0, 1);
+    const key = `${ratio}:${light}`;
+    if (key === previous) return;
+    previous = key;
+    context.clearRect(0, 0, 256, 32);
+    context.fillStyle = light ? '#e9f0f4' : '#091923';
+    context.beginPath(); context.roundRect(1, 1, 254, 30, 14); context.fill();
+    context.strokeStyle = light ? '#7293a3' : '#6a92a6'; context.lineWidth = 2; context.stroke();
+    context.save(); context.beginPath(); context.roundRect(6, 6, 244, 20, 8); context.clip();
+    context.fillStyle = light ? '#c0d0d9' : '#29404e'; context.fillRect(6, 6, 244, 20);
+    context.fillStyle = `#${color.clone().multiplyScalar(light ? 0.62 : 1).getHexString()}`;
+    context.fillRect(6, 6, 244 * ratio, 20);
+    context.restore(); texture.needsUpdate = true;
+  } };
+}
+
 function createTank(color: number, movement?: Bot['movement']): TankRig {
   const root = new THREE.Group();
   const hull = new THREE.Group();
@@ -284,7 +315,9 @@ function createTank(color: number, movement?: Bot['movement']): TankRig {
   materials.forEach(material => {
     if ('opacity' in material) material.userData.blueprintOpacity = material.opacity;
   });
-  return { root, hull, turret, materials, winnerHalo, winnerMaterial };
+  const health = createHealthBar(new THREE.Color(color));
+  root.add(health.sprite);
+  return { root, hull, turret, materials, winnerHalo, winnerMaterial, health };
 }
 
 function createGrid(replay: Replay): THREE.Group {
@@ -1309,6 +1342,8 @@ export function BlueprintArena({
         tank.hull.rotation.y = -bot.bodyAngle;
         tank.turret.rotation.y = -bot.turretAngle;
         const dead = bot.hp <= 0;
+        tank.health.sprite.visible = !dead && !bot.forfeited && gunnerSubjectId !== id;
+        tank.health.update(bot.hp, bot.maxHp, sceneTheme === 'light');
         const winner = replay.result.winnerBotId === id;
         const faded = dead || bot.forfeited || (matchEnded && replay.result.winnerBotId != null && !winner);
         tank.root.rotation.z = THREE.MathUtils.lerp(tank.root.rotation.z, dead ? 0.22 : 0, 0.08);

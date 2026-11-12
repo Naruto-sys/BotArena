@@ -157,20 +157,39 @@ test('capture-point mode renders bases and produces a real replay', async ({ pag
   await expect(page.locator('.error-card')).toHaveCount(0);
 });
 
-test('saved-map editor highlights a blocked spawn and disables save', async ({ page }) => {
+test('community creates and edits maps using only the Arena editor', async ({ page }) => {
   await signup(page.request); await page.goto('/#ugc');
   await page.locator('.ugc-tabs').getByRole('button', { name: 'Карты', exact: true }).click();
   await page.getByRole('button', { name: '+ Создать карту', exact: true }).click();
+  await expect(page).toHaveURL(/#arena$/);
+  await expect(page.locator('.lab-arena')).toHaveCount(1);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByRole('button', { name: 'Добавить стену', exact: true }).click();
   const row = page.locator('.lab-wall-row').first();
   await row.getByLabel('x', { exact: true }).fill('2');
   await row.getByLabel('y', { exact: true }).fill('4.5');
   await expect(page.locator('.lab-arena .invalid-placement')).toHaveCount(1);
-  await expect(page.getByRole('button', { name: 'Сохранить карту', exact: true })).toBeDisabled();
+  const save = page.locator('.arena-workspace-toolbar').getByRole('button', { name: 'Сохранить карту', exact: true });
+  await expect(save).toBeDisabled(); await expect(start(page)).toBeDisabled();
   await page.getByRole('button', { name: 'Отменить изменение', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Сохранить карту', exact: true })).toBeEnabled();
-  await page.getByRole('button', { name: 'Сохранить карту', exact: true }).click();
-  await expect(page.locator('.map-builder')).toHaveCount(0);
+  await save.click();
+  const modal = page.getByRole('dialog', { name: 'Сохранение карты', exact: true });
+  await expect(modal.locator('svg')).toHaveCount(0);
+  await modal.getByLabel('Название карты', { exact: true }).fill('QA unified map');
+  await modal.getByRole('button', { name: 'Сохранить карту', exact: true }).click();
+  await expect(modal).toHaveCount(0);
+  const maps = await page.request.get('/api/maps/').then(r => r.json());
+  expect(maps).toHaveLength(1); expect(maps[0].walls).toHaveLength(1);
+  await nav(page, 'Сообщество').click();
+  await page.locator('.ugc-tabs').getByRole('button', { name: 'Карты', exact: true }).click();
+  await page.locator('.map-card').filter({ hasText: 'QA unified map' }).getByRole('button', { name: 'Редактировать', exact: true }).click();
+  await expect(page).toHaveURL(/#arena$/);
+  await page.locator('.lab-wall-row').first().getByLabel('x', { exact: true }).fill('7');
+  await save.click(); await expect(modal.getByLabel('Название карты', { exact: true })).toHaveValue('QA unified map');
+  await modal.getByRole('button', { name: 'Сохранить карту', exact: true }).click(); await expect(modal).toHaveCount(0);
+  const updated = await page.request.get('/api/maps/').then(r => r.json());
+  expect(updated).toHaveLength(1); expect(updated[0].id).toBe(maps[0].id); expect(updated[0].walls[0].x).toBe(7);
+  await page.request.delete(`/api/maps/${maps[0].id}`);
 });
 
 test('local account supports profile, strategy and map persistence and owner checks', async ({ page, playwright }) => {
@@ -217,10 +236,14 @@ test('clipboard success is green and denied access is an error', async ({ page }
   await page.addInitScript(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => {} } }));
   await page.goto('/#ugc'); await page.locator('.ugc-tabs').getByRole('button', { name: 'Манёвры', exact: true }).click();
   await page.getByRole('button', { name: 'Копировать код', exact: true }).click();
-  await expect(page.locator('.ugc-notice')).toHaveText('Код манёвра скопирован.');
+  await expect(page.locator('.maneuver-card').getByRole('button')).toHaveText('Скопировано');
+  await expect(page.locator('.ugc-hub > .ugc-notice')).toHaveCount(0);
+  await expect(page.locator('.maneuver-card').getByRole('status')).toHaveText('Код манёвра скопирован.');
+  await expect(page.getByRole('button', { name: 'Копировать код', exact: true })).toBeVisible({ timeout: 4000 });
   await page.evaluate(() => { navigator.clipboard.writeText = async () => { throw Error('denied'); }; });
   await page.getByRole('button', { name: 'Копировать код', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('Не удалось скопировать код');
+  await expect(page.locator('.maneuver-card').getByRole('alert')).toContainText('Не удалось скопировать код');
+  await expect(page.locator('.ugc-hub > .error-card')).toHaveCount(0);
 });
 
 test('geometry accounts for rotated hulls and touching edges', () => {
@@ -524,4 +547,243 @@ test('campaign completion does not offer a nonexistent next level', async ({ pag
   await start(page).click();
   await expect(page.locator('.campaign-result')).toBeVisible({ timeout: 30000 });
   await expect(page.getByRole('button', { name: 'Следующий уровень →', exact: true })).toHaveCount(0);
+});
+
+for (const width of [1440, 390]) {
+  test(`wall collision preview stays under pointer without layout jitter at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 1000 }); await arena(page);
+    await page.locator('.lab-arena').scrollIntoViewIfNeeded();
+    const point = ([x, y]) => page.locator('.lab-arena').evaluate((svg, [x, y]) => {
+      const p = new DOMPoint(x, y).matrixTransform(svg.getScreenCTM()); return { x: p.x, y: p.y };
+    }, [x, y]);
+    const begin = await point([5.2, 2.5]), invalid = await point([2.7, 5]), valid = await point([5.2, 2.5]);
+    const initial = await page.locator('.lab-arena').boundingBox();
+    const bots = (await stored(page)).bots;
+    await page.mouse.move(begin.x, begin.y); await page.mouse.down();
+    for (let cycle = 0; cycle < 4; cycle++) {
+      await page.mouse.move(valid.x, valid.y);
+      await page.mouse.move(invalid.x, invalid.y);
+      for (let repeat = 0; repeat < 4; repeat++) {
+        await page.mouse.move(invalid.x, invalid.y);
+        await expect(page.locator('.lab-wall.invalid-placement')).toHaveCount(1);
+        await expect(page.locator('.lab-wall.invalid-placement')).toHaveAttribute('y', '4.4');
+        const bounds = await page.locator('.lab-arena').boundingBox(); expect(Math.abs(bounds.y - initial.y)).toBeLessThan(1);
+        expect((await stored(page)).bots).toEqual(bots);
+        await expect(start(page)).toBeDisabled();
+      }
+    }
+    await page.mouse.up();
+    await expect(page.locator('.lab-wall.invalid-placement')).toHaveCount(1);
+    await drag(page, [2.7, 5], [5.2, 2.5]);
+    await expect(page.locator('.invalid-placement')).toHaveCount(0); await expect(start(page)).toBeEnabled();
+  });
+}
+
+test('workshop has one local library and no duplicate placeholder tabs', async ({ page }) => {
+  await page.goto('/#workshop');
+  await expect(page.locator('.platform-content .ux-tabs')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Каталог стратегий', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Манёвры', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Карты', exact: true })).toHaveCount(0);
+  await expect(page.getByText('В разработке', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: /Публикации и каталог/ }).click();
+  await expect(page).toHaveURL(/#ugc$/);
+  await expect(nav(page, 'Сообщество')).toHaveAttribute('aria-current', 'page');
+});
+
+test('reset detaches the saved map instead of overwriting it', async ({ page }) => {
+  await signup(page.request);
+  const response = await page.request.post('/api/maps/', { data: { name: 'QA original map', walls: [] } });
+  const original = await response.json();
+  await page.goto('/#ugc'); await page.locator('.ugc-tabs').getByRole('button', { name: 'Карты', exact: true }).click();
+  await page.locator('.map-card').filter({ hasText: 'QA original map' }).getByRole('button', { name: 'Редактировать', exact: true }).click();
+  await settings(page).click(); await page.getByRole('dialog').getByRole('button', { name: 'Сбросить', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Сохранить карту', exact: true }).click();
+  const modal = page.getByRole('dialog', { name: 'Сохранение карты', exact: true });
+  await expect(modal.getByLabel('Название карты', { exact: true })).toHaveValue('Новая арена');
+  await modal.getByRole('button', { name: 'Сохранить карту', exact: true }).click(); await expect(modal).toHaveCount(0);
+  const maps = await page.request.get('/api/maps/').then(r => r.json());
+  expect(maps).toHaveLength(2); expect(maps.find(map => map.id === original.id).walls).toEqual([]);
+});
+
+test('wall resizing across a tank leaves a stable rejected draft', async ({ page }) => {
+  await arena(page);
+  await page.locator('.lab-wall').first().click();
+  await page.locator('.lab-arena').scrollIntoViewIfNeeded();
+  const handle = await page.locator('.lab-wall-handle-sw').boundingBox();
+  const target = await page.locator('.lab-arena').evaluate(svg => {
+    const p = new DOMPoint(2, 5).matrixTransform(svg.getScreenCTM()); return { x:p.x, y:p.y };
+  });
+  const before = await page.locator('.lab-arena').boundingBox();
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2); await page.mouse.down();
+  for (let repeat=0; repeat<6; repeat++) {
+    await page.mouse.move(target.x, target.y);
+    await expect(page.locator('.lab-wall.invalid-placement')).toHaveCount(1);
+    const bounds = await page.locator('.lab-arena').boundingBox(); expect(Math.abs(bounds.y - before.y)).toBeLessThan(1);
+    expect((await stored(page)).bots[0].position).toEqual({ x:2.2, y:5 });
+  }
+  await page.mouse.up(); await expect(start(page)).toBeDisabled();
+});
+
+test('roster number controls support buttons, typed HP, limits and both themes', async ({ page }) => {
+  await arena(page);
+  await expect(settings(page)).toHaveText('Участники и параметры боя');
+  await expect(page.getByRole('button', { name:'Как управлять ботом', exact:true })).toHaveText('Как управлять ботом');
+  await settings(page).click();
+  const team = page.locator('.lab-team-player');
+  const teamHp = team.getByRole('spinbutton', { name:'HP всей команды', exact:true });
+  await team.getByRole('button', { name:'Увеличить: HP всей команды', exact:true }).click();
+  await expect(teamHp).toHaveValue('110');
+  await team.getByRole('button', { name:'Применить ко всем', exact:true }).click();
+  await expect(team.getByRole('spinbutton', { name:'HP', exact:true })).toHaveValue('110');
+  expect((await stored(page)).bots[0].hp).toBe(110);
+  await teamHp.fill('5000'); await teamHp.blur(); await expect(teamHp).toHaveValue('500');
+  await expect(team.getByRole('button', { name:'Увеличить: HP всей команды', exact:true })).toBeDisabled();
+  await teamHp.fill(''); await teamHp.blur(); await expect(teamHp).toHaveValue('500');
+  for (const theme of ['dark', 'light']) {
+    await page.evaluate(theme => { document.documentElement.dataset.theme=theme; }, theme);
+    await expect(teamHp).toHaveCSS('appearance', 'textfield');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
+  }
+  await page.getByRole('dialog').getByRole('button', { name:'Сбросить', exact:true }).click();
+  await expect(teamHp).toHaveValue('100');
+});
+
+test('header account controls share height and alignment in both themes and layouts', async ({ page }) => {
+  await signup(page.request); await page.goto('/');
+  for (const width of [1440, 390, 320]) {
+    await page.setViewportSize({ width, height:900 });
+    for (const theme of ['dark','light']) {
+      await page.evaluate(theme => { document.documentElement.dataset.theme=theme; }, theme);
+      const controls = await Promise.all(['.tour-launch','.profile-balance','.profile-trigger'].map(selector => page.locator(selector).boundingBox()));
+      for (const bounds of controls) {
+        expect(Math.abs(bounds.height - controls[0].height)).toBeLessThan(1);
+        expect(Math.abs(bounds.y - controls[0].y)).toBeLessThan(1);
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
+      await expect(page.locator('.platform-brand')).toHaveAccessibleName(/BotArena/);
+      await expect(page.locator('.profile-fallback')).toBeVisible();
+    }
+  }
+});
+
+for (const width of [1440,390]) {
+  test(`launch scrolls to Arena after leaving expanded editor at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({width,height:844}); await arena(page);
+    await page.getByRole('button', {name:'Развернуть редактор',exact:true}).click();
+    await start(page).click();
+    await expect(page.locator('.replay')).toBeVisible();
+    await expect.poll(async () => {
+      const target=await page.locator('.replay').boundingBox();
+      return target.y;
+    }).toBeLessThan(844 * .45);
+    await page.locator('.blueprint-canvas').waitFor({state:'attached',timeout:30000});
+    await expect.poll(() => page.locator('.replay').evaluate(node => node.getBoundingClientRect().top)).toBeLessThan(844*.45);
+    await expect(page.getByRole('button',{name:'План',exact:true})).toHaveAttribute('aria-pressed','true');
+  });
+}
+
+test('arena has no technical corner labels and finished result is inset and readable', async ({ page }) => {
+  await arena(page); await start(page).click();
+  await page.locator('.blueprint-canvas').waitFor({state:'attached',timeout:30000});
+  await expect(page.locator('.blueprint-hud')).toHaveCount(0);
+  const seek = page.getByRole('slider', {name:'Позиция реплея',exact:true});
+  await seek.focus(); await seek.press('End');
+  const result = page.locator('.match-outcome'); await expect(result).toBeVisible();
+  await expect(result.locator('strong')).not.toBeEmpty(); await expect(result.locator('span')).not.toBeEmpty();
+  for (const width of [1440,390]) {
+    await page.setViewportSize({width,height:900});
+    for (const theme of ['dark','light']) {
+      await page.evaluate(theme => { document.documentElement.dataset.theme=theme; },theme);
+      const stage = await page.locator('.blueprint-stage').boundingBox(), badge = await result.boundingBox();
+      expect(badge.y-stage.y).toBeGreaterThanOrEqual(17);
+      expect(badge.x).toBeGreaterThan(stage.x); expect(badge.x+badge.width).toBeLessThan(stage.x+stage.width);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
+    }
+  }
+});
+
+test('damage labels are opt-in through battle analysis and disappear when disabled', async ({ page }) => {
+  await arena(page);
+  const setup = await stored(page);
+  setup.arena.walls = []; setup.maxTicks = 100;
+  setup.bots.forEach((bot,index) => {
+    bot.position = {x:index ? 10 : 3, y:5}; bot.source='code';
+    bot.code.javascript = index ? 'function tick(){return {};}' : 'function tick(){return {aimDirection:{x:1,y:0},shoot:true};}';
+  });
+  await page.evaluate(setup => localStorage.setItem('botarena.labSetup.v1', JSON.stringify(setup)), setup);
+  await page.reload();
+  const completed = page.waitForResponse(async response => {
+    if (!response.url().includes('/api/match-jobs/') || response.status() !== 200) return false;
+    const body=await response.json(); return body.state==='completed' && !!body.match;
+  });
+  await start(page).click(); const replay=(await (await completed).json()).match.replay;
+  const hit = replay.frames.find(frame => frame.events.some(event => event.type==='BotHit' && event.damage>0));
+  expect(hit).toBeTruthy();
+  await page.locator('.blueprint-canvas').waitFor({state:'attached',timeout:30000});
+  await page.getByRole('button',{name:'Пауза',exact:true}).click();
+  await page.getByRole('slider',{name:'Позиция реплея',exact:true}).fill(String(hit.tick));
+  await expect(page.locator('.arena-damage')).toHaveCount(0);
+  await page.getByText('Анализ боя',{exact:true}).click();
+  const toggle=page.getByRole('checkbox',{name:'Показывать урон',exact:true});
+  await expect(toggle).not.toBeChecked(); await toggle.check();
+  await expect(page.locator('.arena-damage').first()).toBeVisible();
+  await expect(page.locator('.arena-damage').first()).toContainText('-20');
+  await toggle.uncheck(); await expect(page.locator('.arena-damage')).toHaveCount(0);
+});
+
+test('PvE light theme covers chapter badges, progress and completed/available/locked nodes', async ({ page }) => {
+  await signup(page.request);
+  const course=await page.request.get('/api/pve/').then(r=>r.json()); const first=course.blocks[0].levels[0];
+  const attempt=await page.request.post(`/api/pve/levels/${first.id}/attempt`, {data:{language:'javascript',code:first.solutionCode.javascript}});
+  expect(attempt.status()).toBe(200); expect((await attempt.json()).completed).toBe(true);
+  await page.addInitScript(()=>localStorage.setItem('botarena-theme','light'));
+  await page.goto('/#learn/pve');
+  const completed=page.locator('.level-stop.completed .level-node').first();
+  await expect(completed).toHaveCSS('background-color','rgb(203, 232, 220)');
+  await expect(page.locator('.level-stop:not(.completed):not(.locked) .level-node').first()).toHaveCSS('background-color','rgb(216, 241, 232)');
+  await expect(page.locator('.level-stop.locked .level-node').first()).toHaveCSS('background-color','rgb(229, 236, 241)');
+  await expect(page.locator('.chapter-rail button.active > span')).toHaveCSS('background-color','rgb(205, 234, 221)');
+  expect(await page.locator('.progress-ring').evaluate(node=>getComputedStyle(node,'::after').backgroundColor)).toBe('rgb(245, 249, 251)');
+  await page.getByRole('button',{name:'Меню аккаунта',exact:true}).click();
+  const profile=page.getByRole('button',{name:'Настройки профиля',exact:true}); await profile.hover();
+  await expect(profile).toHaveCSS('background-color','rgb(224, 241, 237)');
+  await page.getByRole('button',{name:'Включить тёмную тему',exact:true}).click(); await page.keyboard.press('Escape');
+  await expect(completed).toHaveCSS('background-color','rgb(22, 53, 44)');
+  await page.getByRole('button',{name:'Меню аккаунта',exact:true}).click();
+  await page.getByRole('button',{name:'Включить светлую тему',exact:true}).click(); await page.keyboard.press('Escape');
+  await expect(completed).toHaveCSS('background-color','rgb(203, 232, 220)');
+  await page.setViewportSize({width:390,height:900});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
+});
+
+test('light theme updates editor hulls and campaign order badges', async ({ page }) => {
+  await arena(page); const before=await stored(page);
+  await expect(page.locator('.lab-bot-hull').first()).toHaveCSS('fill','rgb(17, 28, 44)');
+  await page.getByRole('button',{name:'Включить светлую тему',exact:true}).click();
+  await expect(page.locator('.lab-bot-hull').first()).toHaveCSS('fill','rgb(245, 250, 252)');
+  expect((await stored(page)).bots).toEqual(before.bots);
+  await nav(page,'Обучение').click();
+  await page.locator('.chapter-route').first().locator('.lesson-stop.available button').first().click();
+  await page.locator('.campaign-levels summary').click();
+  await expect(page.locator('.level-card.selected .level-order')).toHaveCSS('background-color','rgb(223, 235, 242)');
+  await expect(page.locator('.level-card.locked .level-order').first()).toHaveCSS('background-color','rgb(232, 238, 242)');
+});
+
+test('footer sits at viewport bottom on short pages and follows long content', async ({ page }) => {
+  await page.setViewportSize({width:1440,height:1600}); await page.goto('/');
+  for (const name of ['Главная','Мастерская']) {
+    await nav(page,name).click();
+    const footer=await page.locator('.platform-footer').boundingBox();
+    expect(Math.abs(footer.y+footer.height-1600)).toBeLessThanOrEqual(1);
+  }
+  await page.setViewportSize({width:390,height:1400});
+  const footer=await page.locator('.platform-footer').boundingBox(), navigation=await page.getByRole('navigation',{name:'Основная навигация'}).boundingBox();
+  expect(footer.y+footer.height).toBeLessThanOrEqual(navigation.y);
+  expect(navigation.y-footer.y-footer.height).toBeLessThan(40);
+  await page.setViewportSize({width:390,height:700}); await nav(page,'Главная').click();
+  const last=await page.locator('.ux-home .ux-path').last().boundingBox();
+  const bottom=await page.locator('.platform-footer').boundingBox();
+  expect(bottom.y).toBeGreaterThanOrEqual(last.y+last.height+40);
 });

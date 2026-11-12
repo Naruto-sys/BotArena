@@ -168,7 +168,10 @@ export function AuthPanel({ session, onChange }: { session: AuthSession | undefi
     <div className="profile-menu" ref={profileRef} onBlur={event => {
       if (!event.currentTarget.contains(event.relatedTarget)) setProfileOpen(false);
     }}>
-      <strong className="profile-balance" title="Баланс"><small>Баланс</small> ◈ {session.user.balance ?? 0}</strong>
+      <div className="profile-balance" title="Баланс" aria-label={`Баланс: ${session.user.balance ?? 0} кредитов`}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="m12 3 9 9-9 9-9-9 9-9Z" /><path d="m12 8 4 4-4 4-4-4 4-4Z" /></svg>
+        <small>Баланс</small><b>{(session.user.balance ?? 0).toLocaleString('ru-RU')}</b>
+      </div>
       <button type="button" className="profile-trigger" ref={profileTrigger}
         aria-label="Меню аккаунта" aria-expanded={profileOpen} aria-controls="account-actions"
         onClick={() => setProfileOpen(!profileOpen)}>

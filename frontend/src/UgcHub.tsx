@@ -15,7 +15,7 @@ const starter: SaveStrategy = {
   code: 'function tick({ self, enemy }) {\n  // Твоя тактика начинается здесь\n  return {};\n}',
 };
 
-export function UgcHub({ onPlayMap }: { onPlayMap?: (map: BattleMap) => void }) {
+export function UgcHub({ onPlayMap, onCreateMap }: { onPlayMap: (map: BattleMap) => void; onCreateMap: () => void }) {
   const mounted = useMounted();
   const [section, setSection] = useState<Section>('catalog');
   const currentSection = useRef(section);
@@ -132,10 +132,10 @@ export function UgcHub({ onPlayMap }: { onPlayMap?: (map: BattleMap) => void }) 
       {section === 'catalog' && <div className="ugc-toolbar"><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Название, автор или идея…" /><select value={language} onChange={event => setLanguage(event.target.value)}><option value="">Все языки</option><option value="javascript">JavaScript</option><option value="python">Python</option></select><select value={sort} onChange={event => setSort(event.target.value)}><option value="popular">Популярные</option><option value="new">Новые</option><option value="forks">Часто форкают</option></select></div>}
       <div className="ugc-grid">{cards.map(card => <StrategyCard key={card.id} item={card} mine={section === 'mine'} onClick={() => void open(card.id)} />)}{!cards.length && <div className="ugc-empty"><b>{section === 'mine' ? 'Мастерская пуста' : 'Ничего не найдено'}</b><p>{section === 'mine' ? 'Создай первую стратегию — опубликовать её можно будет после проверки кода.' : 'Измени запрос или фильтры.'}</p></div>}</div>
     </>}
-    {section === 'maneuvers' && <><div className="ugc-section-head"><div><h2>Библиотека манёвров</h2><p>Копируй готовую механику и адаптируй под своего бота.</p></div></div><div className="ugc-chips"><button className={!category ? 'active' : ''} onClick={() => setCategory('')}>Все</button><button className={category === 'movement' ? 'active' : ''} onClick={() => setCategory('movement')}>Движение</button><button className={category === 'combat' ? 'active' : ''} onClick={() => setCategory('combat')}>Бой</button></div><div className="maneuver-grid">{maneuvers.map(item => <article className="maneuver-card" key={item.id}><span className="maneuver-icon">{item.category === 'combat' ? '⌖' : '↝'}</span><div><small>{item.language === 'python' ? 'Python' : 'JavaScript'} · {item.category === 'combat' ? 'Бой' : 'Движение'}</small><h3>{item.name}</h3><p>{item.description}</p><code>{item.usage}</code><button onClick={async () => { try { await navigator.clipboard.writeText(item.code); showNotice(ui.maneuverCopied); } catch { setError(ui.copyFailed); } }}>Копировать код</button></div></article>)}</div></>}
+    {section === 'maneuvers' && <><div className="ugc-section-head"><div><h2>Библиотека манёвров</h2><p>Копируй готовую механику и адаптируй под своего бота.</p></div></div><div className="ugc-chips"><button className={!category ? 'active' : ''} onClick={() => setCategory('')}>Все</button><button className={category === 'movement' ? 'active' : ''} onClick={() => setCategory('movement')}>Движение</button><button className={category === 'combat' ? 'active' : ''} onClick={() => setCategory('combat')}>Бой</button></div><div className="maneuver-grid">{maneuvers.map(item => <ManeuverCard key={item.id} item={item} />)}</div></>}
     {section === 'friends' && <FriendsPanel />}
     {section === 'rooms' && <RoomsPanel />}
-    {section === 'maps' && <BattleMapEditor onPlayMap={onPlayMap} />}
+    {section === 'maps' && <BattleMapEditor onPlayMap={onPlayMap} onCreateMap={onCreateMap} />}
     {detail && <div className="ugc-modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setDetail(undefined); }}><article className="ugc-modal"><button className="ugc-close" onClick={() => setDetail(undefined)}>×</button><p className="ugc-kicker">@{detail.author.nickname} · {detail.isPublished ? 'опубликована' : 'не опубликована'} · {detail.isActive ? 'активна' : 'неактивна'}</p><h2>{detail.name}</h2><p>{detail.description}</p>{!detail.isActive && <p className="error-card">{detail.validationError ?? 'Код стратегии не проходит проверку выполнения.'}</p>}{detail.salePrice && <p className="strategy-price">◈ {detail.salePrice} кредитов</p>}<div className="ugc-tags">{detail.tags.map(tag => <span key={tag}>{tag}</span>)}</div>{detail.code ? <pre><code>{detail.code}</code></pre> : <div className="paid-code-lock"><b>Исходный код защищён</b><p>Купи стратегию, чтобы получить собственную копию и доступ к коду.</p></div>}<div className="ugc-actions">{detail.isOwner ? <><button onClick={() => edit(detail)}>Редактировать</button><button onClick={() => void openSend(detail)}>Отправить другу</button>{detail.isPublished ? <button onClick={() => void unpublish(detail)}>Снять с публикации</button> : <button className="primary" disabled={!detail.isActive} onClick={() => { setPublishing(detail); setPaid(false); setPublishPrice(10); }}>Опубликовать</button>}<button className="danger-button" onClick={() => void remove(detail)}>Удалить</button></> : <>{detail.salePrice && !detail.canReadCode && <button className="primary" disabled={busy} onClick={() => void purchase()}>Купить за ◈ {detail.salePrice}</button>}<button disabled={busy || !detail.canReadCode} title={!detail.canReadCode ? 'Сначала купите стратегию' : undefined} onClick={() => void fork()}>Создать ремикс</button></>}</div></article></div>}
     {editing && <div className="ugc-modal-backdrop"><form className="ugc-modal ugc-editor" onSubmit={save}><button type="button" className="ugc-close" onClick={() => setEditing(undefined)}>×</button><p className="ugc-kicker">{editing === 'new' ? 'НОВАЯ СТРАТЕГИЯ' : 'РЕДАКТИРОВАНИЕ'}</p><h2>{editing === 'new' ? 'Создать стратегию' : draft.name}</h2><div className="ugc-form-row"><label>Название<input required maxLength={80} value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} /></label><label>Язык<select value={draft.language} onChange={event => setDraft({ ...draft, language: event.target.value as StrategyLanguage })}><option value="javascript">JavaScript</option><option value="python">Python</option></select></label></div><label>Описание<textarea rows={2} maxLength={1000} value={draft.description} onChange={event => setDraft({ ...draft, description: event.target.value })} /></label><label>Теги<input value={draft.tags.join(', ')} onChange={event => setDraft({ ...draft, tags: event.target.value.split(',') })} placeholder="атака, навигация" /></label><label>Код<textarea className="ugc-code" required value={draft.code} onChange={event => setDraft({ ...draft, code: event.target.value })} spellCheck={false} /></label><div className="ugc-actions"><button type="button" onClick={() => setEditing(undefined)}>Отмена</button><button className="primary" disabled={busy}>{busy ? 'Сохраняем…' : 'Сохранить стратегию'}</button></div></form></div>}
     {publishing && <div className="ugc-modal-backdrop"><section className="ugc-modal"><button className="ugc-close" onClick={() => setPublishing(undefined)}>×</button><p className="ugc-kicker">ПУБЛИКАЦИЯ</p><h2>{publishing.name}</h2><label className="radio-row"><input type="radio" checked={!paid} onChange={() => setPaid(false)} /> Бесплатная стратегия</label><label className="radio-row"><input type="radio" checked={paid} onChange={() => setPaid(true)} /> Платная стратегия</label>{paid && <label>Цена, кредиты<input type="number" min={1} max={1000000} value={publishPrice} onChange={event => setPublishPrice(Number(event.target.value))} /></label>}<div className="ugc-actions"><button onClick={() => setPublishing(undefined)}>Отмена</button><button className="primary" disabled={busy || paid && publishPrice < 1} onClick={() => void publish()}>Опубликовать</button></div></section></div>}
@@ -173,4 +173,28 @@ function StrategyCard({ item, mine, onClick }: { item: UgcStrategyCard; mine: bo
       </dl>
     </footer>
   </article>;
+}
+
+function ManeuverCard({ item }: { item: ManeuverSnippet }) {
+  const mounted = useMounted();
+  const [copyState, setCopyState] = useState<'idle' | 'copying' | 'copied' | 'error'>('idle');
+  useEffect(() => {
+    if (copyState !== 'copied') return;
+    const timer = window.setTimeout(() => setCopyState('idle'), 2200);
+    return () => window.clearTimeout(timer);
+  }, [copyState]);
+  async function copy() {
+    setCopyState('copying');
+    try { await navigator.clipboard.writeText(item.code); if (mounted.current) setCopyState('copied'); }
+    catch { if (mounted.current) setCopyState('error'); }
+  }
+  return <article className="maneuver-card"><span className="maneuver-icon">{item.category === 'combat' ? '⌖' : '↝'}</span><div>
+    <small>{item.language === 'python' ? 'Python' : 'JavaScript'} · {item.category === 'combat' ? 'Бой' : 'Движение'}</small>
+    <h3>{item.name}</h3><p>{item.description}</p><code>{item.usage}</code>
+    <button className={`copy-code-button${copyState === 'copied' ? ' copied' : ''}`} disabled={copyState === 'copying'} onClick={() => void copy()}>
+      {copyState === 'copied' ? ui.copied : copyState === 'copying' ? ui.copying : ui.copyCode}
+    </button>
+    <span role="status" className="copy-status">{copyState === 'copied' ? ui.maneuverCopied : ''}</span>
+    {copyState === 'error' && <p role="alert" className="copy-error">{ui.copyFailed}</p>}
+  </div></article>;
 }

@@ -33,7 +33,8 @@ import {
 import { MatchDiagnosticError, buildCustomMatchPayload, runMatch } from './matchApi';
 import { StrategyHelpContent } from './StrategyHelp';
 import { AuthPanel } from './AuthPanel';
-import { ugcApi, type AuthNotice } from './ugcApi';
+import { isUnauthorized, requireLogin, ugcApi, type AuthNotice } from './ugcApi';
+import { validateBattleMap } from './battleMapValidation';
 import { text } from './text';
 import { Home, Workshop, LearningMap, SystemTour, type Page } from './PlatformPages';
 import { platformText as ui } from './text';
@@ -220,6 +221,7 @@ function App() {
   const [libraryNote, setLibraryNote] = useState('');
   const [libraryId, setLibraryId] = useState<string>();
   const editorPanel = useRef<HTMLFormElement>(null);
+  const replayPanel = useRef<HTMLElement>(null);
   const startButton = useRef<HTMLButtonElement>(null);
   const [mode, setMode] = useState<AppMode>(() => location.hash.startsWith('#arena') ? 'lab' : 'campaign');
   const [languages, setLanguages] = useState<StrategyLanguage[]>(['javascript']);
@@ -228,6 +230,11 @@ function App() {
   const [presets, setPresets] = useState<BehaviorPresetInfo[]>([]);
   const [mapError, setMapError] = useState('');
   const [mapValid, setMapValid] = useState(true);
+  const [mapDocument, setMapDocument] = useState<{ id?: string; name: string }>();
+  const [mapSaveOpen, setMapSaveOpen] = useState(false);
+  const [mapSaving, setMapSaving] = useState(false);
+  const [mapSaveError, setMapSaveError] = useState('');
+  const [mapNotice, setMapNotice] = useState('');
   const [selectedWalls, setSelectedWalls] = useState<number[]>([]);
   const [selectedBase, setSelectedBase] = useState<number | null>(null);
   const [labSettingsOpen, setLabSettingsOpen] = useState(false);
@@ -356,6 +363,13 @@ function App() {
     setJobStatus(undefined);
   }
 
+  useEffect(() => {
+    if (!loading || !replayPanel.current) return;
+    const header = document.querySelector('.platform-header')?.getBoundingClientRect().height ?? 0;
+    const top = replayPanel.current.getBoundingClientRect().top + window.scrollY - header - 12;
+    window.scrollTo({ top: Math.max(0, top), behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  }, [loading]);
+
   function selectMode(next: AppMode) {
     if (next === mode) return;
     resetRunState();
@@ -379,6 +393,7 @@ function App() {
   }
 
   function startQuickDemo() {
+    setMapDocument(undefined); setMapNotice('');
     const setup = loadLabSetup();
     const player = setup.bots.find(bot => bot.teamId === 'player') ?? setup.bots[0];
     setLabSetup({ ...setup, activeBotId: player.id, bots: setup.bots.map(bot => bot.id === player.id
@@ -415,6 +430,8 @@ function App() {
     if (id === libraryId) detachStrategy();
   }
 
+  useEffect(() => { setMapNotice(''); }, [labSetup.arena.walls]);
+
   function saveCurrentStrategy() {
     const item: SavedStrategy = { id: libraryId ?? crypto.randomUUID(),
       name: strategyName.trim() || ui.defaultName, code, language, movement };
@@ -423,17 +440,42 @@ function App() {
     setLibrary(next); setLibraryId(item.id); setLibraryNote(ui.saved);
   }
 
-  function playMap(map: BattleMap) {
+  function playMap(map?: BattleMap) {
     const setup = defaultLabSetup();
     const previous = labSetup.bots.find(bot => bot.teamId === 'player' && bot.source === 'code');
     if (previous) setup.bots[0] = { ...setup.bots[0], code: { ...previous.code }, movement: previous.movement };
-    setup.arena = { width: map.width, height: map.height, walls: map.walls.map(wall => ({ ...wall })) };
+    setup.arena = { width: map?.width ?? 16, height: map?.height ?? 10, walls: map?.walls.map(wall => ({ ...wall })) ?? [] };
+    setMapDocument({ id: map?.id, name: map?.name ?? 'Новая арена' });
+    setMapNotice(''); setMapSaveError('');
     navigate('arena'); resetRunState(); detachStrategy();
     setLabSetup(setup); setSelectedWalls([]); setSelectedBase(null);
     setEditorEpoch(value => value + 1);
   }
 
+  function openMapSave() {
+    if (!session?.authenticated) { requireLogin(); return; }
+    if (!mapDocument) setMapDocument({ name: 'Новая арена' });
+    setMapSaveError(''); setMapSaveOpen(true);
+  }
+
+  async function saveArenaMap(event: FormEvent) {
+    event.preventDefault();
+    const validation = validateBattleMap(labSetup.arena.walls);
+    if (!mapValid || validation || !mapDocument?.name.trim() || mapSaving) return;
+    setMapSaving(true); setMapSaveError('');
+    try {
+      const value = { name: mapDocument.name.trim(), walls: labSetup.arena.walls.map(wall => ({ ...wall })) };
+      const saved = mapDocument.id ? await ugcApi.updateMap(mapDocument.id, value) : await ugcApi.createMap(value);
+      setMapDocument({ id: saved.id, name: saved.name }); setMapSaveOpen(false);
+      setMapNotice(`Карта «${saved.name}» сохранена. Она доступна в сообществе и PvP-комнатах.`);
+    } catch (problem) {
+      if (isUnauthorized(problem)) { setMapSaveOpen(false); requireLogin(); }
+      else setMapSaveError(problem instanceof Error ? problem.message : 'Не удалось сохранить карту.');
+    } finally { setMapSaving(false); }
+  }
+
   function openStrategy(item: SavedStrategy) {
+    setMapDocument(undefined); setMapNotice('');
     if (!languages.includes(item.language)) { setLibraryNote(ui.pythonRequired); return; }
     navigate('arena');
     resetRunState();
@@ -622,13 +664,23 @@ function App() {
   return (
     <main className={`platform-app${expanded ? ' editor-expanded' : ''}`}>
       <header className="platform-header">
-        <button className="platform-brand" onClick={() => navigate('home')}><img src="/botarena-forge-icon.png" alt="" /><span>{text.brand}<small>CODE · SIMULATE · EVOLVE</small></span></button>
+        <button className="platform-brand" aria-label={text.brand} onClick={() => navigate('home')}><img src="/botarena-forge-icon.png" alt="" /><span>{text.brand}<small>CODE · SIMULATE · EVOLVE</small></span></button>
         <nav aria-label="Основная навигация">{Object.entries(ui.nav).map(([id, label]) =>
           <button key={id} type="button" aria-current={page === id ? 'page' : undefined}
             disabled={loading} onClick={() => navigate(id as Page)}>{label}</button>)}</nav>
         <div className="platform-account"><button className="tour-launch" onClick={() => setTourOpen(true)}>Обзор</button><AuthPanel session={session} onChange={setSession} /></div>
       </header>
       {tourOpen && <SystemTour onClose={() => setTourOpen(false)} onNavigate={navigate} />}
+      {mapSaveOpen && <ArenaModal title="Сохранение карты" onClose={() => { if (!mapSaving) setMapSaveOpen(false); }}>
+        <form className="room-form" onSubmit={saveArenaMap}>
+          <label>Название карты<input autoFocus required maxLength={80} value={mapDocument?.name ?? ''}
+            onChange={event => setMapDocument(previous => ({ ...previous, name: event.target.value }))} /></label>
+          <p className="muted">Сохраняются стены арены. Стартовые зоны для PvP остаются фиксированными.</p>
+          {(mapSaveError || validateBattleMap(labSetup.arena.walls)) && <p role="alert" className="error-card">{mapSaveError || validateBattleMap(labSetup.arena.walls)}</p>}
+          <div className="ugc-actions"><button type="button" disabled={mapSaving} onClick={() => setMapSaveOpen(false)}>Вернуться к редактору</button>
+            <button className="primary" disabled={mapSaving || !mapValid || !mapDocument?.name.trim() || !!validateBattleMap(labSetup.arena.walls)}>{mapSaving ? 'Сохраняем…' : 'Сохранить карту'}</button></div>
+        </form>
+      </ArenaModal>}
       {labSettingsOpen && <ArenaModal title={ui.roster} wide onClose={() => setLabSettingsOpen(false)}>
         {mapError && <p role="alert" className="error-card">{mapError}</p>}
         <LabSettingsDialog
@@ -637,6 +689,7 @@ function App() {
           onRosterChange={updateRoster}
           onReset={() => {
             detachStrategy();
+            setMapDocument(undefined); setMapNotice(''); setMapSaveError('');
             setMapError('');
             setLabSetup(defaultLabSetup());
             setSelectedWalls([]);
@@ -669,18 +722,20 @@ function App() {
         <StrategyHelpContent language={language} movement={movement} />
       </ArenaModal>}
       <div className="platform-content">
+      <div className="platform-page-body">
       {session && !session.authenticated && <div className="guest-banner"><b>Гостевой режим</b><span>Можно запускать одиночные бои, но прогресс не сохраняется.</span><button onClick={() => window.dispatchEvent(new CustomEvent('botarena-open-auth'))}>Войти или зарегистрироваться</button></div>}
       {authNotice && <div className="auth-callout auth-feedback" role="status"><p>{authNotice.message}</p><div className="ux-actions">{authNotice.canLogin && <button className="account-login" onClick={() => window.dispatchEvent(new CustomEvent('botarena-open-auth'))}>Войти / Регистрация</button>}<button type="button" onClick={() => setAuthNotice(undefined)}>{ui.close}</button></div></div>}
       <Suspense fallback={<div className="empty">{ui.loadingSection}</div>}>
-      {page === 'home' ? <><Home tracks={tracks} completed={completed} languages={languages} navigate={navigate} onDemo={startQuickDemo} demoInvite={demoInvite} onContinue={() => {
+      {page === 'home' ? <><Home navigate={navigate} onDemo={startQuickDemo} demoInvite={demoInvite} onContinue={() => {
           navigate('learn');
           const next = tracks.find(t => t.available && t.levels.some(l => !completed.includes(l.id) && isLevelUnlocked(l.order, t.levels, completed)));
           if (next) openTrack(next);
         }} />{error && <p role="alert" className="error-card">{error}</p>}</>
-      : page === 'workshop' ? <><div className="ux-tabs"><button aria-pressed="true">{ui.localStrategies}</button><button onClick={() => navigate('community')}>{ui.onlineWorkshop} ↗</button></div><Workshop items={library} onOpen={openStrategy}
+      : page === 'workshop' ? <Workshop items={library} onOpen={openStrategy}
           onRemove={removeStrategy}
-          onArena={() => { setLibraryId(undefined); setStrategyName(ui.defaultName); navigate('arena'); }} /></>
-      : page === 'community' ? <UgcHub onPlayMap={playMap} />
+          onCommunity={() => navigate('community')}
+          onArena={() => { setLibraryId(undefined); setStrategyName(ui.defaultName); navigate('arena'); }} />
+      : page === 'community' ? <UgcHub onPlayMap={playMap} onCreateMap={() => playMap()} />
       : <>
         <div className="ux-page-heading"><div><h1>{ui.nav[page]}</h1><p>{page === 'learn' ? ui.learnIntro : ui.arenaIntro}</p></div></div>
         {page === 'learn' && <div className="ux-tabs"><button aria-pressed={!training} onClick={() => { setTraining(false); history.replaceState(null, '', '#learn'); }}>{ui.learningLab}</button><button aria-pressed={training} onClick={() => { setTraining(true); history.replaceState(null, '', '#learn/pve'); }}>{ui.pveProgress}</button></div>}
@@ -699,9 +754,11 @@ function App() {
       ) : (
         <>
         <div className="arena-workspace-toolbar">
-          {mode === 'lab' && <button type="button" onClick={() => setLabSettingsOpen(true)}>⚙ {ui.roster}</button>}
-          <button type="button" onClick={() => setStrategyHelpOpen(true)}>？ {text.help.title}</button>
+          {mode === 'lab' && <><button type="button" onClick={() => setLabSettingsOpen(true)}>{ui.roster}</button>
+            <button type="button" disabled={!mapValid || loading} onClick={openMapSave}>Сохранить карту</button></>}
+          <button type="button" onClick={() => setStrategyHelpOpen(true)}>{text.help.title}</button>
         </div>
+        {mode === 'lab' && mapNotice && <p role="status" className="ugc-notice">{mapNotice}</p>}
         <div className="layout">
           <form ref={editorPanel} className="panel editor" onSubmit={run}>
             <div className="ux-editor-heading"><small>{ui.editor}</small><button type="button" onClick={() => setExpanded(!expanded)}>{expanded ? ui.collapse : ui.focus}</button></div>
@@ -893,7 +950,7 @@ function App() {
             </details>
 
           </form>
-          <section className="panel replay">
+          <section ref={replayPanel} className="panel replay">
             <div className="arena-panel-heading">
               <div className="arena-title"><h2>{text.arena}</h2>{mode === 'lab' && <span className="arena-info" tabIndex={0} role="img" aria-label={text.lab.mapHint} data-tooltip={text.lab.mapHint}>i</span>}</div>
               {replay && <button type="button" onClick={() => { setExpanded(false); editorPanel.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>{ui.backCode}</button>}
@@ -929,6 +986,7 @@ function App() {
                 placementError={mapError}
                 onPlacementError={setMapError}
                 onValidityChange={setMapValid}
+                validateWalls={mapDocument ? validateBattleMap : undefined}
                 onSelectWalls={setSelectedWalls}
                 mode={labSetup.mode}
                 onModeChange={nextMode => {
@@ -1013,6 +1071,7 @@ function App() {
       </>}
       {page === 'workshop' && libraryNote && <p role="status" className="ux-notice">{libraryNote}</p>}
       </Suspense>
+      </div>
       <footer className="platform-footer"><strong><img src="/botarena-forge-icon.png" alt="" />BotArena</strong><span>{ui.footer}</span></footer>
       </div>
     </main>

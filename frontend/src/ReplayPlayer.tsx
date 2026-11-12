@@ -81,6 +81,7 @@ export function ReplayPlayer({ replay, botNames, onComplete }: {
   const [showTrails, setShowTrails] = useState(true);
   const [showChronoXray, setShowChronoXray] = useState(true);
   const [showTacticalTrace, setShowTacticalTrace] = useState(false);
+  const [showDamageNumbers, setShowDamageNumbers] = useState(false);
   const [traceBotId, setTraceBotId] = useState(replay.frames[0]?.bots[0]?.id ?? '');
   const heldChronoShots = useRef(new Set<string>());
   const chronoHoldUntil = useRef(0);
@@ -164,7 +165,7 @@ export function ReplayPlayer({ replay, botNames, onComplete }: {
   const next = replay.frames[Math.min(lastFrame, index + 1)];
   const fraction = position < lastFrame ? position - Math.floor(position) : 0;
   const roster = frame.bots;
-  const damageNumbers = collectDamageNumbers(replay.frames, index, fraction);
+  const damageNumbers = showDamageNumbers ? collectDamageNumbers(replay.frames, index, fraction) : [];
   const displayLabel = (botId: string, teamId?: string) =>
     rosterBotLabel(botId, teamId, roster, botNames);
   const winnerBotId = replay.result.winnerBotId;
@@ -257,19 +258,11 @@ export function ReplayPlayer({ replay, botNames, onComplete }: {
           showChronoXray={showChronoXray} showTacticalTrace={showTacticalTrace}
           traceBotId={traceBotId} perceptionBotId={traceBotId} onSeek={seekReplay}
           captureEpoch={video.captureEpoch} captureActive={video.busy} onRenderFrame={video.onRenderFrame} />
-        {!gunnerView && <ReplayEffectsOverlay
+        {showDamageNumbers && !gunnerView && <ReplayEffectsOverlay
           arena={replay.arena}
           damageNumbers={damageNumbers}
           finished={finished}
         />}
-        <div className="blueprint-hud" aria-hidden="true">
-          <span>{cameraMode === 'perception' ? `BOT PERCEPTION / ${cinematicBotLabel(traceBotId, multiple)}`
-            : cameraMode === 'timeline' ? 'CHRONOSPACE / TIME TOWER'
-            : (cameraMode === 'auto' || cameraMode === 'adaptive') && activeShot
-            ? `${cameraMode === 'adaptive' ? 'SECTION DIRECTOR' : 'CINEMA DIRECTOR'} / ${activeShot.label}`
-            : 'BA–25 / REPLAY VISUALIZER'}</span>
-          <span>{String(frame.tick).padStart(3, '0')}F</span>
-        </div>
         {(cameraMode === 'auto' || cameraMode === 'adaptive') && activeShot && (
           <div className="director-cue" aria-hidden="true">
             <span>CUT {String(shotNumber).padStart(2, '0')} / {String(shotPlan.shots.length).padStart(2, '0')}</span>
@@ -320,7 +313,9 @@ export function ReplayPlayer({ replay, botNames, onComplete }: {
           </div>
         )}
         <div className="blueprint-reticle" aria-hidden="true"><i /><i /></div>
-        {finished && <p role="status" className="outcome">{copy.outcome(outcome, reason)}</p>}
+        {finished && <div role="status" className="outcome match-outcome" aria-label={copy.outcome(outcome, reason)}>
+          <strong>{outcome}</strong><span>{reason}</span>
+        </div>}
       </div>
       <fieldset className="replay-settings" disabled={video.busy}>
       <div className="director-bar">
@@ -350,6 +345,11 @@ export function ReplayPlayer({ replay, botNames, onComplete }: {
             <input type="checkbox" checked={showTacticalTrace}
               onChange={event => setShowTacticalTrace(event.target.checked)} />
             Тактический след
+          </label>
+          <label className="trail-toggle">
+            <input type="checkbox" checked={showDamageNumbers}
+              onChange={event => setShowDamageNumbers(event.target.checked)} />
+            {copy.showDamage}
           </label>
           {(showTacticalTrace || cameraMode === 'perception') && botIds.length > 1 && (
             <select aria-label="Бот для анализа" value={traceBotId}

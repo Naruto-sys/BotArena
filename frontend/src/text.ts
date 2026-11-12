@@ -186,6 +186,7 @@ export const text = {
     pause: 'Пауза',
     resume: 'Продолжить',
     position: 'Позиция реплея',
+    showDamage: 'Показывать урон',
     speed: 'Скорость реплея',
     speedOption: (speed: number) => `${speed}×`,
     time: (position: number, duration: number) => `${position.toFixed(1)} / ${duration.toFixed(1)} с`,
@@ -276,6 +277,7 @@ export const text = {
 
 export const platformText = {
   defaultName: 'Моя стратегия',
+  copyCode: 'Копировать код', copied: 'Скопировано', copying: 'Копируем…',
   maneuverCopied: 'Код манёвра скопирован.',
   copyFailed: 'Не удалось скопировать код. Разрешите доступ к буферу обмена и попробуйте снова.',
   strategySent: 'Стратегия отправлена другу.',
@@ -308,7 +310,7 @@ export const platformText = {
   arenaIntro: 'Измени код → запусти бой → изучи результат.',
   learnIntro: 'Выбери главу и проходи испытания по порядку. Прогресс сохраняется на этом устройстве.',
   pve: 'PvE · Тренировка', rooms: 'PvP · Комнаты',
-  tabs: { mine: 'Мои стратегии', catalog: 'Каталог стратегий', moves: 'Манёвры', maps: 'Карты' },
+  noMatches: 'Ничего не найдено. Измените поиск или выберите другой язык.',
   communityTabs: ['Друзья', 'Лента', 'Игроки'],
   soon: 'В разработке',
   roomsNote: 'Сетевые комнаты ещё не подключены. Сейчас доступны локальные бои против пресетов и собственного кода.',

@@ -139,8 +139,12 @@ export function LabArenaEditor({
     onValidityChange(true);
   }
 
+  const ownUpdate = useRef<{ walls: string; positions: string } | undefined>(undefined);
   const positions = bots.map(bot => `${bot.id}:${bot.position.x}:${bot.position.y}:${bot.bodyAngle}`).join('|');
   useEffect(() => {
+    const own = ownUpdate.current;
+    ownUpdate.current = undefined;
+    if (own && own.walls === JSON.stringify(arena.walls) && own.positions === positions) return;
     setRejectedWall(undefined);
     setRejectedBot(undefined);
     setPlacementError('');
@@ -176,6 +180,7 @@ export function LabArenaEditor({
     if (validWalls([wall], proposal)) {
       setRejectedWall(undefined);
       onValidityChange(true);
+      ownUpdate.current = { walls: JSON.stringify(proposal), positions };
       if (index === arena.walls.length) onAddWall(wall);
       else onChangeWall(index, wall);
     } else {
@@ -198,6 +203,8 @@ export function LabArenaEditor({
       return;
     }
     cancelPlacement();
+    ownUpdate.current = { walls: JSON.stringify(arena.walls), positions: bots.map(item =>
+      `${item.id}:${item.id === botId ? x : item.position.x}:${item.id === botId ? y : item.position.y}:${item.bodyAngle}`).join('|') };
     onMoveBot(botId, x, y);
   }
 
@@ -382,7 +389,6 @@ export function LabArenaEditor({
         </label>
         <p className="muted">{text.lab.modeHint[mode]}</p>
       </div>}
-      {placementError && <div role="alert" className="error-card map-placement-error"><p>{placementError}</p>{(rejectedWall || rejectedBot) && <button type="button" onClick={cancelPlacement}>{text.lab.cancelPlacement}</button>}</div>}
       <div className="arena-stage">
         <svg
           className="arena lab-arena"
@@ -493,7 +499,7 @@ export function LabArenaEditor({
                 key={bot.id}
                 data-bot={bot.id}
                 transform={`translate(${bot.position.x} ${bot.position.y})`}
-                style={{ color, cursor: botsDraggable ? 'grab' : 'default' }}
+                style={{ color, cursor: botsDraggable ? 'grab' : 'default', pointerEvents: rejectedWall ? 'none' : undefined }}
                 onPointerDown={event => {
                   if (!botsDraggable) return;
                   event.preventDefault();
@@ -511,7 +517,7 @@ export function LabArenaEditor({
               >
                 <g transform={`rotate(${hull})`}>
                   <rect x="-.34" y="-.29" width=".68" height=".58" rx=".04"
-                    fill="#111c2c" stroke={color} strokeWidth=".045" />
+                    className="lab-bot-hull" fill="#111c2c" stroke={color} strokeWidth=".045" />
                 </g>
                 <g transform={`rotate(${turret})`}>
                   <circle r=".15" fill={color} />
@@ -521,6 +527,10 @@ export function LabArenaEditor({
             );
           })}
         </svg>
+      </div>
+
+      <div className="map-placement-feedback">
+      {placementError && <div role="alert" className="error-card map-placement-error"><p>{placementError}</p>{(rejectedWall || rejectedBot) && <button type="button" onClick={cancelPlacement}>{text.lab.cancelPlacement}</button>}</div>}
       </div>
 
       <div className="lab-walls">

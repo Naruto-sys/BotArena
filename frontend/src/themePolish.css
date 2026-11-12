@@ -20,8 +20,6 @@
 [data-theme="light"] .code-editor { background: #f8fbfd; border-color: #c0d2de; color: #193448; }
 [data-theme="light"] .arena-stage .arena, [data-theme="light"] .blueprint-viewport, [data-theme="light"] .arena-stage .empty { background: #e8f0f3; border-color: #9db8c8; color: #3e6176; }
 [data-theme="light"] .arena-stage .preview-caption { background: #f1f7fa; color: #466678; border-color: #a5c1d0; }
-[data-theme="light"] .blueprint-hud { color: #175c75; text-shadow: none; }
-[data-theme="light"] .blueprint-hud::before, [data-theme="light"] .blueprint-hud::after { border-color: #39768d; }
 [data-theme="light"] .blueprint-reticle { border-color: #39768d; }
 [data-theme="light"] .director-cue, [data-theme="light"] .chrono-badge,
 [data-theme="light"] .tactical-readout, [data-theme="light"] .perception-readout,
