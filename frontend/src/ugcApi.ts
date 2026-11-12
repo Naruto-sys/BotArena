@@ -1,5 +1,5 @@
 import { platformText as ui } from './text';
-import type { ArenaUser, AuthSession, BattleChallenge, BattleMap, FriendStrategy, Friendship, FriendUser, GameRoom, ManeuverSnippet, MatchResponse, OAuthProvider, PveAttemptResult, PveCourse, PveLeaderboard, StrategyLanguage, StrategyTransfer, UgcStrategy, UgcStrategyCard, Wall } from './contracts';
+import type { ArenaUser, AuthSession, BattleChallenge, BattleMap, FriendStrategy, Friendship, FriendUser, GameRoom, RoomDetails, ManeuverSnippet, MatchResponse, OAuthProvider, PveAttemptResult, PveCourse, PveLeaderboard, StrategyLanguage, StrategyTransfer, UgcStrategy, UgcStrategyCard, Wall } from './contracts';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -68,12 +68,13 @@ export const ugcApi = {
   rooms: (filters: { clipboard?: string; presets?: string; maxCharactersPerSecond?: string; maxStake?: string } = {}) =>
     request<GameRoom[]>(`/api/rooms/?${new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== undefined && value !== '') as [string, string][])}`),
   createRoom: (value: CreateRoom) => request<GameRoom>('/api/rooms/', { method: 'POST', body: JSON.stringify(value) }),
-  room: (id: string) => request<{ room: GameRoom; match: MatchResponse | null; winnerId: string | null; draft?: { code: string; language: StrategyLanguage; sourceStrategyId: string | null; isReady: boolean } }>(`/api/rooms/${id}`),
+  room: (id: string, afterMatchRoundNumber?: number) => request<RoomDetails>(`/api/rooms/${id}${afterMatchRoundNumber === undefined ? '' : `?afterMatchRoundNumber=${afterMatchRoundNumber}`}`),
   joinRoom: (id: string, password?: string) => request<GameRoom>(`/api/rooms/${id}/join`, { method: 'POST', body: JSON.stringify({ password }) }),
   myRooms: () => request<GameRoom[]>('/api/rooms/mine'),
-  updateRoomDraft: (id: string, value: { code: string; language: StrategyLanguage; strategyId?: string }) =>
+  updateRoomDraft: (id: string, value: { code: string; language: StrategyLanguage; strategyId?: string; roundNumber: number }) =>
     request(`/api/rooms/${id}/draft`, { method: 'PUT', body: JSON.stringify(value) }),
-  readyRoom: (id: string) => request<{ waiting: boolean; match?: MatchResponse; winnerId?: string | null }>(`/api/rooms/${id}/ready`, { method: 'POST' }),
+  readyRoom: (id: string, roundNumber: number) => request<{ waiting: boolean; match?: MatchResponse; roundNumber: number }>(`/api/rooms/${id}/ready`, { method: 'POST', body: JSON.stringify({ roundNumber }) }),
+  nextRoomRound: (id: string, roundNumber: number) => request<GameRoom>(`/api/rooms/${id}/next-round`, { method: 'POST', body: JSON.stringify({ roundNumber }) }),
   cancelRoom: (id: string) => request<void>(`/api/rooms/${id}`, { method: 'DELETE' }),
   maps: () => request<BattleMap[]>('/api/maps/'),
   createMap: (value: { name: string; walls: Wall[] }) => request<BattleMap>('/api/maps/', { method: 'POST', body: JSON.stringify(value) }),

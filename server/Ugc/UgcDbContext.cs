@@ -111,6 +111,7 @@ public sealed class UgcDbContext(DbContextOptions<UgcDbContext> options) : DbCon
         rooms.Property(item => item.MapName).HasMaxLength(80);
         rooms.Property(item => item.ArenaJson).HasMaxLength(8_192);
         rooms.Property(item => item.Status).HasConversion<string>().HasMaxLength(16);
+        rooms.Property(item => item.RoundNumber).HasDefaultValue(1);
         rooms.HasOne(item => item.Creator).WithMany().HasForeignKey(item => item.CreatorId).OnDelete(DeleteBehavior.Restrict);
         rooms.HasOne(item => item.Guest).WithMany().HasForeignKey(item => item.GuestId).OnDelete(DeleteBehavior.Restrict);
 

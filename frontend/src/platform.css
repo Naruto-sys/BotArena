@@ -675,6 +675,13 @@ dialog.arena-modal-native::backdrop { background: #020a13c7; backdrop-filter: bl
 .platform-page-body { flex:1; min-width:0; }
 /* Above the header (40), below sign-in (100) and auth feedback (150). */
 .ugc-modal-backdrop { z-index:80; }
+.room-round-status { display:flex; align-items:center; gap:8px 16px; flex-wrap:wrap; margin:0; padding:12px 14px; border:1px solid #345566; border-radius:10px; background:#102432; color:#a7c5d3; }
+.room-round-status strong { color:#9ce6d3; }
+.room-last-match { display:grid; gap:12px; padding-top:12px; border-top:1px solid #345566; min-width:0; }
+.room-last-match > button { justify-self:start; }
+[data-theme="light"] .room-round-status { background:#edf6f4; color:#466b70; border-color:#b8d3ce; }
+[data-theme="light"] .room-round-status strong { color:#216b58; }
+[data-theme="light"] .room-last-match { border-color:#c7d5df; }
 
 .maneuver-card .copy-code-button { min-width:9rem; }
 .maneuver-card .copy-code-button.copied { color:#9be5cb; background:#16392f; border-color:#417b68; }

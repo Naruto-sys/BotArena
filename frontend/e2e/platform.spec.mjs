@@ -371,8 +371,8 @@ test('room invite opens the correct tab; cancellation releases a waiting guest',
     await page.getByRole('dialog').getByRole('button', { name: 'Войти по приглашению', exact: true }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel('Код', { exact: true }).fill('function tick(){return {};}');
-    await dialog.getByRole('button', { name: /Готов к бою/ }).click();
-    await expect(dialog.getByRole('button', { name: 'Ждём соперника…', exact: true })).toBeDisabled();
+    await dialog.getByRole('button', { name: /Готов к раунду/ }).click();
+    await expect(dialog.getByRole('button', { name: 'Ждём готовности соперника…', exact: true })).toBeDisabled();
     expect((await owner.delete(`/api/rooms/${room.id}`)).status()).toBe(204);
     await expect(dialog.getByRole('button', { name: 'Комната закрыта', exact: true })).toBeDisabled();
   } finally { await owner.dispose(); }
