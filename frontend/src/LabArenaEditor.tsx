@@ -517,7 +517,7 @@ export function LabArenaEditor({
               >
                 <g transform={`rotate(${hull})`}>
                   <rect x="-.34" y="-.29" width=".68" height=".58" rx=".04"
-                    fill="#111c2c" stroke={color} strokeWidth=".045" />
+                    className="lab-bot-hull" fill="#111c2c" stroke={color} strokeWidth=".045" />
                 </g>
                 <g transform={`rotate(${turret})`}>
                   <circle r=".15" fill={color} />

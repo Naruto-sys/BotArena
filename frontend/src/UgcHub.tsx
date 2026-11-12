@@ -132,7 +132,7 @@ export function UgcHub({ onPlayMap, onCreateMap }: { onPlayMap: (map: BattleMap)
       {section === 'catalog' && <div className="ugc-toolbar"><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Название, автор или идея…" /><select value={language} onChange={event => setLanguage(event.target.value)}><option value="">Все языки</option><option value="javascript">JavaScript</option><option value="python">Python</option></select><select value={sort} onChange={event => setSort(event.target.value)}><option value="popular">Популярные</option><option value="new">Новые</option><option value="forks">Часто форкают</option></select></div>}
       <div className="ugc-grid">{cards.map(card => <StrategyCard key={card.id} item={card} mine={section === 'mine'} onClick={() => void open(card.id)} />)}{!cards.length && <div className="ugc-empty"><b>{section === 'mine' ? 'Мастерская пуста' : 'Ничего не найдено'}</b><p>{section === 'mine' ? 'Создай первую стратегию — опубликовать её можно будет после проверки кода.' : 'Измени запрос или фильтры.'}</p></div>}</div>
     </>}
-    {section === 'maneuvers' && <><div className="ugc-section-head"><div><h2>Библиотека манёвров</h2><p>Копируй готовую механику и адаптируй под своего бота.</p></div></div><div className="ugc-chips"><button className={!category ? 'active' : ''} onClick={() => setCategory('')}>Все</button><button className={category === 'movement' ? 'active' : ''} onClick={() => setCategory('movement')}>Движение</button><button className={category === 'combat' ? 'active' : ''} onClick={() => setCategory('combat')}>Бой</button></div><div className="maneuver-grid">{maneuvers.map(item => <article className="maneuver-card" key={item.id}><span className="maneuver-icon">{item.category === 'combat' ? '⌖' : '↝'}</span><div><small>{item.language === 'python' ? 'Python' : 'JavaScript'} · {item.category === 'combat' ? 'Бой' : 'Движение'}</small><h3>{item.name}</h3><p>{item.description}</p><code>{item.usage}</code><button onClick={async () => { try { await navigator.clipboard.writeText(item.code); showNotice(ui.maneuverCopied); } catch { setError(ui.copyFailed); } }}>Копировать код</button></div></article>)}</div></>}
+    {section === 'maneuvers' && <><div className="ugc-section-head"><div><h2>Библиотека манёвров</h2><p>Копируй готовую механику и адаптируй под своего бота.</p></div></div><div className="ugc-chips"><button className={!category ? 'active' : ''} onClick={() => setCategory('')}>Все</button><button className={category === 'movement' ? 'active' : ''} onClick={() => setCategory('movement')}>Движение</button><button className={category === 'combat' ? 'active' : ''} onClick={() => setCategory('combat')}>Бой</button></div><div className="maneuver-grid">{maneuvers.map(item => <ManeuverCard key={item.id} item={item} />)}</div></>}
     {section === 'friends' && <FriendsPanel />}
     {section === 'rooms' && <RoomsPanel />}
     {section === 'maps' && <BattleMapEditor onPlayMap={onPlayMap} onCreateMap={onCreateMap} />}
@@ -173,4 +173,28 @@ function StrategyCard({ item, mine, onClick }: { item: UgcStrategyCard; mine: bo
       </dl>
     </footer>
   </article>;
+}
+
+function ManeuverCard({ item }: { item: ManeuverSnippet }) {
+  const mounted = useMounted();
+  const [copyState, setCopyState] = useState<'idle' | 'copying' | 'copied' | 'error'>('idle');
+  useEffect(() => {
+    if (copyState !== 'copied') return;
+    const timer = window.setTimeout(() => setCopyState('idle'), 2200);
+    return () => window.clearTimeout(timer);
+  }, [copyState]);
+  async function copy() {
+    setCopyState('copying');
+    try { await navigator.clipboard.writeText(item.code); if (mounted.current) setCopyState('copied'); }
+    catch { if (mounted.current) setCopyState('error'); }
+  }
+  return <article className="maneuver-card"><span className="maneuver-icon">{item.category === 'combat' ? '⌖' : '↝'}</span><div>
+    <small>{item.language === 'python' ? 'Python' : 'JavaScript'} · {item.category === 'combat' ? 'Бой' : 'Движение'}</small>
+    <h3>{item.name}</h3><p>{item.description}</p><code>{item.usage}</code>
+    <button className={`copy-code-button${copyState === 'copied' ? ' copied' : ''}`} disabled={copyState === 'copying'} onClick={() => void copy()}>
+      {copyState === 'copied' ? ui.copied : copyState === 'copying' ? ui.copying : ui.copyCode}
+    </button>
+    <span role="status" className="copy-status">{copyState === 'copied' ? ui.maneuverCopied : ''}</span>
+    {copyState === 'error' && <p role="alert" className="copy-error">{ui.copyFailed}</p>}
+  </div></article>;
 }

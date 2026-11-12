@@ -722,6 +722,7 @@ function App() {
         <StrategyHelpContent language={language} movement={movement} />
       </ArenaModal>}
       <div className="platform-content">
+      <div className="platform-page-body">
       {session && !session.authenticated && <div className="guest-banner"><b>Гостевой режим</b><span>Можно запускать одиночные бои, но прогресс не сохраняется.</span><button onClick={() => window.dispatchEvent(new CustomEvent('botarena-open-auth'))}>Войти или зарегистрироваться</button></div>}
       {authNotice && <div className="auth-callout auth-feedback" role="status"><p>{authNotice.message}</p><div className="ux-actions">{authNotice.canLogin && <button className="account-login" onClick={() => window.dispatchEvent(new CustomEvent('botarena-open-auth'))}>Войти / Регистрация</button>}<button type="button" onClick={() => setAuthNotice(undefined)}>{ui.close}</button></div></div>}
       <Suspense fallback={<div className="empty">{ui.loadingSection}</div>}>
@@ -1070,6 +1071,7 @@ function App() {
       </>}
       {page === 'workshop' && libraryNote && <p role="status" className="ux-notice">{libraryNote}</p>}
       </Suspense>
+      </div>
       <footer className="platform-footer"><strong><img src="/botarena-forge-icon.png" alt="" />BotArena</strong><span>{ui.footer}</span></footer>
       </div>
     </main>

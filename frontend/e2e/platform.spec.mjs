@@ -236,10 +236,14 @@ test('clipboard success is green and denied access is an error', async ({ page }
   await page.addInitScript(() => Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => {} } }));
   await page.goto('/#ugc'); await page.locator('.ugc-tabs').getByRole('button', { name: 'Манёвры', exact: true }).click();
   await page.getByRole('button', { name: 'Копировать код', exact: true }).click();
-  await expect(page.locator('.ugc-notice')).toHaveText('Код манёвра скопирован.');
+  await expect(page.locator('.maneuver-card').getByRole('button')).toHaveText('Скопировано');
+  await expect(page.locator('.ugc-hub > .ugc-notice')).toHaveCount(0);
+  await expect(page.locator('.maneuver-card').getByRole('status')).toHaveText('Код манёвра скопирован.');
+  await expect(page.getByRole('button', { name: 'Копировать код', exact: true })).toBeVisible({ timeout: 4000 });
   await page.evaluate(() => { navigator.clipboard.writeText = async () => { throw Error('denied'); }; });
   await page.getByRole('button', { name: 'Копировать код', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('Не удалось скопировать код');
+  await expect(page.locator('.maneuver-card').getByRole('alert')).toContainText('Не удалось скопировать код');
+  await expect(page.locator('.ugc-hub > .error-card')).toHaveCount(0);
 });
 
 test('geometry accounts for rotated hulls and touching edges', () => {
@@ -727,4 +731,59 @@ test('damage labels are opt-in through battle analysis and disappear when disabl
   await expect(page.locator('.arena-damage').first()).toBeVisible();
   await expect(page.locator('.arena-damage').first()).toContainText('-20');
   await toggle.uncheck(); await expect(page.locator('.arena-damage')).toHaveCount(0);
+});
+
+test('PvE light theme covers chapter badges, progress and completed/available/locked nodes', async ({ page }) => {
+  await signup(page.request);
+  const course=await page.request.get('/api/pve/').then(r=>r.json()); const first=course.blocks[0].levels[0];
+  const attempt=await page.request.post(`/api/pve/levels/${first.id}/attempt`, {data:{language:'javascript',code:first.solutionCode.javascript}});
+  expect(attempt.status()).toBe(200); expect((await attempt.json()).completed).toBe(true);
+  await page.addInitScript(()=>localStorage.setItem('botarena-theme','light'));
+  await page.goto('/#learn/pve');
+  const completed=page.locator('.level-stop.completed .level-node').first();
+  await expect(completed).toHaveCSS('background-color','rgb(203, 232, 220)');
+  await expect(page.locator('.level-stop:not(.completed):not(.locked) .level-node').first()).toHaveCSS('background-color','rgb(216, 241, 232)');
+  await expect(page.locator('.level-stop.locked .level-node').first()).toHaveCSS('background-color','rgb(229, 236, 241)');
+  await expect(page.locator('.chapter-rail button.active > span')).toHaveCSS('background-color','rgb(205, 234, 221)');
+  expect(await page.locator('.progress-ring').evaluate(node=>getComputedStyle(node,'::after').backgroundColor)).toBe('rgb(245, 249, 251)');
+  await page.getByRole('button',{name:'Меню аккаунта',exact:true}).click();
+  const profile=page.getByRole('button',{name:'Настройки профиля',exact:true}); await profile.hover();
+  await expect(profile).toHaveCSS('background-color','rgb(224, 241, 237)');
+  await page.getByRole('button',{name:'Включить тёмную тему',exact:true}).click(); await page.keyboard.press('Escape');
+  await expect(completed).toHaveCSS('background-color','rgb(22, 53, 44)');
+  await page.getByRole('button',{name:'Меню аккаунта',exact:true}).click();
+  await page.getByRole('button',{name:'Включить светлую тему',exact:true}).click(); await page.keyboard.press('Escape');
+  await expect(completed).toHaveCSS('background-color','rgb(203, 232, 220)');
+  await page.setViewportSize({width:390,height:900});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
+});
+
+test('light theme updates editor hulls and campaign order badges', async ({ page }) => {
+  await arena(page); const before=await stored(page);
+  await expect(page.locator('.lab-bot-hull').first()).toHaveCSS('fill','rgb(17, 28, 44)');
+  await page.getByRole('button',{name:'Включить светлую тему',exact:true}).click();
+  await expect(page.locator('.lab-bot-hull').first()).toHaveCSS('fill','rgb(245, 250, 252)');
+  expect((await stored(page)).bots).toEqual(before.bots);
+  await nav(page,'Обучение').click();
+  await page.locator('.chapter-route').first().locator('.lesson-stop.available button').first().click();
+  await page.locator('.campaign-levels summary').click();
+  await expect(page.locator('.level-card.selected .level-order')).toHaveCSS('background-color','rgb(223, 235, 242)');
+  await expect(page.locator('.level-card.locked .level-order').first()).toHaveCSS('background-color','rgb(232, 238, 242)');
+});
+
+test('footer sits at viewport bottom on short pages and follows long content', async ({ page }) => {
+  await page.setViewportSize({width:1440,height:1600}); await page.goto('/');
+  for (const name of ['Главная','Мастерская']) {
+    await nav(page,name).click();
+    const footer=await page.locator('.platform-footer').boundingBox();
+    expect(Math.abs(footer.y+footer.height-1600)).toBeLessThanOrEqual(1);
+  }
+  await page.setViewportSize({width:390,height:1400});
+  const footer=await page.locator('.platform-footer').boundingBox(), navigation=await page.getByRole('navigation',{name:'Основная навигация'}).boundingBox();
+  expect(footer.y+footer.height).toBeLessThanOrEqual(navigation.y);
+  expect(navigation.y-footer.y-footer.height).toBeLessThan(40);
+  await page.setViewportSize({width:390,height:700}); await nav(page,'Главная').click();
+  const last=await page.locator('.ux-home .ux-path').last().boundingBox();
+  const bottom=await page.locator('.platform-footer').boundingBox();
+  expect(bottom.y).toBeGreaterThanOrEqual(last.y+last.height+40);
 });

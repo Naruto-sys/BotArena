@@ -277,6 +277,7 @@ export const text = {
 
 export const platformText = {
   defaultName: 'Моя стратегия',
+  copyCode: 'Копировать код', copied: 'Скопировано', copying: 'Копируем…',
   maneuverCopied: 'Код манёвра скопирован.',
   copyFailed: 'Не удалось скопировать код. Разрешите доступ к буферу обмена и попробуйте снова.',
   strategySent: 'Стратегия отправлена другу.',

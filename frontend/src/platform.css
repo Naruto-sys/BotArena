@@ -639,3 +639,46 @@ dialog.arena-modal-native::backdrop { background: #020a13c7; backdrop-filter: bl
 
 .ux-home > .ux-hero + h2 { margin:32px 0 20px; }
 @media(max-width:760px) { .ux-home > .ux-hero + h2 { margin:24px 0 16px; } }
+
+/* Theme all learning states, not just the outer cards. */
+[data-theme="light"] .learning-shell { --course:#187d65; }
+[data-theme="light"] .learning-shell .eyebrow { color:var(--course); }
+[data-theme="light"] .progress-ring { background:conic-gradient(var(--course) var(--progress), #d4e1e7 0); }
+[data-theme="light"] .progress-ring::after { background:#f5f9fb; }
+[data-theme="light"] .chapter-rail { scrollbar-color:#9db4c0 #edf3f6; }
+[data-theme="light"] .chapter-rail > button > span { background:#e4edf2; color:#526f80; }
+[data-theme="light"] .chapter-rail > button.active > span,
+[data-theme="light"] .chapter-rail > button.completed > span { background:#cdeadd; color:#21664f; }
+[data-theme="light"] .level-map::before { background:linear-gradient(#91c6b5,#d8e4e9 70%); }
+[data-theme="light"] .level-stop .level-node { background:#d8f1e8; color:#1d715a; border-color:#f4f7fa; box-shadow:0 0 0 1px #69aa95,0 4px 14px #39766314; }
+[data-theme="light"] .level-stop.completed .level-node { background:#cbe8dc; color:#21664f; }
+[data-theme="light"] .level-stop.locked .level-node { background:#e5ecf1; color:#7c929f; box-shadow:0 0 0 1px #bdcdd6; }
+[data-theme="light"] .course-summary > p:not(.eyebrow) { color:#597484; }
+[data-theme="light"] .reward-note, [data-theme="light"] .level-stop article footer { border-color:#cbdce4; }
+[data-theme="light"] .reward-note > span, [data-theme="light"] .hint-stack p span { background:#d6eee4; color:#21664f; }
+[data-theme="light"] .level-mini-stats { color:#52796d; }
+[data-theme="light"] .learning-shell .lesson-dialog .hint-stack .solution-button { background:#e0f3ec; border-color:#a0cbbb; color:#236b56; }
+[data-theme="light"] .learning-shell .lesson-close:hover { background:#e4f2ef; color:#1d6c59; border-color:#77ac9c; }
+[data-theme="light"] .learning-shell .leaderboard-head { background:#e9f1f5; color:#587382; }
+[data-theme="light"] .campaign-levels > summary { color:#58788d; }
+[data-theme="light"] .level-order { background:#dfebf2; color:#3d6479; }
+[data-theme="light"] .level-card.selected { background:#e1f1f5; border-color:#6da5b5; }
+[data-theme="light"] .level-card.done .level-order { background:#d9eee4; color:#296e54; }
+[data-theme="light"] .level-card.locked .level-order { background:#e8eef2; color:#7d929e; }
+[data-theme="light"] .lab-arena .lab-bot-hull { fill:#f5fafc; }
+[data-theme="light"] .profile-menu .account-dropdown .account-action:hover,
+[data-theme="light"] .profile-menu .account-dropdown .account-action:focus-visible { background:#e0f1ed; color:#205f55; border-color:#9fc8bb; }
+[data-theme="light"] .platform-account .profile-trigger:hover,
+[data-theme="light"] .platform-account .tour-launch:hover { background:#e8f3f2; color:#245d57; border-color:#86b4a8; }
+/* Grow page content to keep the footer at the bottom without overlaying it. */
+.platform-content { flex:1; display:flex; flex-direction:column; }
+.platform-page-body { flex:1; min-width:0; }
+
+.maneuver-card .copy-code-button { min-width:9rem; }
+.maneuver-card .copy-code-button.copied { color:#9be5cb; background:#16392f; border-color:#417b68; }
+.maneuver-card .copy-error { margin:.5rem 0 0; color:#f1aaa2; font-size:12px; }
+.copy-status { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+[data-theme="light"] .maneuver-card code { background:#eef5f8; color:#33596b; border:1px solid #d0e0e8; border-radius:8px; }
+[data-theme="light"] .maneuver-icon { background:#e6f3ef; color:#217563; border-color:#b7d5cb; }
+[data-theme="light"] .maneuver-card .copy-code-button.copied { color:#236b52; background:#e1f4eb; border-color:#97c4ad; }
+[data-theme="light"] .maneuver-card .copy-error { color:#a33e36; }

@@ -63,7 +63,7 @@ const tourSteps: { page: Page; section: string; title: string; description: stri
   { page: 'learn', section: 'Обучение', title: 'Режим обучения', description: 'Переключайтесь между учебными испытаниями и рейтинговым PvE.', target: '.ux-tabs' },
   { page: 'arena', section: 'Арена', title: 'Редактор стратегии', description: 'Здесь меняются код, язык, шасси и состав участников боя.', target: '.editor' },
   { page: 'arena', section: 'Арена', title: 'Поле боя', description: 'После запуска здесь появится запись матча и инструменты анализа.', target: '.replay' },
-  { page: 'arena', section: 'Арена', title: 'PvP-комнаты', description: 'Зарегистрированные игроки могут перейти к открытым сетевым комнатам.', target: '.platform-content > .ux-tabs' },
+  { page: 'arena', section: 'Арена', title: 'PvP-комнаты', description: 'Зарегистрированные игроки могут перейти к открытым сетевым комнатам.', target: '.platform-page-body > .ux-tabs' },
   { page: 'workshop', section: 'Мастерская', title: 'Мастерская', description: 'Здесь хранятся стратегии на этом устройстве. Публикации, манёвры и карты находятся в сообществе.', target: '[data-tour-target="workshop-heading"]' },
   { page: 'workshop', section: 'Мастерская', title: 'Поиск и создание', description: 'Фильтруйте стратегии или создавайте новую копию для эксперимента.', target: '.ux-actions' },
   { page: 'workshop', section: 'Мастерская', title: 'Ваши стратегии', description: 'Сохранённые работы появляются здесь. Если список пуст, создайте первую стратегию на Арене.', target: '[data-tour-target="workshop-strategies"]' },
