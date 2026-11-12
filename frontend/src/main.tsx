@@ -615,7 +615,7 @@ function App() {
         <nav aria-label="Основная навигация">{Object.entries(ui.nav).map(([id, label]) =>
           <button key={id} type="button" aria-current={page === id ? 'page' : undefined}
             disabled={loading} onClick={() => navigate(id as Page)}>{label}</button>)}</nav>
-        <div className="platform-account"><button className="tour-launch" onClick={() => setTourOpen(true)}>？ Обзор</button><AuthPanel session={session} onChange={setSession} /><button className="platform-settings-button" title={ui.settings} aria-label={ui.settings} onClick={() => setSettings(true)}>⚙</button></div>
+        <div className="platform-account"><button className="tour-launch" aria-label="Обзор" onClick={() => setTourOpen(true)}><span aria-hidden="true">？</span><span className="tour-label">Обзор</span></button><AuthPanel session={session} onChange={setSession} /><button className="platform-settings-button" title={ui.settings} aria-label={ui.settings} onClick={() => setSettings(true)}>⚙</button></div>
       </header>
       {settings && <SettingsDialog onClose={() => setSettings(false)} />}
       {tourOpen && <SystemTour onClose={() => setTourOpen(false)} onNavigate={navigate} />}
