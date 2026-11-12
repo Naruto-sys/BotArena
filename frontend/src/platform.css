@@ -568,3 +568,32 @@ dialog.arena-modal-native::backdrop { background: #020a13c7; backdrop-filter: bl
 .campaign-result { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
 .campaign-result p { margin:0; flex:1 1 220px; }
 .campaign-result button { flex-shrink:0; }
+
+/* Validation feedback must never move the SVG underneath an active pointer. */
+.map-placement-feedback { min-height:4rem; padding-top:.5rem; overflow-anchor:none; }
+.map-placement-feedback .map-placement-error { margin:0; }
+@media (max-width: 760px) { .map-placement-feedback { min-height:6rem; } }
+
+.workshop-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; margin-bottom:20px; }
+.workshop-heading h1 { margin-bottom:8px; }
+.workshop-heading .ux-lead { margin:0; }
+.workshop-heading > button { flex-shrink:0; }
+.workshop-tools { margin-bottom:20px; }
+
+.number-field { display:grid; gap:6px; min-width:0; }
+.number-field > label { font-size:12px; color:#91adbf; }
+.lab-team > header .number-field { width:136px; }
+.number-stepper { display:grid; grid-template-columns:38px minmax(40px,1fr) 38px; align-items:stretch; min-height:40px; overflow:hidden; border:1px solid #36576d; border-radius:9px; background:#0b1b29; }
+.number-stepper:focus-within { border-color:#58d9c3; box-shadow:0 0 0 2px #58d9c322; }
+.lab-settings .number-stepper input { appearance:textfield; -moz-appearance:textfield; width:100%; min-width:0; padding:8px 4px; margin:0; border:0; border-radius:0; background:transparent; color:#e0f0f7; outline:none; box-shadow:none; text-align:center; font:600 15px/1.2 system-ui; font-variant-numeric:tabular-nums; }
+.number-stepper input::-webkit-inner-spin-button, .number-stepper input::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+.lab-settings .number-stepper button { min-width:0; padding:4px; border:0; border-radius:0; background:#173043; color:#90d7db; font:500 20px/1 system-ui; }
+.lab-settings .number-stepper button:hover:enabled { background:#22475b; color:#d4fff5; }
+.lab-settings .number-stepper button:disabled { opacity:.35; cursor:default; }
+.lab-settings .number-stepper button:focus-visible { outline:2px solid #58d9c3; outline-offset:-3px; }
+[data-theme="light"] .number-field > label { color:#526f80; }
+[data-theme="light"] .number-stepper { background:#fff; border-color:#b7cdd8; }
+[data-theme="light"] .lab-settings .number-stepper input { color:#23485c; }
+[data-theme="light"] .lab-settings .number-stepper button { background:#e7f1f5; color:#366477; }
+[data-theme="light"] .lab-settings .number-stepper button:hover:enabled { background:#d0e8e6; color:#155f59; }
+@media (max-width:760px) { .number-stepper { min-height:44px; grid-template-columns:44px minmax(40px,1fr) 44px; } .lab-team > header .number-field { width:148px; } }

@@ -17,15 +17,17 @@ export function Home({ tracks, completed, languages, navigate, onContinue, onDem
     <h2>{ui.next}</h2><div className="ux-grid">{ui.paths.map(([title, description], i) => <article className="panel ux-path" key={title}><small>0{i + 1}</small><h2>{title}</h2><p>{description}</p><button onClick={() => navigate((['learn', 'arena', 'workshop'] as Page[])[i])}>{title} →</button></article>)}</div>
   </div>;
 }
-export function Workshop({ items, onOpen, onRemove, onArena }: { items: SavedStrategy[]; onOpen: (item: SavedStrategy) => void; onRemove: (id: string) => void; onArena: () => void }) {
-  const [tab, setTab] = useState<keyof typeof ui.tabs>('mine');
+export function Workshop({ items, onOpen, onRemove, onArena, onCommunity }: {
+  items: SavedStrategy[]; onOpen: (item: SavedStrategy) => void; onRemove: (id: string) => void;
+  onArena: () => void; onCommunity: () => void;
+}) {
   const [query, setQuery] = useState('');
   const [language, setLanguage] = useState('all');
   const filtered = items.filter(item => item.name.toLowerCase().includes(query.toLowerCase()) && (language === 'all' || item.language === language));
-  return <><h1>{ui.nav.workshop}</h1><p className="ux-lead">{ui.paths[2][1]}</p><div className="ux-tabs">{Object.entries(ui.tabs).map(([id, label]) => <button key={id} aria-pressed={tab === id} onClick={() => setTab(id as typeof tab)}>{label}</button>)}</div>
-    {tab === 'mine' ? <><div className="ux-actions"><input aria-label={ui.search} placeholder={ui.search} value={query} onChange={e => setQuery(e.target.value)} /><select aria-label={ui.all} value={language} onChange={e => setLanguage(e.target.value)}><option value="all">{ui.all}</option><option value="javascript">JavaScript</option><option value="python">Python</option></select><button className="primary" onClick={onArena}>{ui.copy} →</button></div><div data-tour-target="workshop-strategies"><div className="ux-grid">{filtered.map(item => <article className="panel ux-path" key={item.id}><small>{item.language.toUpperCase()} · {item.movement}</small><h2>{item.name}</h2><p>{ui.saved}</p><div className="ux-actions"><button className="primary" onClick={() => onOpen(item)}>{ui.edit}</button><button onClick={() => onRemove(item.id)}>{ui.remove}</button></div></article>)}</div>{filtered.length === 0 && <div className="ux-placeholder">{ui.empty}</div>}</div></>
-    : tab === 'maps' ? <article className="panel ux-path"><h2>{ui.map}</h2><p>{ui.mapNote}</p><button onClick={onArena}>{ui.openMap} →</button></article>
-    : <ComingSoon>{tab === 'catalog' ? ui.catalogNote : ui.movesNote}</ComingSoon>}
+  return <>
+    <div className="workshop-heading" data-tour-target="workshop-heading"><div><h1>{ui.nav.workshop}</h1><p className="ux-lead">{ui.paths[2][1]}</p></div><button onClick={onCommunity}>{ui.onlineWorkshop} ↗</button></div>
+    <div className="ux-actions workshop-tools"><input aria-label={ui.search} placeholder={ui.search} value={query} onChange={e => setQuery(e.target.value)} /><select aria-label={ui.all} value={language} onChange={e => setLanguage(e.target.value)}><option value="all">{ui.all}</option><option value="javascript">JavaScript</option><option value="python">Python</option></select><button className="primary" onClick={onArena}>{ui.copy} →</button></div>
+    <div data-tour-target="workshop-strategies"><div className="ux-grid">{filtered.map(item => <article className="panel ux-path" key={item.id}><small>{item.language.toUpperCase()} · {item.movement}</small><h2>{item.name}</h2><p>{ui.saved}</p><div className="ux-actions"><button className="primary" onClick={() => onOpen(item)}>{ui.edit}</button><button onClick={() => onRemove(item.id)}>{ui.remove}</button></div></article>)}</div>{filtered.length === 0 && <div className="ux-placeholder">{items.length ? ui.noMatches : ui.empty}</div>}</div>
   </>;
 }
 export function Community() {
@@ -66,7 +68,7 @@ const tourSteps: { page: Page; section: string; title: string; description: stri
   { page: 'arena', section: 'Арена', title: 'Редактор стратегии', description: 'Здесь меняются код, язык, шасси и состав участников боя.', target: '.editor' },
   { page: 'arena', section: 'Арена', title: 'Поле боя', description: 'После запуска здесь появится запись матча и инструменты анализа.', target: '.replay' },
   { page: 'arena', section: 'Арена', title: 'PvP-комнаты', description: 'Зарегистрированные игроки могут перейти к открытым сетевым комнатам.', target: '.platform-content > .ux-tabs' },
-  { page: 'workshop', section: 'Мастерская', title: 'Разделы мастерской', description: 'Переключайтесь между локальными работами и онлайн-каталогом.', target: '.ux-tabs' },
+  { page: 'workshop', section: 'Мастерская', title: 'Мастерская', description: 'Здесь хранятся стратегии на этом устройстве. Публикации, манёвры и карты находятся в сообществе.', target: '[data-tour-target="workshop-heading"]' },
   { page: 'workshop', section: 'Мастерская', title: 'Поиск и создание', description: 'Фильтруйте стратегии или создавайте новую копию для эксперимента.', target: '.ux-actions' },
   { page: 'workshop', section: 'Мастерская', title: 'Ваши стратегии', description: 'Сохранённые работы появляются здесь. Если список пуст, создайте первую стратегию на Арене.', target: '[data-tour-target="workshop-strategies"]' },
   { page: 'community', section: 'Сообщество', title: 'Стратегии сообщества', description: 'Изучайте публикации, покупайте код и создавайте собственные ремиксы.', target: '.ugc-hero' },

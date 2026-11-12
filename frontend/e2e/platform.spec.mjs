@@ -157,20 +157,39 @@ test('capture-point mode renders bases and produces a real replay', async ({ pag
   await expect(page.locator('.error-card')).toHaveCount(0);
 });
 
-test('saved-map editor highlights a blocked spawn and disables save', async ({ page }) => {
+test('community creates and edits maps using only the Arena editor', async ({ page }) => {
   await signup(page.request); await page.goto('/#ugc');
   await page.locator('.ugc-tabs').getByRole('button', { name: 'Карты', exact: true }).click();
   await page.getByRole('button', { name: '+ Создать карту', exact: true }).click();
+  await expect(page).toHaveURL(/#arena$/);
+  await expect(page.locator('.lab-arena')).toHaveCount(1);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByRole('button', { name: 'Добавить стену', exact: true }).click();
   const row = page.locator('.lab-wall-row').first();
   await row.getByLabel('x', { exact: true }).fill('2');
   await row.getByLabel('y', { exact: true }).fill('4.5');
   await expect(page.locator('.lab-arena .invalid-placement')).toHaveCount(1);
-  await expect(page.getByRole('button', { name: 'Сохранить карту', exact: true })).toBeDisabled();
+  const save = page.locator('.arena-workspace-toolbar').getByRole('button', { name: 'Сохранить карту', exact: true });
+  await expect(save).toBeDisabled(); await expect(start(page)).toBeDisabled();
   await page.getByRole('button', { name: 'Отменить изменение', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Сохранить карту', exact: true })).toBeEnabled();
-  await page.getByRole('button', { name: 'Сохранить карту', exact: true }).click();
-  await expect(page.locator('.map-builder')).toHaveCount(0);
+  await save.click();
+  const modal = page.getByRole('dialog', { name: 'Сохранение карты', exact: true });
+  await expect(modal.locator('svg')).toHaveCount(0);
+  await modal.getByLabel('Название карты', { exact: true }).fill('QA unified map');
+  await modal.getByRole('button', { name: 'Сохранить карту', exact: true }).click();
+  await expect(modal).toHaveCount(0);
+  const maps = await page.request.get('/api/maps/').then(r => r.json());
+  expect(maps).toHaveLength(1); expect(maps[0].walls).toHaveLength(1);
+  await nav(page, 'Сообщество').click();
+  await page.locator('.ugc-tabs').getByRole('button', { name: 'Карты', exact: true }).click();
+  await page.locator('.map-card').filter({ hasText: 'QA unified map' }).getByRole('button', { name: 'Редактировать', exact: true }).click();
+  await expect(page).toHaveURL(/#arena$/);
+  await page.locator('.lab-wall-row').first().getByLabel('x', { exact: true }).fill('7');
+  await save.click(); await expect(modal.getByLabel('Название карты', { exact: true })).toHaveValue('QA unified map');
+  await modal.getByRole('button', { name: 'Сохранить карту', exact: true }).click(); await expect(modal).toHaveCount(0);
+  const updated = await page.request.get('/api/maps/').then(r => r.json());
+  expect(updated).toHaveLength(1); expect(updated[0].id).toBe(maps[0].id); expect(updated[0].walls[0].x).toBe(7);
+  await page.request.delete(`/api/maps/${maps[0].id}`);
 });
 
 test('local account supports profile, strategy and map persistence and owner checks', async ({ page, playwright }) => {
@@ -524,4 +543,105 @@ test('campaign completion does not offer a nonexistent next level', async ({ pag
   await start(page).click();
   await expect(page.locator('.campaign-result')).toBeVisible({ timeout: 30000 });
   await expect(page.getByRole('button', { name: 'Следующий уровень →', exact: true })).toHaveCount(0);
+});
+
+for (const width of [1440, 390]) {
+  test(`wall collision preview stays under pointer without layout jitter at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 1000 }); await arena(page);
+    await page.locator('.lab-arena').scrollIntoViewIfNeeded();
+    const point = ([x, y]) => page.locator('.lab-arena').evaluate((svg, [x, y]) => {
+      const p = new DOMPoint(x, y).matrixTransform(svg.getScreenCTM()); return { x: p.x, y: p.y };
+    }, [x, y]);
+    const begin = await point([5.2, 2.5]), invalid = await point([2.7, 5]), valid = await point([5.2, 2.5]);
+    const initial = await page.locator('.lab-arena').boundingBox();
+    const bots = (await stored(page)).bots;
+    await page.mouse.move(begin.x, begin.y); await page.mouse.down();
+    for (let cycle = 0; cycle < 4; cycle++) {
+      await page.mouse.move(valid.x, valid.y);
+      await page.mouse.move(invalid.x, invalid.y);
+      for (let repeat = 0; repeat < 4; repeat++) {
+        await page.mouse.move(invalid.x, invalid.y);
+        await expect(page.locator('.lab-wall.invalid-placement')).toHaveCount(1);
+        await expect(page.locator('.lab-wall.invalid-placement')).toHaveAttribute('y', '4.4');
+        const bounds = await page.locator('.lab-arena').boundingBox(); expect(Math.abs(bounds.y - initial.y)).toBeLessThan(1);
+        expect((await stored(page)).bots).toEqual(bots);
+        await expect(start(page)).toBeDisabled();
+      }
+    }
+    await page.mouse.up();
+    await expect(page.locator('.lab-wall.invalid-placement')).toHaveCount(1);
+    await drag(page, [2.7, 5], [5.2, 2.5]);
+    await expect(page.locator('.invalid-placement')).toHaveCount(0); await expect(start(page)).toBeEnabled();
+  });
+}
+
+test('workshop has one local library and no duplicate placeholder tabs', async ({ page }) => {
+  await page.goto('/#workshop');
+  await expect(page.locator('.platform-content .ux-tabs')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Каталог стратегий', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Манёвры', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Карты', exact: true })).toHaveCount(0);
+  await expect(page.getByText('В разработке', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: /Публикации и каталог/ }).click();
+  await expect(page).toHaveURL(/#ugc$/);
+  await expect(nav(page, 'Сообщество')).toHaveAttribute('aria-current', 'page');
+});
+
+test('reset detaches the saved map instead of overwriting it', async ({ page }) => {
+  await signup(page.request);
+  const response = await page.request.post('/api/maps/', { data: { name: 'QA original map', walls: [] } });
+  const original = await response.json();
+  await page.goto('/#ugc'); await page.locator('.ugc-tabs').getByRole('button', { name: 'Карты', exact: true }).click();
+  await page.locator('.map-card').filter({ hasText: 'QA original map' }).getByRole('button', { name: 'Редактировать', exact: true }).click();
+  await settings(page).click(); await page.getByRole('dialog').getByRole('button', { name: 'Сбросить', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Сохранить карту', exact: true }).click();
+  const modal = page.getByRole('dialog', { name: 'Сохранение карты', exact: true });
+  await expect(modal.getByLabel('Название карты', { exact: true })).toHaveValue('Новая арена');
+  await modal.getByRole('button', { name: 'Сохранить карту', exact: true }).click(); await expect(modal).toHaveCount(0);
+  const maps = await page.request.get('/api/maps/').then(r => r.json());
+  expect(maps).toHaveLength(2); expect(maps.find(map => map.id === original.id).walls).toEqual([]);
+});
+
+test('wall resizing across a tank leaves a stable rejected draft', async ({ page }) => {
+  await arena(page);
+  await page.locator('.lab-wall').first().click();
+  await page.locator('.lab-arena').scrollIntoViewIfNeeded();
+  const handle = await page.locator('.lab-wall-handle-sw').boundingBox();
+  const target = await page.locator('.lab-arena').evaluate(svg => {
+    const p = new DOMPoint(2, 5).matrixTransform(svg.getScreenCTM()); return { x:p.x, y:p.y };
+  });
+  const before = await page.locator('.lab-arena').boundingBox();
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2); await page.mouse.down();
+  for (let repeat=0; repeat<6; repeat++) {
+    await page.mouse.move(target.x, target.y);
+    await expect(page.locator('.lab-wall.invalid-placement')).toHaveCount(1);
+    const bounds = await page.locator('.lab-arena').boundingBox(); expect(Math.abs(bounds.y - before.y)).toBeLessThan(1);
+    expect((await stored(page)).bots[0].position).toEqual({ x:2.2, y:5 });
+  }
+  await page.mouse.up(); await expect(start(page)).toBeDisabled();
+});
+
+test('roster number controls support buttons, typed HP, limits and both themes', async ({ page }) => {
+  await arena(page);
+  await expect(settings(page)).toHaveText('Участники и параметры боя');
+  await expect(page.getByRole('button', { name:'Как управлять ботом', exact:true })).toHaveText('Как управлять ботом');
+  await settings(page).click();
+  const team = page.locator('.lab-team-player');
+  const teamHp = team.getByRole('spinbutton', { name:'HP всей команды', exact:true });
+  await team.getByRole('button', { name:'Увеличить: HP всей команды', exact:true }).click();
+  await expect(teamHp).toHaveValue('110');
+  await team.getByRole('button', { name:'Применить ко всем', exact:true }).click();
+  await expect(team.getByRole('spinbutton', { name:'HP', exact:true })).toHaveValue('110');
+  expect((await stored(page)).bots[0].hp).toBe(110);
+  await teamHp.fill('5000'); await teamHp.blur(); await expect(teamHp).toHaveValue('500');
+  await expect(team.getByRole('button', { name:'Увеличить: HP всей команды', exact:true })).toBeDisabled();
+  await teamHp.fill(''); await teamHp.blur(); await expect(teamHp).toHaveValue('500');
+  for (const theme of ['dark', 'light']) {
+    await page.evaluate(theme => { document.documentElement.dataset.theme=theme; }, theme);
+    await expect(teamHp).toHaveCSS('appearance', 'textfield');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
+  }
+  await page.getByRole('dialog').getByRole('button', { name:'Сбросить', exact:true }).click();
+  await expect(teamHp).toHaveValue('100');
 });
