@@ -679,3 +679,23 @@ for (const width of [1440,390]) {
     await expect(page.getByRole('button',{name:'План',exact:true})).toHaveAttribute('aria-pressed','true');
   });
 }
+
+test('arena has no technical corner labels and finished result is inset and readable', async ({ page }) => {
+  await arena(page); await start(page).click();
+  await page.locator('.blueprint-canvas').waitFor({state:'attached',timeout:30000});
+  await expect(page.locator('.blueprint-hud')).toHaveCount(0);
+  const seek = page.getByRole('slider', {name:'Позиция реплея',exact:true});
+  await seek.focus(); await seek.press('End');
+  const result = page.locator('.match-outcome'); await expect(result).toBeVisible();
+  await expect(result.locator('strong')).not.toBeEmpty(); await expect(result.locator('span')).not.toBeEmpty();
+  for (const width of [1440,390]) {
+    await page.setViewportSize({width,height:900});
+    for (const theme of ['dark','light']) {
+      await page.evaluate(theme => { document.documentElement.dataset.theme=theme; },theme);
+      const stage = await page.locator('.blueprint-stage').boundingBox(), badge = await result.boundingBox();
+      expect(badge.y-stage.y).toBeGreaterThanOrEqual(17);
+      expect(badge.x).toBeGreaterThan(stage.x); expect(badge.x+badge.width).toBeLessThan(stage.x+stage.width);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
+    }
+  }
+});

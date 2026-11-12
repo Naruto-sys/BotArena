@@ -262,14 +262,6 @@ export function ReplayPlayer({ replay, botNames, onComplete }: {
           damageNumbers={damageNumbers}
           finished={finished}
         />}
-        <div className="blueprint-hud" aria-hidden="true">
-          <span>{cameraMode === 'perception' ? `BOT PERCEPTION / ${cinematicBotLabel(traceBotId, multiple)}`
-            : cameraMode === 'timeline' ? 'CHRONOSPACE / TIME TOWER'
-            : (cameraMode === 'auto' || cameraMode === 'adaptive') && activeShot
-            ? `${cameraMode === 'adaptive' ? 'SECTION DIRECTOR' : 'CINEMA DIRECTOR'} / ${activeShot.label}`
-            : 'BA–25 / REPLAY VISUALIZER'}</span>
-          <span>{String(frame.tick).padStart(3, '0')}F</span>
-        </div>
         {(cameraMode === 'auto' || cameraMode === 'adaptive') && activeShot && (
           <div className="director-cue" aria-hidden="true">
             <span>CUT {String(shotNumber).padStart(2, '0')} / {String(shotPlan.shots.length).padStart(2, '0')}</span>
@@ -320,7 +312,9 @@ export function ReplayPlayer({ replay, botNames, onComplete }: {
           </div>
         )}
         <div className="blueprint-reticle" aria-hidden="true"><i /><i /></div>
-        {finished && <p role="status" className="outcome">{copy.outcome(outcome, reason)}</p>}
+        {finished && <div role="status" className="outcome match-outcome" aria-label={copy.outcome(outcome, reason)}>
+          <strong>{outcome}</strong><span>{reason}</span>
+        </div>}
       </div>
       <fieldset className="replay-settings" disabled={video.busy}>
       <div className="director-bar">
