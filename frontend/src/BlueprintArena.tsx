@@ -575,6 +575,8 @@ function interpolatedBot(state: RenderState, id: Bot['id']): Bot | undefined {
   const start = state.frame.bots.find(bot => bot.id === id);
   if (!start) return undefined;
   const end = state.next.bots.find(bot => bot.id === id) ?? start;
+  // A respawn is a new life at its spawn, rather than movement across the arena.
+  if (start.hp <= 0 && end.hp > 0) return start;
   return {
     ...start,
     position: mixPoint(start.position, end.position, state.fraction),
@@ -1244,8 +1246,9 @@ export function BlueprintArena({
         tank.hull.rotation.y = -bot.bodyAngle;
         tank.turret.rotation.y = -bot.turretAngle;
         const dead = bot.hp <= 0;
-        const winner = replay.result.winnerBotId === id;
-        const faded = dead || bot.forfeited || (matchEnded && replay.result.winnerBotId != null && !winner);
+        const winner = replay.result.winnerBotId === id || replay.result.winnerBotIds?.includes(id);
+        const faded = dead || bot.forfeited || (matchEnded &&
+          (replay.result.winnerBotId != null || (replay.result.winnerBotIds?.length ?? 0) > 0) && !winner);
         tank.root.rotation.z = THREE.MathUtils.lerp(tank.root.rotation.z, dead ? 0.22 : 0, 0.08);
         tank.materials.forEach(material => {
           if ('opacity' in material) {
@@ -1253,7 +1256,7 @@ export function BlueprintArena({
             material.opacity = faded ? baseOpacity * 0.35 : baseOpacity;
           }
         });
-        tank.winnerHalo.visible = matchEnded && winner;
+        tank.winnerHalo.visible = matchEnded && !!winner;
         if (tank.winnerHalo.visible) {
           const tailProgress = THREE.MathUtils.clamp(
             (state.position - lastReplayFrame) / VISUAL_TAIL_FRAMES, 0, 1,

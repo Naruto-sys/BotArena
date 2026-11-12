@@ -123,8 +123,11 @@ static IResult? ValidateCustomMatch(MatchRequest request, CustomMatchSpec custom
     {
         return Results.BadRequest(new { error = "Проверьте размер, координаты и параметры клеток арены." });
     }
-    if (custom.MaxTicks is { } ticks && ticks is < 40 or > 1200)
-        return Results.BadRequest(new { error = "MaxTicks должен быть от 40 до 1200." });
+    if (!Enum.IsDefined(custom.Mode))
+        return Results.BadRequest(new { error = "Неизвестный режим матча." });
+    var maxTicks = custom.Mode != MatchMode.Elimination ? 2400 : 1200;
+    if (custom.MaxTicks is { } ticks && (ticks < 40 || ticks > maxTicks))
+        return Results.BadRequest(new { error = $"MaxTicks должен быть от 40 до {maxTicks}." });
 
     var ids = new HashSet<string>(StringComparer.Ordinal);
     var hasPlayer = false;
@@ -139,6 +142,8 @@ static IResult? ValidateCustomMatch(MatchRequest request, CustomMatchSpec custom
         else hasEnemy = true;
         if (!MovementCatalog.Supports(spawn.Movement))
             return Results.BadRequest(new { error = "Выберите существующее шасси робота." });
+        if (!Enum.IsDefined(spawn.Weapon))
+            return Results.BadRequest(new { error = "Выберите оружие: Cannon, Mortar или Gauss." });
         if (spawn.Hp is < 1 or > 500)
             return Results.BadRequest(new { error = "HP танка должен быть от 1 до 500." });
         if (spawn.X < 0.5 || spawn.Y < 0.5 || spawn.X > 15.5 || spawn.Y > 9.5)
@@ -181,6 +186,14 @@ static IResult? ValidateCustomMatch(MatchRequest request, CustomMatchSpec custom
     if (hasPlayerCode && request.Language is { } lang && !StrategyLanguages.Available().Contains(lang))
         return Results.BadRequest(new { error = "Выбранный язык стратегии недоступен." });
 
+    if (custom.Mode != MatchMode.Elimination)
+    {
+        try { _ = new Duel(CustomMatchConfiguration.Create(custom, 1)); }
+        catch (ArgumentException failure)
+        {
+            return Results.BadRequest(new { error = $"Проверьте настройки режима: {failure.Message}" });
+        }
+    }
     return null;
 }
 

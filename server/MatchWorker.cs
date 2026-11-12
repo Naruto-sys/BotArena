@@ -100,22 +100,8 @@ internal static class MatchWorker
 
     private static MatchWorkerResult RunCustom(MatchRequest request, CustomMatchSpec custom)
     {
-        var spawns = custom.Spawns.Select(spawn =>
-            new BotSpawn(
-                spawn.Id,
-                new(spawn.X, spawn.Y),
-                spawn.BodyAngle,
-                spawn.TurretAngle,
-                spawn.TeamId,
-                spawn.Hp) { Movement = MovementCatalog.Create(spawn.Movement) }).ToArray();
-        var config = MatchConfig.Classic with
-        {
-            MaxTicks = custom.MaxTicks ?? MatchConfig.Classic.MaxTicks,
-            Arena = custom.Arena with { Walls = Array.AsReadOnly(custom.Arena.Walls.ToArray()) },
-            Spawns = Array.AsReadOnly(spawns),
-            Consumables = MatchConfig.Biomes.Consumables,
-            RandomSeed = Random.Shared.Next()
-        };
+        var config = CustomMatchConfiguration.Create(custom, Random.Shared.Next());
+        var spawns = config.Spawns;
 
         var loadouts = custom.Loadouts.ToDictionary(item => item.BotId, StringComparer.Ordinal);
         var runtimes = new Dictionary<string, IBotRuntime>(StringComparer.Ordinal);
@@ -254,7 +240,13 @@ internal static class MatchWorker
         ProcessStartInfo start, MatchRequest request, CancellationToken cancellation)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
-        timeout.CancelAfter(TimeSpan.FromSeconds(5));
+        // A full 120-second control match continues across deaths and produces more frames.
+        timeout.CancelAfter(TimeSpan.FromSeconds(request.CustomMatch?.Mode switch
+        {
+            MatchMode.Deathmatch => 20,
+            MatchMode.KingOfHill => 15,
+            _ => 5,
+        }));
         using var process = Process.Start(start) ?? throw new InvalidOperationException("Cannot start match worker.");
         var stderr = process.StandardError.BaseStream.CopyToAsync(Stream.Null);
         try

@@ -79,6 +79,8 @@ function cornerPoint(wall: Wall, corner: Corner) {
 
 export function LabArenaEditor({
   arena,
+  controlZone,
+  respawnPoints,
   bots,
   selectedWall,
   placementError,
@@ -92,6 +94,8 @@ export function LabArenaEditor({
   onClearWalls,
 }: {
   arena: Arena;
+  controlZone?: { center: { x: number; y: number }; radius: number };
+  respawnPoints?: Array<{ id: string; position: { x: number; y: number } }>;
   bots: LabBot[];
   selectedWall: number | null;
   placementError: string;
@@ -115,6 +119,11 @@ export function LabArenaEditor({
         return false;
       }
       const overlap = bots.find(bot => wallOverlapsBot(wall, bot));
+      if (respawnPoints?.some(point => point.position.x + .5 >= wall.x && point.position.x - .5 <= wall.x + wall.width
+        && point.position.y + .5 >= wall.y && point.position.y - .5 <= wall.y + wall.height)) {
+        setPlacementError('Стена перекрывает точку возрождения.');
+        return false;
+      }
       if (overlap) {
         setPlacementError(text.lab.wallOverlapsBot(botLabel(overlap.id, overlap.teamId, bots)));
         return false;
@@ -261,6 +270,15 @@ export function LabArenaEditor({
             fill={{ Ground: '#142234', Sand: '#705432', Snow: '#78929f', Ice: '#245e7a' }[cell.surface]}
             fillOpacity={cell.fog ? 0.8 : 0.65} />)}
           <rect width={arena.width} height={arena.height} fill="url(#lab-grid)" />
+          {respawnPoints?.map(point => <circle key={point.id} cx={point.position.x} cy={point.position.y} r=".25"
+            fill="none" stroke="#79e6a5" strokeWidth=".05" strokeDasharray=".1 .07" pointerEvents="none">
+            <title>Точка возрождения</title>
+          </circle>)}
+          {controlZone && <g pointerEvents="none">
+            <circle cx={controlZone.center.x} cy={controlZone.center.y} r={controlZone.radius}
+              fill="#e8c35b22" stroke="#e8c35b" strokeWidth=".07" strokeDasharray=".18 .12" />
+            <text x={controlZone.center.x} y={controlZone.center.y} textAnchor="middle" fill="#e8c35b" fontSize=".3">Зона контроля</text>
+          </g>}
           <ArenaCoordinates width={arena.width} height={arena.height} />
           {arena.walls.map((wall, index) => {
             const selected = selectedWall === index;

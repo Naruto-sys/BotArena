@@ -18,7 +18,8 @@ export function botColor(bot: Pick<Bot, 'id' | 'teamId'> | CampaignSpawn, roster
   const index = Math.max(0, teammates.findIndex(item => item.id === bot.id));
   if (team === 'player') return playerColors[index % playerColors.length];
   if (team === 'opponent') return opponentColors[index % opponentColors.length];
-  return ffaColors[index % ffaColors.length];
+  const rivals = [...new Set(roster.map(resolveTeamId).filter(id => id !== 'player' && id !== 'opponent'))];
+  return ffaColors[Math.max(0, rivals.indexOf(team)) % ffaColors.length];
 }
 
 type LabeledBot = Pick<Bot, 'id' | 'teamId'> | CampaignSpawn | { id: string; teamId?: string; name?: string };
@@ -44,7 +45,8 @@ export function botLabel(
     return teammates.length > 1 ? text.replay.enemy(number) : text.replay.opponent;
   }
   if (botId === 'player') return text.replay.player;
-  return text.replay.rival(number);
+  const rivalIndex = roster.filter(item => resolveTeamId(item) !== 'player').findIndex(item => item.id === botId);
+  return text.replay.rival(rivalIndex >= 0 ? rivalIndex + 1 : number);
 }
 
 export function teamWon(result: { winnerBotId: string | null; winnerTeamId?: string | null }): boolean {

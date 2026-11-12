@@ -9,6 +9,9 @@ public record BotSpawn(string Id, Vec2 Position, double BodyAngle, double Turret
 
 public sealed record MatchConfig(int TickRate, int MaxTicks, ArenaState Arena, IReadOnlyList<BotSpawn> Spawns)
 {
+    public MatchMode Mode { get; init; } = MatchMode.Elimination;
+    public KingOfHillRules? KingOfHill { get; init; }
+    public DeathmatchRules? Deathmatch { get; init; }
     public double MaxForwardSpeed { get; init; } = 3.6;
     public double MaxReverseSpeed { get; init; } = 2.0;
     public double Acceleration { get; init; } = 8.0;
@@ -107,6 +110,9 @@ public sealed partial class Duel : ISimulationEngine
         if (config.Spawns.Count < 2)
             throw new ArgumentException("At least two robot spawns are required.", nameof(config));
         this.config = config;
+        if (!Enum.IsDefined(config.Mode)) throw new ArgumentException("Unknown match mode.", nameof(config));
+        if (config.Spawns.Any(spawn => !Enum.IsDefined(spawn.Weapon)))
+            throw new ArgumentException("Unknown weapon type.", nameof(config));
         terrain = new(config.Arena);
         if (!double.IsFinite(config.MortarBlastRadius) || config.MortarBlastRadius < 0)
             throw new ArgumentOutOfRangeException(nameof(config.MortarBlastRadius));
@@ -130,6 +136,7 @@ public sealed partial class Duel : ISimulationEngine
         inventories = Enumerable.Range(0, bots.Length).Select(_ => new List<ConsumableType>()).ToArray();
         effects = Enumerable.Range(0, bots.Length).Select(_ => new List<ActiveEffect>()).ToArray();
         cooldowns = new int[bots.Length];
+        respawnAt = new int?[bots.Length];
         bodyTurnRates = new double[bots.Length];
         turretTurnRates = new double[bots.Length];
         var grid = new SpatialGrid();
@@ -147,6 +154,8 @@ public sealed partial class Duel : ISimulationEngine
                 throw new ArgumentException("Robot spawns must not overlap.", nameof(config));
             grid.Add(i, bounds);
         }
+        InitializeKingOfHill();
+        InitializeDeathmatch();
         InitializeConsumables();
     }
 
@@ -155,7 +164,8 @@ public sealed partial class Duel : ISimulationEngine
     public BotObservation Observe(string botId)
     {
         var self = bots[FindBot(botId)];
-        var sightLine = new Hitbox(self.Position, 0, 0, 0);
+        var observers = config.Mode == MatchMode.KingOfHill
+            ? bots.Where((bot, i) => IsActive(i) && bot.TeamId == self.TeamId).ToArray() : [self];
         var enemies = new List<BotState>();
         BotState? nearest = null;
         var nearestDistance = double.PositiveInfinity;
@@ -164,7 +174,7 @@ public sealed partial class Duel : ISimulationEngine
             var candidate = bots[i];
             if (candidate.Id == botId || !IsActive(i) || candidate.TeamId == self.TeamId) continue;
             var offset = candidate.Position - self.Position;
-            if (!CanObserve(self.Position, candidate.Position)) continue;
+            if (!observers.Any(observer => CanObserve(observer.Position, candidate.Position))) continue;
             candidate = candidate with { Inventory = [] };
             enemies.Add(candidate);
             var distance = double.Hypot(offset.X, offset.Y);
@@ -178,6 +188,9 @@ public sealed partial class Duel : ISimulationEngine
         return new(tick, self, nearest, [.. bullets], config.Arena)
         {
             Enemies = enemies.AsReadOnly(),
+            Allies = bots.Where(bot => bot.Id != self.Id && bot.TeamId == self.TeamId).ToArray(),
+            KingOfHill = CaptureKingOfHill(),
+            Deathmatch = CaptureDeathmatch(),
             SafeZone = CurrentSafeZone(),
             Items = items.Where(item => CanObserve(self.Position, item.Position)).ToArray(),
             SmokeClouds = smokeClouds.Where(cloud => CanObserve(self.Position, cloud.Position)).ToArray(),
@@ -187,7 +200,7 @@ public sealed partial class Duel : ISimulationEngine
 
     public GameFrame CaptureFrame() => new(tick, [.. bots], [.. bullets], [.. events], CurrentSafeZone())
     {
-        Items = items.ToArray(), SmokeClouds = smokeClouds.ToArray()
+        Items = items.ToArray(), SmokeClouds = smokeClouds.ToArray(), KingOfHill = CaptureKingOfHill(), Deathmatch = CaptureDeathmatch()
     };
 
     public void Step(IReadOnlyDictionary<string, BotAction> actions)
@@ -224,9 +237,21 @@ public sealed partial class Duel : ISimulationEngine
         AdvanceBullets();
         ApplyShrinkZoneDamage();
         CollectConsumables();
-        if (tick < config.MaxTicks && bots.Where((_, i) => IsActive(i)).Select(bot => bot.TeamId).Distinct().Take(2).Count() > 1)
+        if (config.Mode == MatchMode.KingOfHill)
+        {
+            UpdateKingOfHill();
+            if (Result is null) SpawnConsumables();
+            return;
+        }
+        if (config.Mode == MatchMode.Deathmatch)
+        {
+            UpdateDeathmatch();
+            if (Result is null) SpawnConsumables();
+            return;
+        }
+        if (tick < config.MaxTicks &&
+            bots.Where((_, i) => IsActive(i)).Select(bot => bot.TeamId).Distinct().Take(2).Count() > 1)
             SpawnConsumables();
-
         if (!FinishIfEliminated(MatchEndReason.BotDestroyed) && tick == config.MaxTicks)
             Finish(new(null, MatchEndReason.TimeLimit, tick));
     }
@@ -239,11 +264,14 @@ public sealed partial class Duel : ISimulationEngine
         var failed = botIds.Select(FindBot).ToArray();
         foreach (var index in failed)
         {
-            if (!IsActive(index)) continue;
+            if (bots[index].Forfeited) continue;
             bots[index] = bots[index] with { Forfeited = true, Speed = 0, Velocity = default };
+            respawnAt[index] = null;
         }
         ClearInactiveConsumables();
-        FinishIfEliminated(MatchEndReason.BotError);
+        if (config.Mode == MatchMode.KingOfHill) FinishIfKingOfHillForfeited();
+        else if (config.Mode == MatchMode.Deathmatch) FinishIfDeathmatchForfeited();
+        else FinishIfEliminated(MatchEndReason.BotError);
     }
 
     public void CompleteObjective(string winnerBotId)
@@ -267,7 +295,7 @@ public sealed partial class Duel : ISimulationEngine
 
     private SafeZoneState? CurrentSafeZone()
     {
-        if (!config.ShrinkZoneEnabled) return null;
+        if (!config.ShrinkZoneEnabled || config.Mode != MatchMode.Elimination) return null;
         var arena = config.Arena;
         var startTick = Math.Max(0, (int)Math.Round(config.ShrinkStartSeconds * config.TickRate));
         if (tick < startTick)
@@ -288,7 +316,7 @@ public sealed partial class Duel : ISimulationEngine
 
     private void ApplyShrinkZoneDamage()
     {
-        if (!config.ShrinkZoneEnabled || config.ShrinkOutsideDamagePerSecond <= 0) return;
+        if (!config.ShrinkZoneEnabled || config.Mode != MatchMode.Elimination || config.ShrinkOutsideDamagePerSecond <= 0) return;
         var startTick = Math.Max(0, (int)Math.Round(config.ShrinkStartSeconds * config.TickRate));
         if (tick < startTick) return;
         if ((tick - startTick) % config.TickRate != 0) return;
@@ -544,7 +572,7 @@ public sealed partial class Duel : ISimulationEngine
             var ownerTeam = bots[FindBot(bullet.OwnerBotId)].TeamId;
             foreach (var candidate in neighbors)
             {
-                if (bots[candidate].Id == bullet.OwnerBotId || bots[candidate].TeamId == ownerTeam) continue;
+                if (!IsActive(candidate) || bots[candidate].Id == bullet.OwnerBotId || bots[candidate].TeamId == ownerTeam) continue;
                 var impact = box.Impact(hulls[candidate], motion);
                 if (impact > 1 || impact > hit || (impact == hit && candidate > targetIndex)) continue;
                 targetIndex = candidate;
@@ -643,8 +671,11 @@ public sealed partial class Duel : ISimulationEngine
         events.Add(new(tick, GameEventType.BotHit, bullet.OwnerBotId, target.Id, bullet.Id,
             position, damage, Weapon: bullet.Weapon, ShieldDamage: shieldDamage));
         if (target.Hp == damage)
+        {
             events.Add(new(tick, GameEventType.BotDestroyed, bullet.OwnerBotId, target.Id, bullet.Id,
                 position, Weapon: bullet.Weapon));
+            RecordDeathmatchDeath(targetIndex, bullet.OwnerBotId);
+        }
     }
 
     private void ValidateTarget(BotState bot, BotAction action)

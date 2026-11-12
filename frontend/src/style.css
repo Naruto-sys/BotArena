@@ -745,3 +745,20 @@ main { padding: 0 1.2rem 1.2rem; }
 @media (max-width: 800px) {
   .lab-wall-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+.hill-scoreboard {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .6rem 1.2rem;
+  padding: .8rem 1rem;
+  margin-bottom: .7rem;
+  border: 1px solid #e8c35b66;
+  border-radius: .6rem;
+  background: #182333;
+  color: #f1df9b;
+}
+.deathmatch-scoreboard { overflow-x: auto; margin-bottom: .8rem; padding: .8rem; border: 1px solid #79e6a566; border-radius: .6rem; }
+.deathmatch-scoreboard table { width: 100%; border-collapse: collapse; margin-top: .5rem; font-size: .85rem; }
+.deathmatch-scoreboard th, .deathmatch-scoreboard td { padding: .4rem; text-align: left; white-space: nowrap; }
+.deathmatch-scoreboard tbody tr { border-top: 1px solid #78929f44; }
+.deathmatch-scoreboard tr[data-winner] { background: #79e6a522; }
+.lab-weapon-note { grid-column: 1 / -1; line-height: 1.45; }

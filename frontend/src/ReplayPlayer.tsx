@@ -11,6 +11,7 @@ import { botColor, botLabel as rosterBotLabel, resolveTeamId, teamWon } from './
 import { botCssColor, botLabel as cinematicBotLabel } from './botVisuals';
 import { text } from './text';
 import { platformText as ui } from './text';
+import { weapons } from './weapons';
 
 const copy = text.replay;
 const speeds = [0.5, 1, 2, 4];
@@ -176,7 +177,9 @@ export function ReplayPlayer({ replay, botNames, onComplete }: {
     rosterBotLabel(botId, teamId, roster, botNames);
   const winnerBotId = replay.result.winnerBotId;
   const winnerTeamId = replay.result.winnerTeamId;
-  const outcome = teamWon(replay.result)
+  const outcome = replay.mode === 'Deathmatch' && (replay.result.winnerBotIds?.length ?? 0) > 1
+    ? `Совместное первое место: ${replay.result.winnerBotIds!.map(id => displayLabel(id, roster.find(bot => bot.id === id)?.teamId)).join(', ')}`
+    : teamWon(replay.result)
     ? (winnerTeamId === 'player' && roster.filter(bot => resolveTeamId(bot) === 'player').length > 1
       ? copy.teamWin
       : copy.winner(displayLabel(winnerBotId ?? 'player', 'player')))
@@ -254,6 +257,29 @@ export function ReplayPlayer({ replay, botNames, onComplete }: {
 
   return (
     <>
+      {frame.kingOfHill && <div className="hill-scoreboard" aria-label="Счёт Царя горы">
+        <strong>Царь горы</strong>
+        {frame.kingOfHill.scores.map(entry => <span key={entry.teamId}>
+          {entry.teamId === 'player' ? 'Ваша сторона' : 'Противник'}: <b>{entry.score.toFixed(1)} / {frame.kingOfHill!.scoreLimit}</b>
+        </span>)}
+        <span>{frame.kingOfHill.contested ? 'Зона оспаривается'
+          : frame.kingOfHill.controllingTeamId === 'player' ? 'Вы удерживаете зону'
+          : frame.kingOfHill.controllingTeamId ? 'Противник удерживает зону' : 'Зона свободна'}</span>
+      </div>}
+      {frame.deathmatch && <div className="deathmatch-scoreboard">
+        <strong>Deathmatch · до {frame.deathmatch.scoreLimit} очков</strong>
+        <table aria-label="Таблица Deathmatch">
+          <thead><tr><th>Участник</th><th>Очки</th><th>Уничтожения</th><th>Смерти</th><th>Состояние</th></tr></thead>
+          <tbody>{[...frame.deathmatch.standings].sort((a, b) => b.score - a.score || a.botId.localeCompare(b.botId)).map(entry =>
+            <tr key={entry.botId} data-winner={position >= lastFrame && replay.result.winnerBotIds?.includes(entry.botId) ? 'true' : undefined}>
+              <th scope="row">{displayLabel(entry.botId, roster.find(bot => bot.id === entry.botId)?.teamId)}</th>
+              <td>{entry.score}</td><td>{entry.kills}</td><td>{entry.deaths}</td>
+              <td>{entry.forfeited ? 'Ошибка стратегии' : entry.alive ? 'В бою'
+                : entry.waitingForSpace ? 'Ожидает безопасного места'
+                : `Возрождение через ${(entry.respawnSecondsRemaining ?? 0).toFixed(1)} с`}</td>
+            </tr>)}</tbody>
+        </table>
+      </div>}
       <div className={`arena-stage blueprint-stage${cinematicFocus ? ' cinematic-focus' : ''}`
         + `${video.busy ? ' video-exporting' : ''}`
         + `${gunnerView ? ' gunner-mode' : ''}`
@@ -416,6 +442,13 @@ export function ReplayPlayer({ replay, botNames, onComplete }: {
               <meter aria-label={label} min={0} max={bot.maxHp} value={bot.hp} />
               <b>{bot.forfeited ? copy.forfeited : copy.hp(bot.hp, bot.maxHp)}</b>
               <div className="bot-details">
+                <span>{weapons[bot.weapon ?? 'Cannon'].name}</span>
+                {frame.kingOfHill?.respawns.filter(entry => entry.botId === bot.id).map(entry =>
+                  <span key={entry.botId}>{entry.waitingForSpace ? 'Ожидает свободного места'
+                    : `Возрождение через ${entry.secondsRemaining.toFixed(1)} с`}</span>)}
+                {frame.deathmatch?.standings.filter(entry => entry.botId === bot.id && !entry.alive && !entry.forfeited).map(entry =>
+                  <span key={entry.botId}>{entry.waitingForSpace ? 'Ожидает безопасного места'
+                    : `Возрождение через ${(entry.respawnSecondsRemaining ?? 0).toFixed(1)} с`}</span>)}
                 <span>{copy.surfaces[bot.surface ?? 'Ground']}{bot.inFog ? ` · ${copy.fog}` : ''}</span>
                 {(bot.shieldHp ?? 0) > 0 && <span>{copy.shieldHp(bot.shieldHp!)}</span>}
                 {(bot.inventory ?? []).length > 0 && <span>{copy.inventory(bot.inventory!.map(type => copy.items[type]).join(', '))}</span>}

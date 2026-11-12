@@ -369,7 +369,7 @@ internal static class BehaviorPresets
               return world(free.c, free.r);
             }
 
-            function tick({ self, enemy, arena, tick }) {
+            function tick({ self, enemy, arena, tick, kingOfHill, allies }) {
               const walls = arena.walls || [];
               if (!occ) buildOccupancy(arena, walls);
               if (lastPos) stuckFor = distance(self, lastPos) < 0.08 ? stuckFor + 1 : 0;
@@ -378,6 +378,21 @@ internal static class BehaviorPresets
               if (force) {
                 path = null;
                 stuckFor = 0;
+              }
+
+              if (kingOfHill) {
+                const zone = kingOfHill.zone;
+                const target = {
+                  x: zone.center.x + (self.teamId === 'player' ? -0.5 : 0.5),
+                  y: zone.center.y + (allies.length ? (self.id.endsWith('-2') ? 0.5 : -0.5) : 0)
+                };
+                return {
+                  ...(distance(self, target) > 0.3
+                    ? { driveTo: nextWaypoint(self, target, arena, walls, tick, force) }
+                    : { leftTrack: 0, rightTrack: 0 }),
+                  aimAt: enemy ? enemy.position : zone.center,
+                  shoot: !!enemy && self.canShoot && facing(self, enemy.position)
+                };
               }
 
               if (enemy) {
@@ -418,7 +433,21 @@ internal static class BehaviorPresets
     public static string GetCode(string id)
     {
         var resolved = Resolve(id) ?? throw new KeyNotFoundException(id);
-        return Catalog.Single(item => item.Info.Id == resolved).Script;
+        return Catalog.Single(item => item.Info.Id == resolved).Script + "\n" + """
+            // Preserve each preset's aim choice when using a mortar.
+            const presetWeaponTick = tick;
+            tick = function(state) {
+              const action = presetWeaponTick(state);
+              if (state.self.weapon !== 'Mortar' || !action.shoot || action.targetPoint !== undefined) return action;
+              const point = action.aimAt ?? state.enemy?.position;
+              if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y))
+                return { ...action, shoot: false };
+              return { ...action, targetPoint: {
+                x: Math.max(0, Math.min(state.arena.width, point.x)),
+                y: Math.max(0, Math.min(state.arena.height, point.y))
+              } };
+            };
+            """;
     }
 
     private static string? Resolve(string id)

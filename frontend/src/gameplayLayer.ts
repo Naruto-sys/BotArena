@@ -14,6 +14,18 @@ export function createGameplayLayer(replay: Replay) {
   const world = (x: number, y: number, height: number) =>
     new THREE.Vector3(x - replay.arena.width / 2, height, y - replay.arena.height / 2);
   const cellSize = replay.arena.cellSize ?? 1;
+  const hill = replay.frames.find(frame => frame.kingOfHill)?.kingOfHill;
+  let hillMaterial: THREE.MeshBasicMaterial | undefined;
+  if (hill) {
+    hillMaterial = new THREE.MeshBasicMaterial({ color: 0xe8c35b, transparent: true, opacity: 0.75, side: THREE.DoubleSide, depthWrite: false });
+    const ring = new THREE.Mesh(new THREE.RingGeometry(hill.zone.radius - 0.06, hill.zone.radius, 64), hillMaterial);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.copy(world(hill.zone.center.x, hill.zone.center.y, 0.03));
+    group.add(ring);
+    const fill = new THREE.Mesh(new THREE.CircleGeometry(hill.zone.radius, 64),
+      new THREE.MeshBasicMaterial({ color: 0xe8c35b, transparent: true, opacity: 0.08, side: THREE.DoubleSide, depthWrite: false }));
+    fill.rotation.x = ring.rotation.x; fill.position.copy(ring.position); group.add(fill);
+  }
   const surfaces = { Ground: 0x142234, Sand: 0x705432, Snow: 0x78929f, Ice: 0x245e7a };
   for (const cell of replay.arena.cells ?? []) {
     const width = Math.min(cellSize, replay.arena.width - cell.x * cellSize);
@@ -91,6 +103,9 @@ export function createGameplayLayer(replay: Replay) {
   return {
     group,
     update(frame: Frame, perception: boolean) {
+      if (hillMaterial) hillMaterial.color.setHex(frame.kingOfHill?.contested ? 0xffd06b
+        : frame.kingOfHill?.controllingTeamId === 'player' ? 0x75c8ff
+        : frame.kingOfHill?.controllingTeamId ? 0xff7777 : 0xe8c35b);
       // The perception camera keeps its existing information masking; world objects remain spectator data.
       dynamic.visible = !perception;
       for (const object of items.values()) object.visible = false;

@@ -11,6 +11,7 @@ import type {
   ScriptError,
   StrategyLanguage,
   StrategyLogLine,
+  WeaponType,
 } from './contracts';
 import { ArenaPreview } from './ArenaPreview';
 import { botLabel, teamWon } from './botDisplay';
@@ -19,14 +20,20 @@ import { wallOverlapsBot } from './mapGeometry';
 import { LabArenaEditor } from './LabArenaEditor';
 import {
   classicWalls,
+  hillWalls,
+  hillZone,
+  changeLabMode,
   customBots,
   defaultLabSetup,
   layoutBots,
+  layoutDeathmatchBots,
   loadLabSetup,
   saveLabSetup,
   type BehaviorPresetInfo,
   type LabSetup,
 } from './labDraft';
+import { deathmatchWalls, deathmatchSpawns } from './deathmatchMap';
+import { weapons, weaponExamples } from './weapons';
 import { MatchDiagnosticError, buildCustomMatchPayload, runMatch } from './matchApi';
 import { StrategyHelp } from './StrategyHelp';
 import { AuthPanel } from './AuthPanel';
@@ -80,6 +87,7 @@ const example = `function tick({ self, enemy }) {
     leftTrack: drive + turn,
     rightTrack: drive - turn,
     aimDirection: { x: dx, y: dy },
+    ...(self.weapon === 'Mortar' && enemy ? { targetPoint: enemy.position } : {}),
     shoot: !!enemy && self.canShoot &&
       Math.abs(wrap(heading - self.turretAngle)) < 0.045
   };
@@ -100,6 +108,7 @@ const trackedExamples = {
             "y": target["y"] - self_position["y"],
         },
         "shoot": state["self"]["canShoot"],
+        **({"targetPoint": target} if state["self"]["weapon"] == "Mortar" else {}),
     }
 `,
 };
@@ -114,6 +123,7 @@ const hoverExamples = {
   if (!enemy) return { thrust };
   return {
     thrust,
+    ...(self.weapon === 'Mortar' ? { targetPoint: enemy.position } : {}),
     aimDirection: { x: enemy.position.x - self.position.x, y: enemy.position.y - self.position.y },
     shoot: self.canShoot,
   };
@@ -135,6 +145,8 @@ const hoverExamples = {
             "y": enemy["position"]["y"] - self["position"]["y"],
         }
         action["shoot"] = self["canShoot"]
+        if self["weapon"] == "Mortar":
+            action["targetPoint"] = enemy["position"]
     return action
 `,
 };
@@ -145,6 +157,7 @@ const wheeledExamples = {
   if (enemy) {
     action.aimDirection = { x: enemy.position.x - self.position.x, y: enemy.position.y - self.position.y };
     action.shoot = self.canShoot;
+    if (self.weapon === 'Mortar') action.targetPoint = enemy.position;
   }
   return action;
 }`,
@@ -156,6 +169,8 @@ const wheeledExamples = {
         action["aimDirection"] = {"x": enemy["position"]["x"] - position["x"],
                                   "y": enemy["position"]["y"] - position["y"]}
         action["shoot"] = state["self"]["canShoot"]
+        if state["self"]["weapon"] == "Mortar":
+            action["targetPoint"] = enemy["position"]
     return action
 `,
 };
@@ -167,6 +182,7 @@ const omniExamples = {
   if (tick < 46) return { thrust: { x: 0, y: 1 } };
   if (!enemy) return {};
   return {
+    ...(self.weapon === 'Mortar' ? { targetPoint: enemy.position } : {}),
     aimDirection: { x: enemy.position.x - self.position.x, y: enemy.position.y - self.position.y },
     shoot: self.canShoot,
   };
@@ -188,6 +204,7 @@ const omniExamples = {
         "aimDirection": {"x": enemy["position"]["x"] - self["position"]["x"],
                          "y": enemy["position"]["y"] - self["position"]["y"]},
         "shoot": self["canShoot"],
+        **({"targetPoint": enemy["position"]} if self["weapon"] == "Mortar" else {}),
     }
 `,
 };
@@ -463,9 +480,12 @@ function App() {
   }
 
   function updateRoster(allyCount: number, enemyCount: number) {
-    const allies = Math.min(4, Math.max(1, allyCount || 1));
-    const enemies = Math.min(4, Math.max(1, enemyCount || 1));
-    const bots = layoutBots(allies, enemies, labSetup.bots);
+    const hill = labSetup.mode === 'KingOfHill';
+    const dm = labSetup.mode === 'Deathmatch';
+    const changed = allyCount !== labSetup.allyCount ? allyCount : enemyCount;
+    const allies = dm ? 1 : hill ? Math.min(2, Math.max(1, changed || 1)) : Math.min(4, Math.max(1, allyCount || 1));
+    const enemies = dm ? Math.min(5, Math.max(3, enemyCount || 3)) : hill ? allies : Math.min(4, Math.max(1, enemyCount || 1));
+    const bots = dm ? layoutDeathmatchBots(enemies + 1, labSetup.bots) : layoutBots(allies, enemies, labSetup.bots, hill);
     const blocked = bots.find(bot => labSetup.arena.walls.some(wall => wallOverlapsBot(wall, bot)));
     if (blocked) {
       setMapError(text.lab.rosterOverlapsWall(botLabel(blocked.id, blocked.teamId, bots)));
@@ -659,19 +679,38 @@ function App() {
               </div>
             )}
 
+            {mode === 'lab' && <div className="strategy-language">
+              <label htmlFor="match-mode">Режим боя</label>
+              <select id="match-mode" value={labSetup.mode} disabled={loading} onChange={event => {
+                detachStrategy();
+                setLabSetup(previous => changeLabMode(previous, event.target.value as LabSetup['mode']));
+                setMapError(''); setSelectedWall(null); setEditorEpoch(value => value + 1);
+              }}>
+                <option value="Elimination">Бой на выбывание</option>
+                <option value="KingOfHill">Царь горы</option>
+                <option value="Deathmatch">Deathmatch — каждый за себя</option>
+              </select>
+              {labSetup.mode === 'KingOfHill' && <p className="muted">Удерживайте круг: 1 очко/с, победа при 30 очках. Лимит 120 с, возрождение через 5 с. При смене режима загружается его стартовая карта.</p>}
+              {labSetup.mode === 'Deathmatch' && <p className="muted">Каждый против всех: +1 за уничтожение, победа при 10 очках. Лимит 120 с, возрождение через 5 с в свободном месте за укрытием. При смене режима загружается его стартовая карта.</p>}
+            </div>}
             {mode === 'lab' && (
               <details className="lab-roster"><summary>{ui.roster}</summary>
                 <div className="lab-counts">
-                  <label>
+                  {labSetup.mode === 'Deathmatch' ? <label>
+                    Участников
+                    <input type="number" min={4} max={6} value={labSetup.bots.length}
+                      onChange={event => updateRoster(1, Number(event.target.value) - 1)} />
+                  </label> : <><label>
                     {text.lab.allies}
-                    <input type="number" min={1} max={4} value={labSetup.allyCount}
+                    <input type="number" min={1} max={labSetup.mode === 'KingOfHill' ? 2 : 4} value={labSetup.allyCount}
                       onChange={event => updateRoster(Number(event.target.value), labSetup.enemyCount)} />
                   </label>
                   <label>
                     {text.lab.enemies}
-                    <input type="number" min={1} max={4} value={labSetup.enemyCount}
+                    <input type="number" min={1} max={labSetup.mode === 'KingOfHill' ? 2 : 4} value={labSetup.enemyCount}
                       onChange={event => updateRoster(labSetup.allyCount, Number(event.target.value))} />
                   </label>
+                  </>}
                   <button type="button" onClick={() => {
                     detachStrategy();
                     setMapError('');
@@ -708,6 +747,24 @@ function App() {
                               : item),
                           }))} />
                       </label>
+                      <label>
+                        Оружие
+                        <select value={bot.weapon} disabled={loading} onChange={event => setLabSetup(previous => ({
+                          ...previous, bots: previous.bots.map(item => item.id === bot.id
+                            ? { ...item, weapon: event.target.value as WeaponType } : item),
+                        }))}>
+                          {(Object.keys(weapons) as WeaponType[]).map(type => <option key={type} value={type}>{weapons[type].name}</option>)}
+                        </select>
+                      </label>
+                      <small className="lab-weapon-note muted">{weapons[bot.weapon].description}
+                        {bot.weapon === 'Mortar' && bot.source === 'code' && <span> При выстреле укажите targetPoint: {'{x, y}'} внутри арены.</span>}
+                      </small>
+                      {bot.source === 'code' && <button type="button" disabled={loading} onClick={() => {
+                        detachStrategy();
+                        setLabSetup(previous => ({ ...previous, activeBotId: bot.id, bots: previous.bots.map(item => item.id === bot.id
+                          ? { ...item, code: { ...item.code, [language]: weaponExamples[language] } } : item) }));
+                        setEditorEpoch(value => value + 1);
+                      }}>Загрузить пример стрельбы</button>}
                       <label>
                         {text.lab.behavior}
                         <select
@@ -917,6 +974,8 @@ function App() {
             {mode === 'lab' && labArenaView === 'edit' ? (
               <LabArenaEditor
                 arena={labSetup.arena}
+                controlZone={labSetup.mode === 'KingOfHill' ? hillZone : undefined}
+                respawnPoints={labSetup.mode === 'Deathmatch' ? deathmatchSpawns : undefined}
                 bots={labSetup.bots}
                 selectedWall={selectedWall}
                 placementError={mapError}
@@ -959,7 +1018,7 @@ function App() {
                 onClassicWalls={() => {
                   setLabSetup(previous => ({
                     ...previous,
-                    arena: { ...previous.arena, walls: classicWalls.map(wall => ({ ...wall })) },
+                    arena: { ...previous.arena, walls: (previous.mode === 'Deathmatch' ? deathmatchWalls : previous.mode === 'KingOfHill' ? hillWalls : classicWalls).map(wall => ({ ...wall })) },
                   }));
                   setSelectedWall(null);
                 }}

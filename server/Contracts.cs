@@ -12,6 +12,7 @@ public record MatchReplay(
     ReachMarker? Marker = null)
 {
     public int RandomSeed { get; init; }
+    public MatchMode Mode { get; init; }
 }
 public record CustomMatchSpawn(
     string Id,
@@ -21,7 +22,8 @@ public record CustomMatchSpawn(
     double BodyAngle = 0,
     double TurretAngle = 0,
     int Hp = 100,
-    string? Movement = null);
+    string? Movement = null,
+    WeaponType Weapon = WeaponType.Cannon);
 public record CustomMatchLoadout(
     string BotId,
     string Source,
@@ -31,7 +33,10 @@ public record CustomMatchSpec(
     ArenaState Arena,
     IReadOnlyList<CustomMatchSpawn> Spawns,
     IReadOnlyList<CustomMatchLoadout> Loadouts,
-    int? MaxTicks = null);
+    int? MaxTicks = null,
+    MatchMode Mode = MatchMode.Elimination,
+    ControlZone? ControlZone = null,
+    IReadOnlyList<RespawnPoint>? RespawnPoints = null);
 public record MatchRequest(
     string? BotCode,
     string? OpponentId = null,

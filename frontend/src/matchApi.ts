@@ -1,5 +1,7 @@
 import type { MatchJobStatus, MatchResponse, ScriptError, StrategyLanguage } from './contracts';
 import type { LabSetup } from './labDraft';
+import { hillZone } from './labDraft';
+import { deathmatchSpawns } from './deathmatchMap';
 import { text } from './text';
 
 export class MatchDiagnosticError extends Error {
@@ -16,6 +18,9 @@ export function buildCustomMatchPayload(setup: LabSetup, language: StrategyLangu
       ?? 'function tick() { return {}; }',
     language,
     customMatch: {
+      mode: setup.mode,
+      controlZone: setup.mode === 'KingOfHill' ? hillZone : undefined,
+      respawnPoints: setup.mode === 'Deathmatch' ? deathmatchSpawns : undefined,
       arena: setup.arena,
       maxTicks: setup.maxTicks,
       spawns: setup.bots.map(bot => ({
@@ -27,6 +32,7 @@ export function buildCustomMatchPayload(setup: LabSetup, language: StrategyLangu
         turretAngle: bot.turretAngle,
         hp: bot.hp,
         movement: bot.movement ?? 'tracked',
+        weapon: bot.weapon ?? 'Cannon',
       })),
       loadouts: setup.bots.map(bot => bot.source === 'preset'
         ? { botId: bot.id, source: 'preset', presetId: bot.presetId }

@@ -46,14 +46,15 @@ public enum GameEventType
 {
     ShotFired, BotHit, BotDestroyed, ZoneDamage, MatchFinished, ProjectileLanded,
     BeamFired, WeaponChargeStarted, WeaponReady, SurfaceChanged, FogEntered, FogExited,
-    ItemSpawned, ItemPickedUp, ItemUsed, EffectStarted, EffectEnded, BotRepaired, SmokeCreated, SmokeExpired
+    ItemSpawned, ItemPickedUp, ItemUsed, EffectStarted, EffectEnded, BotRepaired, SmokeCreated, SmokeExpired,
+    ControlChanged, ControlScoreChanged, BotRespawned, KillScored
 }
 
 public record GameEvent(int Tick, GameEventType Type, string? SourceBotId = null,
     string? TargetBotId = null, int? BulletId = null, Vec2? Position = null, int? Damage = null,
     Vec2? EndPosition = null, double? Radius = null, WeaponType? Weapon = null,
     SurfaceType? Surface = null, ConsumableType? ItemType = null, int? ItemId = null,
-    int? Amount = null, int? ShieldDamage = null);
+    int? Amount = null, int? ShieldDamage = null, string? TeamId = null);
 
 public record SafeZoneState(double X, double Y, double Width, double Height);
 
@@ -61,6 +62,8 @@ public record GameFrame(int Tick, BotState[] Bots, BulletState[] Bullets, GameEv
 {
     public IReadOnlyList<ItemState> Items { get; init; } = [];
     public IReadOnlyList<SmokeCloud> SmokeClouds { get; init; } = [];
+    public KingOfHillState? KingOfHill { get; init; }
+    public DeathmatchState? Deathmatch { get; init; }
 }
 public record BotObservation(int Tick, BotState Self, BotState? Enemy, BulletState[] Bullets, ArenaState Arena)
 {
@@ -68,7 +71,10 @@ public record BotObservation(int Tick, BotState Self, BotState? Enemy, BulletSta
     public IReadOnlyList<SmokeCloud> SmokeClouds { get; init; } = [];
     public ConsumableRules ConsumableRules { get; init; } = new();
     public IReadOnlyList<BotState> Enemies { get; init; } = [];
+    public IReadOnlyList<BotState> Allies { get; init; } = [];
     public SafeZoneState? SafeZone { get; init; }
+    public KingOfHillState? KingOfHill { get; init; }
+    public DeathmatchState? Deathmatch { get; init; }
 }
 public record BotAction(double LeftTrack, double RightTrack, Vec2 AimDirection, bool Shoot,
     double? TurretTurn = null, Vec2? TargetPoint = null, ConsumableType? UseItem = null)
@@ -78,9 +84,14 @@ public record BotAction(double LeftTrack, double RightTrack, Vec2 AimDirection, 
     public double Throttle { get; init; }
 }
 [JsonConverter(typeof(JsonStringEnumConverter<MatchEndReason>))]
-public enum MatchEndReason { BotDestroyed, TimeLimit, BotError, ObjectiveComplete }
+public enum MatchEndReason { BotDestroyed, TimeLimit, BotError, ObjectiveComplete, ScoreLimit }
 
-public record MatchResult(string? WinnerBotId, MatchEndReason Reason, int DurationTicks, string? WinnerTeamId = null);
+public record MatchResult(string? WinnerBotId, MatchEndReason Reason, int DurationTicks, string? WinnerTeamId = null)
+{
+    public IReadOnlyList<TeamControlScore> Scores { get; init; } = [];
+    public IReadOnlyList<DeathmatchStanding> Standings { get; init; } = [];
+    public IReadOnlyList<string> WinnerBotIds { get; init; } = [];
+}
 
 public abstract record MatchObjective;
 public sealed record DestroyEnemyObjective : MatchObjective;

@@ -84,7 +84,8 @@ internal static class Match
             frames.Add(duel.CaptureFrame());
         }
 
-        return new(new(config.TickRate, config.Arena, frames, duel.Result!, behaviorSamples, marker) { RandomSeed = config.RandomSeed }, error, logs);
+        return new(new(config.TickRate, config.Arena, frames, duel.Result!, behaviorSamples, marker)
+            { RandomSeed = config.RandomSeed, Mode = config.Mode }, error, logs);
     }
 
     public static MatchResponse Run(

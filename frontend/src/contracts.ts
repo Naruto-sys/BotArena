@@ -1,4 +1,20 @@
 export interface Point { x: number; y: number }
+export type MatchMode = 'Elimination' | 'KingOfHill' | 'Deathmatch';
+export interface RespawnPoint { id: string; position: Point; bodyAngle: number; turretAngle: number }
+export interface DeathmatchStanding {
+  botId: string; score: number; kills: number; deaths: number; alive: boolean; forfeited: boolean;
+  respawnSecondsRemaining: number | null; waitingForSpace: boolean;
+}
+export interface DeathmatchState { scoreLimit: number; standings: DeathmatchStanding[] }
+export interface ControlZone { center: Point; radius: number }
+export interface KingOfHillState {
+  zone: ControlZone;
+  scoreLimit: number;
+  controllingTeamId: string | null;
+  contested: boolean;
+  scores: Array<{ teamId: string; score: number }>;
+  respawns: Array<{ botId: string; secondsRemaining: number; waitingForSpace: boolean }>;
+}
 export interface Wall extends Point { width: number; height: number }
 export type SurfaceType = 'Ground' | 'Sand' | 'Snow' | 'Ice';
 export interface ArenaCell { x: number; y: number; surface: SurfaceType; fog: boolean }
@@ -86,7 +102,7 @@ export interface BattleEvent {
   type: 'ShotFired' | 'BotHit' | 'BotDestroyed' | 'ZoneDamage' | 'MatchFinished' | 'ProjectileLanded'
     | 'BeamFired' | 'WeaponChargeStarted' | 'WeaponReady' | 'SurfaceChanged' | 'FogEntered' | 'FogExited'
     | 'ItemSpawned' | 'ItemPickedUp' | 'ItemUsed' | 'EffectStarted' | 'EffectEnded' | 'BotRepaired'
-    | 'SmokeCreated' | 'SmokeExpired';
+    | 'SmokeCreated' | 'SmokeExpired' | 'ControlChanged' | 'ControlScoreChanged' | 'BotRespawned' | 'KillScored';
   sourceBotId: string | null;
   targetBotId: string | null;
   position: Point | null;
@@ -100,6 +116,7 @@ export interface BattleEvent {
   itemId?: number | null;
   amount?: number | null;
   shieldDamage?: number | null;
+  teamId?: string | null;
 }
 export interface SafeZone { x: number; y: number; width: number; height: number }
 export interface Frame {
@@ -110,6 +127,8 @@ export interface Frame {
   items?: Item[];
   smokeClouds?: SmokeCloud[];
   safeZone?: SafeZone | null;
+  kingOfHill?: KingOfHillState | null;
+  deathmatch?: DeathmatchState | null;
 }
 export interface ReachMarker { x: number; y: number; radius: number }
 export interface Replay {
@@ -118,11 +137,15 @@ export interface Replay {
   result: {
     winnerBotId: string | null;
     winnerTeamId?: string | null;
-    reason: 'BotDestroyed' | 'TimeLimit' | 'BotError' | 'ObjectiveComplete';
+    reason: 'BotDestroyed' | 'TimeLimit' | 'BotError' | 'ObjectiveComplete' | 'ScoreLimit';
     durationTicks: number;
+    scores?: Array<{ teamId: string; score: number }>;
+    standings?: DeathmatchStanding[];
+    winnerBotIds?: string[];
   };
   frames: Frame[];
   randomSeed?: number;
+  mode?: MatchMode;
   behaviorSamples?: BehaviorSample[];
   marker?: ReachMarker | null;
 }
