@@ -1,0 +1,123 @@
+/* Shared light surfaces also apply to dialogs portalled outside the app shell.
+   Keep semantic colours together so new states do not fall back to dark CSS. */
+[data-theme="light"] {
+  --light-surface: #fff;
+  --light-soft: #eef5f8;
+  --light-border: #b7cdd8;
+  --light-text: #294f62;
+  --light-muted: #526f80;
+  --light-accent: #187d69;
+  --light-focus: #218d7c;
+  --light-success-bg: #e6f5ed;
+  --light-success-text: #265d46;
+  --light-warning-bg: #fff5df;
+  --light-warning-text: #7a622a;
+  --light-danger-bg: #fff0ed;
+  --light-danger-text: #963e36;
+  --mint: var(--light-accent);
+}
+
+/* Shared interaction states include native dialogs and account portals. */
+[data-theme="light"] :is(button, a, input, select, textarea, summary, [tabindex="0"]):focus-visible {
+  outline: 2px solid var(--light-focus);
+  outline-offset: 3px;
+}
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder { color: #738b99; opacity: 1; }
+[data-theme="light"] :is(input[type="checkbox"], input[type="radio"], input[type="range"]) { accent-color: var(--light-accent); }
+[data-theme="light"] :is(.platform-header nav, .ux-tabs) button:hover:not(:disabled),
+[data-theme="light"] .oauth-login:hover,
+[data-theme="light"] .rooms-panel > .room-advanced > summary:hover {
+  background: #e3f2ed; color: #205f55; border-color: #8dbdad;
+}
+[data-theme="light"] :is(.auth-dialog, .nickname-dialog, .arena-modal) button.primary {
+  background: #d5f3e9; color: #165c4b; border-color: #85bcad;
+}
+[data-theme="light"] :is(.ugc-modal-backdrop, .nickname-backdrop) button:hover:not(:disabled) { border-color: var(--light-accent); }
+
+/* Errors, diagnostics and warnings are surfaces, not just coloured text. */
+[data-theme="light"] .error-card {
+  background: var(--light-danger-bg); color: var(--light-danger-text);
+  border-color: #d7aaa3; border-left-color: #c15f50;
+}
+[data-theme="light"] :is(.error, .audio-error, .webgl-error, .fatal-screen p) { color: var(--light-danger-text); }
+[data-theme="light"] :is(.error-heading span, .error-details dt, .error-phase, .error-snippet strong) { color: #8f554b; }
+[data-theme="light"] .error-details div { background: #f8ddd6; }
+[data-theme="light"] .error-snippet pre { background: #fae4df; color: #80382f; }
+[data-theme="light"] .danger-button { color: var(--light-danger-text); background: var(--light-danger-bg); border-color: #d7aaa3; }
+[data-theme="light"] .danger-button:hover:not(:disabled) { background: #f9ded8; border-color: #b76c60; }
+[data-theme="light"] :is(.auth-required, .paid-code-lock) { background: var(--light-warning-bg); color: var(--light-warning-text); border-color: #d8c18a; }
+[data-theme="light"] :is(.auth-required p, .paid-code-lock p, .guest-banner b) { color: var(--light-warning-text); }
+[data-theme="light"] .debug-log li { background: #e7eff4; }
+[data-theme="light"] details { color: var(--light-muted); }
+[data-theme="light"] .empty { color: var(--light-muted); background: var(--light-soft); border-color: var(--light-border); }
+[data-theme="light"] .debug-log time { color: #246681; }
+[data-theme="light"] .debug-log span { color: var(--light-text); }
+[data-theme="light"] :is(.debug-panel summary, .debug-empty) { color: var(--light-muted); }
+
+/* Community details, code preview, duels, rooms and arena library. */
+[data-theme="light"] .ugc-hub { --mint: var(--light-accent); }
+[data-theme="light"] .ugc-radar { border-color: #99bdbd; background: repeating-radial-gradient(circle, transparent 0 2.1rem, #bad5d5 2.15rem 2.2rem); }
+[data-theme="light"] .ugc-radar::before,
+[data-theme="light"] .ugc-radar::after { background: #bad5d5; }
+[data-theme="light"] .ugc-radar i { box-shadow: none; }
+[data-theme="light"] :is(.ugc-modal, .nickname-dialog) > p:not(.error-card):not(.success-card):not(.ugc-kicker) { color: var(--light-muted); }
+[data-theme="light"] .ugc-modal pre { color: #33596b; background: var(--light-soft); border: 1px solid var(--light-border); border-radius: 8px; }
+[data-theme="light"] :is(.ugc-editor, .nickname-dialog, .room-form, .room-editor, .battle-pickers, .wager-box) label { color: var(--light-muted); }
+[data-theme="light"] .ugc-actions,
+[data-theme="light"] .friend-replay,
+[data-theme="light"] .map-card footer { border-color: #cbdce4; }
+[data-theme="light"] :is(.ugc-avatar, .friend-avatar.fallback, .leaderboard-table i) { color: #267d6c; background: #dff1ee; }
+[data-theme="light"] .wager-box { background: var(--light-success-bg); border-color: #9cc7b2; }
+[data-theme="light"] .strategy-price { color: var(--light-success-text); }
+[data-theme="light"] .room-rules span { color: var(--light-muted); border-color: var(--light-border); }
+[data-theme="light"] .room-rules strong { color: var(--light-success-text); border-color: #9cc7b2; }
+[data-theme="light"] :is(.room-form small, .theme-setting span small, .ux-modal p) { color: var(--light-muted); }
+[data-theme="light"] .linked-accounts b { color: var(--light-accent); }
+[data-theme="light"] .auth-divider::before,
+[data-theme="light"] .auth-divider::after { background: #cbdce4; }
+[data-theme="light"] .map-preview rect:not(:first-child) { fill: #c1d3df; stroke: #68899f; }
+[data-theme="light"] .map-preview circle { fill: #168a9c; }
+[data-theme="light"] .map-preview circle:nth-of-type(2) { fill: #c16a24; }
+[data-theme="light"] .map-safety span { background: var(--light-success-bg); color: var(--light-success-text); }
+
+/* Tours and learning: completion, retry and empty/guest states. */
+[data-theme="light"] .eyebrow { color: var(--light-accent) !important; }
+[data-theme="light"] .learning-orb { background: radial-gradient(circle, #d0ecdf, #eaf6f0 65%); border-color: #96bdae; box-shadow: none; }
+[data-theme="light"] .learning-auth > p:not(.eyebrow) { color: var(--light-muted); }
+[data-theme="light"] .pve-workspace .pve-hints p { color: var(--light-muted); }
+[data-theme="light"] .hint-stack button { background: var(--light-warning-bg); color: var(--light-warning-text); border-color: #d8c18a; }
+[data-theme="light"] .hint-stack .solution-button { background: var(--light-success-bg); color: var(--light-success-text); border-color: #9cc7b2; }
+[data-theme="light"] .tour-progress span { background: #d4e1e7; }
+[data-theme="light"] .tour-progress span.done { background: var(--light-accent); }
+[data-theme="light"] .tour-complete { color: #215f4e; background: #edf8f2ed; }
+[data-theme="light"] .tour-complete p { color: var(--light-muted); }
+[data-theme="light"] .demo-invite-copy { color: #356e61 !important; }
+[data-theme="light"] dialog.ux-modal::backdrop,
+[data-theme="light"] .ux-modal-back { background: #dce8edc9; }
+
+/* Replay: theme the frame as well as canvas, analysis, readouts and export. */
+[data-theme="light"] .blueprint-stage { background: #e8f0f3; box-shadow: inset 0 0 0 1px #9db8c8; }
+[data-theme="light"] .blueprint-stage.cinematic-focus::before,
+[data-theme="light"] .blueprint-stage.cinematic-focus::after { background: #d6e3e9; }
+[data-theme="light"] .track-command b,
+[data-theme="light"] .track-command em { color: var(--light-text); }
+[data-theme="light"] .tactical-readout { --phase-color: #247b94; }
+[data-theme="light"] .tactical-readout.phase-search { --phase-color: #587684; }
+[data-theme="light"] .tactical-readout.phase-aim { --phase-color: #8653ad; }
+[data-theme="light"] .tactical-readout.phase-fire { --phase-color: #98651e; }
+[data-theme="light"] .perception-readout.contact strong { color: #276c4d; text-shadow: none; }
+[data-theme="light"] :is(.director-cue, .perception-readout, .timeline-readout, .tactical-readout) strong { text-shadow: none; }
+[data-theme="light"] .chrono-badge strong { color: #805d25; }
+[data-theme="light"] :is(.trail-toggle, .video-export small, .audio-hint) { color: var(--light-muted); }
+[data-theme="light"] .visual-layers select { color: var(--light-text); background: var(--light-surface); border-color: var(--light-border); }
+[data-theme="light"] .video-download { color: #206c76; background: var(--light-soft); border-color: #99bdc8; }
+[data-theme="light"] .video-export [role="status"] { color: var(--light-success-text); }
+[data-theme="light"] .health meter::-webkit-meter-bar { background: #d4e1e7; }
+[data-theme="light"] .health li > span,
+[data-theme="light"] .health li > b { color: var(--light-text); }
+[data-theme="light"] .health small { color: var(--light-muted); }
+[data-theme="light"] :is(.arena-bot-name, .arena-bot-hp, .arena-damage) { stroke: #e8f0f3; }
+[data-theme="light"] :is(.arena-bot-name, .arena-bot-hp) { fill: var(--light-text); }
+[data-theme="light"] .arena-damage { fill: #8d5817; }
+[data-theme="light"] .arena-damage-zone { fill: #a74040; }

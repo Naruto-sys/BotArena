@@ -42,6 +42,7 @@ import { platformText as ui } from './text';
 import { loadStrategies, saveStrategies, type SavedStrategy } from './strategyLibrary';
 import './style.css';
 import './platform.css';
+import './lightTheme.css';
 
 const PveMap = lazy(() => import('./PveMap').then(module => ({ default: module.PveMap })));
 const UgcHub = lazy(() => import('./UgcHub').then(module => ({ default: module.UgcHub })));

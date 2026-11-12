@@ -400,9 +400,11 @@ function createPhaseMarker(label: string, color: THREE.Color) {
   canvas.width = 384;
   canvas.height = 96;
   const context = canvas.getContext('2d');
-  if (context) {
-    const cssColor = `#${color.getHexString()}`;
-    context.fillStyle = 'rgba(3, 18, 29, .88)';
+  const paint = (light: boolean) => {
+    if (!context) return;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    const cssColor = `#${color.clone().multiplyScalar(light ? 0.48 : 1).getHexString()}`;
+    context.fillStyle = light ? '#f4f9fc' : 'rgba(3, 18, 29, .88)';
     context.fillRect(4, 4, 376, 88);
     context.strokeStyle = cssColor;
     context.lineWidth = 4;
@@ -412,7 +414,8 @@ function createPhaseMarker(label: string, color: THREE.Color) {
     context.textAlign = 'center';
     context.textBaseline = 'middle';
     context.fillText(label, 192, 49);
-  }
+  };
+  paint(false);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -420,9 +423,12 @@ function createPhaseMarker(label: string, color: THREE.Color) {
     transparent: true,
     depthWrite: false,
     depthTest: false,
+    fog: false,
+    toneMapped: false,
   }));
   sprite.scale.set(1.45, 0.36, 1);
   sprite.renderOrder = 8;
+  sprite.userData.updateLabelTheme = (light: boolean) => { paint(light); texture.needsUpdate = true; };
   return sprite;
 }
 
@@ -1092,6 +1098,9 @@ export function BlueprintArena({
         tank.winnerMaterial.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending;
         tank.winnerMaterial.needsUpdate = true;
       }
+      scene.traverse(object => {
+        if (typeof object.userData.updateLabelTheme === 'function') object.userData.updateLabelTheme(light);
+      });
       sceneTheme = theme;
     };
 

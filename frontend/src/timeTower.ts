@@ -23,25 +23,29 @@ function timeLabel(text: string) {
   canvas.width = 256;
   canvas.height = 64;
   const context = canvas.getContext('2d');
-  if (context) {
-    context.fillStyle = 'rgba(3, 18, 29, .88)';
+  const paint = (light: boolean) => {
+    if (!context) return;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = light ? '#f4f9fc' : 'rgba(3, 18, 29, .88)';
     context.fillRect(2, 2, 252, 60);
-    context.strokeStyle = '#68ddff';
+    context.strokeStyle = light ? '#7ea6b6' : '#68ddff';
     context.lineWidth = 3;
     context.strokeRect(2, 2, 252, 60);
-    context.fillStyle = '#b7f3ff';
+    context.fillStyle = light ? '#294f62' : '#b7f3ff';
     context.font = '700 24px monospace';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
     context.fillText(text, 128, 33);
-  }
+  };
+  paint(false);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: texture, transparent: true, depthWrite: false, depthTest: false,
+    map: texture, transparent: true, depthWrite: false, depthTest: false, fog: false, toneMapped: false,
   }));
   sprite.scale.set(1.2, 0.3, 1);
   sprite.renderOrder = 9;
+  sprite.userData.updateLabelTheme = (light: boolean) => { paint(light); texture.needsUpdate = true; };
   return sprite;
 }
 

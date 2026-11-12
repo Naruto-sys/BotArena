@@ -673,6 +673,8 @@ dialog.arena-modal-native::backdrop { background: #020a13c7; backdrop-filter: bl
 /* Grow page content to keep the footer at the bottom without overlaying it. */
 .platform-content { flex:1; display:flex; flex-direction:column; }
 .platform-page-body { flex:1; min-width:0; }
+/* Above the header (40), below sign-in (100) and auth feedback (150). */
+.ugc-modal-backdrop { z-index:80; }
 
 .maneuver-card .copy-code-button { min-width:9rem; }
 .maneuver-card .copy-code-button.copied { color:#9be5cb; background:#16392f; border-color:#417b68; }
