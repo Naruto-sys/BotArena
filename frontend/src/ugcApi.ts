@@ -68,8 +68,9 @@ export const ugcApi = {
   rooms: (filters: { clipboard?: string; presets?: string; maxCharactersPerSecond?: string; maxStake?: string } = {}) =>
     request<GameRoom[]>(`/api/rooms/?${new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== undefined && value !== '') as [string, string][])}`),
   createRoom: (value: CreateRoom) => request<GameRoom>('/api/rooms/', { method: 'POST', body: JSON.stringify(value) }),
-  room: (id: string) => request<{ room: GameRoom; match: MatchResponse | null; winnerId: string | null }>(`/api/rooms/${id}`),
-  joinRoom: (id: string) => request<GameRoom>(`/api/rooms/${id}/join`, { method: 'POST' }),
+  room: (id: string) => request<{ room: GameRoom; match: MatchResponse | null; winnerId: string | null; draft?: { code: string; language: StrategyLanguage; sourceStrategyId: string | null; isReady: boolean } }>(`/api/rooms/${id}`),
+  joinRoom: (id: string, password?: string) => request<GameRoom>(`/api/rooms/${id}/join`, { method: 'POST', body: JSON.stringify({ password }) }),
+  myRooms: () => request<GameRoom[]>('/api/rooms/mine'),
   updateRoomDraft: (id: string, value: { code: string; language: StrategyLanguage; strategyId?: string }) =>
     request(`/api/rooms/${id}/draft`, { method: 'PUT', body: JSON.stringify(value) }),
   readyRoom: (id: string) => request<{ waiting: boolean; match?: MatchResponse; winnerId?: string | null }>(`/api/rooms/${id}/ready`, { method: 'POST' }),
@@ -86,7 +87,7 @@ export const ugcApi = {
 };
 
 export interface SaveStrategy { name: string; description: string; language: StrategyLanguage; code: string; tags: string[]; salePrice: number | null }
-export interface CreateRoom { name: string; allowClipboard: boolean; allowPresetStrategies: boolean; maxCharactersPerSecond: number; stake: number; mapId: string | null }
+export interface CreateRoom { name: string; allowClipboard: boolean; allowPresetStrategies: boolean; maxCharactersPerSecond: number; stake: number; mapId: string | null; isPrivate: boolean; password: string }
 
 export interface AuthNotice { message: string; canLogin: boolean }
 

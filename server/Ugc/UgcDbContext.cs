@@ -106,6 +106,7 @@ public sealed class UgcDbContext(DbContextOptions<UgcDbContext> options) : DbCon
         rooms.ToTable("game_rooms");
         rooms.HasKey(item => item.Id);
         rooms.HasIndex(item => new { item.Status, item.CreatedAt });
+        rooms.Property(item => item.PasswordHash).HasMaxLength(512);
         rooms.Property(item => item.Name).HasMaxLength(80);
         rooms.Property(item => item.MapName).HasMaxLength(80);
         rooms.Property(item => item.ArenaJson).HasMaxLength(8_192);

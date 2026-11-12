@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { Arena, CampaignSpawn, Wall } from './contracts';
 import { ArenaCoordinates, arenaViewBox } from './ArenaCoordinates';
@@ -78,36 +78,17 @@ function cornerPoint(wall: Wall, corner: Corner) {
   }
 }
 
-function placeBesideWalls(bot: LabBot, x: number, y: number, arena: Arena) {
-  const extentX = .34 * Math.abs(Math.cos(bot.bodyAngle)) + .29 * Math.abs(Math.sin(bot.bodyAngle));
-  const extentY = .34 * Math.abs(Math.sin(bot.bodyAngle)) + .29 * Math.abs(Math.cos(bot.bodyAngle));
-  let position = { x, y };
-  for (let pass = 0; pass < arena.walls.length; pass++) {
-    const wall = arena.walls.find(item => wallOverlapsBot(item, { ...bot, position }));
-    if (!wall) break;
-    const candidates = [
-      { x: wall.x - extentX - .02, y: position.y },
-      { x: wall.x + wall.width + extentX + .02, y: position.y },
-      { x: position.x, y: wall.y - extentY - .02 },
-      { x: position.x, y: wall.y + wall.height + extentY + .02 },
-    ];
-    position = candidates.reduce((closest, candidate) =>
-      Math.hypot(candidate.x - position.x, candidate.y - position.y)
-        < Math.hypot(closest.x - position.x, closest.y - position.y) ? candidate : closest);
-    position = {
-      x: Math.min(arena.width - extentX, Math.max(extentX, position.x)),
-      y: Math.min(arena.height - extentY, Math.max(extentY, position.y)),
-    };
-  }
-  return position;
-}
-
 export function LabArenaEditor({
   arena,
   bots,
   selectedWalls,
   placementError,
   onPlacementError: setPlacementError,
+  onValidityChange,
+  validateWalls,
+  botsDraggable = true,
+  showModeSelector = true,
+  spawnSafetyRadius = 0,
   onSelectWalls,
   onMoveBot,
   onChangeWall,
@@ -126,6 +107,11 @@ export function LabArenaEditor({
   selectedWalls: number[];
   placementError: string;
   onPlacementError: (message: string) => void;
+  onValidityChange: (valid: boolean) => void;
+  validateWalls?: (walls: Wall[]) => string;
+  botsDraggable?: boolean;
+  showModeSelector?: boolean;
+  spawnSafetyRadius?: number;
   onSelectWalls: (indices: number[]) => void;
   onMoveBot: (botId: string, x: number, y: number) => void;
   onChangeWall: (index: number, wall: Wall) => void;
@@ -140,10 +126,31 @@ export function LabArenaEditor({
   onChangeBase?: (index: number, zone: CaptureBaseZone) => void;
 }) {
   const spawns = bots.map(toSpawn);
+  const [rejectedWall, setRejectedWall] = useState<{ index: number; wall: Wall }>();
+  const [rejectedBot, setRejectedBot] = useState<{ id: string; x: number; y: number }>();
+  const shownWalls = rejectedWall
+    ? rejectedWall.index === arena.walls.length ? [...arena.walls, rejectedWall.wall] : arena.walls.map((wall, index) => index === rejectedWall.index ? rejectedWall.wall : wall)
+    : arena.walls;
+
+  function cancelPlacement() {
+    setRejectedWall(undefined);
+    setRejectedBot(undefined);
+    setPlacementError('');
+    onValidityChange(true);
+  }
+
+  const positions = bots.map(bot => `${bot.id}:${bot.position.x}:${bot.position.y}:${bot.bodyAngle}`).join('|');
+  useEffect(() => {
+    setRejectedWall(undefined);
+    setRejectedBot(undefined);
+    setPlacementError('');
+    onValidityChange(true);
+  }, [arena.walls, positions, onValidityChange, setPlacementError]);
+  useEffect(() => () => onValidityChange(true), [onValidityChange]);
   const activeWall = selectedWalls[selectedWalls.length - 1];
   const showBases = !!bases && bases.length > 0 && !!onChangeBase;
 
-  function validWalls(walls: Wall[]) {
+  function validWalls(walls: Wall[], allWalls = walls) {
     for (const wall of walls) {
       if (![wall.x, wall.y, wall.width, wall.height].every(Number.isFinite)
         || wall.width < MIN_WALL || wall.height < MIN_WALL || wall.x < 0 || wall.y < 0
@@ -157,24 +164,46 @@ export function LabArenaEditor({
         return false;
       }
     }
+    const extraError = validateWalls?.(allWalls);
+    if (extraError) { setPlacementError(extraError); return false; }
     setPlacementError('');
     return true;
   }
 
   function changeWall(index: number, wall: Wall) {
-    if (validWalls([wall])) onChangeWall(index, wall);
+    setRejectedBot(undefined);
+    const proposal = index === arena.walls.length ? [...arena.walls, wall] : arena.walls.map((item, i) => i === index ? wall : item);
+    if (validWalls([wall], proposal)) {
+      setRejectedWall(undefined);
+      onValidityChange(true);
+      if (index === arena.walls.length) onAddWall(wall);
+      else onChangeWall(index, wall);
+    } else {
+      setRejectedWall({ index, wall });
+      onValidityChange(false);
+    }
   }
 
   function moveBot(botId: string, x: number, y: number) {
     const bot = bots.find(item => item.id === botId);
     if (!bot) return;
-    const position = placeBesideWalls(bot, x, y, arena);
-    const candidate = { ...bot, position };
-    if (bots.some(other => other.id !== botId && botsOverlap(candidate, other))) return;
-    setPlacementError('');
-    onMoveBot(botId, position.x, position.y);
+    const candidate = { ...bot, position: { x, y } };
+    const wallCollision = arena.walls.some(wall => wallOverlapsBot(wall, candidate));
+    const botCollision = bots.some(other => other.id !== botId && botsOverlap(candidate, other));
+    if (wallCollision || botCollision) {
+      setRejectedWall(undefined);
+      setRejectedBot({ id: botId, x, y });
+      setPlacementError(wallCollision ? text.lab.botOverlapsWall : text.lab.botOverlapsBot);
+      onValidityChange(false);
+      return;
+    }
+    cancelPlacement();
+    onMoveBot(botId, x, y);
   }
+
   const dragging = useRef(false);
+  const stopDrag = useRef<() => void>(() => {});
+  useEffect(() => () => stopDrag.current(), []);
 
   useEffect(() => {
     if (selectedWalls.length === 0) return;
@@ -191,6 +220,7 @@ export function LabArenaEditor({
     onMove: (point: { x: number; y: number }) => void,
     onDone?: (moved: boolean) => void,
   ) {
+    stopDrag.current();
     const origin = clientToArena(svg, startClient.x, startClient.y);
     let moved = false;
 
@@ -206,6 +236,7 @@ export function LabArenaEditor({
     const up = () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
       onDone?.(moved);
       if (moved) {
         queueMicrotask(() => {
@@ -218,6 +249,13 @@ export function LabArenaEditor({
 
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+    stopDrag.current = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      dragging.current = false;
+    };
   }
 
   function startMoveWall(index: number, event: ReactPointerEvent<SVGRectElement>) {
@@ -225,7 +263,7 @@ export function LabArenaEditor({
     event.stopPropagation();
     const svg = event.currentTarget.ownerSVGElement;
     if (!svg) return;
-    const wall0 = arena.walls[index];
+    const wall0 = shownWalls[index];
     if (!wall0) return;
     const start = clientToArena(svg, event.clientX, event.clientY);
     const offsetX = start.x - wall0.x;
@@ -261,7 +299,7 @@ export function LabArenaEditor({
     event.stopPropagation();
     const svg = event.currentTarget.ownerSVGElement;
     if (!svg) return;
-    const wall0 = arena.walls[index];
+    const wall0 = shownWalls[index];
     if (!wall0) return;
     if (!selectedWalls.includes(index)) onSelectWalls([index]);
 
@@ -332,7 +370,7 @@ export function LabArenaEditor({
 
   return (
     <div className="lab-map">
-      <div className="lab-mode-bar">
+      {showModeSelector && <div className="lab-mode-bar">
         <label>{text.lab.matchMode}
           <select
             value={mode}
@@ -343,8 +381,8 @@ export function LabArenaEditor({
           </select>
         </label>
         <p className="muted">{text.lab.modeHint[mode]}</p>
-      </div>
-      {placementError && <p role="alert" className="error-card map-placement-error">{placementError}</p>}
+      </div>}
+      {placementError && <div role="alert" className="error-card map-placement-error"><p>{placementError}</p>{(rejectedWall || rejectedBot) && <button type="button" onClick={cancelPlacement}>{text.lab.cancelPlacement}</button>}</div>}
       <div className="arena-stage">
         <svg
           className="arena lab-arena"
@@ -411,7 +449,7 @@ export function LabArenaEditor({
               </g>
             );
           })}
-          {arena.walls.map((wall, index) => {
+          {shownWalls.map((wall, index) => {
             const selected = selectedWalls.includes(index);
             const active = activeWall === index;
             return (
@@ -422,7 +460,8 @@ export function LabArenaEditor({
                   fill={selected ? '#3d5f82' : '#273e58'}
                   stroke={selected ? '#7be0ff' : '#476383'}
                   strokeWidth=".05"
-                  className={selected ? 'lab-wall selected' : 'lab-wall'}
+                  className={`lab-wall${selected ? ' selected' : ''}${rejectedWall?.index === index ? ' invalid-placement' : ''}`}
+                  aria-invalid={rejectedWall?.index === index || undefined}
                   onPointerDown={event => startMoveWall(index, event)}
                 />
                 {active && (['nw', 'ne', 'sw', 'se'] as const).map(corner => {
@@ -443,6 +482,8 @@ export function LabArenaEditor({
               </g>
             );
           })}
+          {spawnSafetyRadius > 0 && bots.map(bot => <circle key={`safe-${bot.id}`} cx={bot.position.x} cy={bot.position.y} r={spawnSafetyRadius} fill="#3dc9f10a" stroke="#3dc9f155" strokeWidth=".04" strokeDasharray=".15 .1" pointerEvents="none" />)}
+          {rejectedBot && <rect className="invalid-placement robot-placement-preview" x={rejectedBot.x - .34} y={rejectedBot.y - .29} width=".68" height=".58" transform={`rotate(${bots.find(bot => bot.id === rejectedBot.id)?.bodyAngle! * 180 / Math.PI} ${rejectedBot.x} ${rejectedBot.y})`} pointerEvents="none" />}
           {bots.map(bot => {
             const color = botColor(toSpawn(bot), spawns);
             const hull = bot.bodyAngle * 180 / Math.PI;
@@ -452,28 +493,20 @@ export function LabArenaEditor({
                 key={bot.id}
                 data-bot={bot.id}
                 transform={`translate(${bot.position.x} ${bot.position.y})`}
-                style={{ color, cursor: 'grab' }}
+                style={{ color, cursor: botsDraggable ? 'grab' : 'default' }}
                 onPointerDown={event => {
+                  if (!botsDraggable) return;
                   event.preventDefault();
                   const svg = event.currentTarget.ownerSVGElement;
                   if (!svg) return;
                   const start = clientToArena(svg, event.clientX, event.clientY);
                   const offsetX = start.x - bot.position.x;
                   const offsetY = start.y - bot.position.y;
-                  const move = (moveEvent: PointerEvent) => {
-                    const point = clientToArena(svg, moveEvent.clientX, moveEvent.clientY);
-                    moveBot(
-                      bot.id,
+                  bindPointerDrag(svg, { x: event.clientX, y: event.clientY }, point => {
+                    moveBot(bot.id,
                       Math.min(15.5, Math.max(0.5, round1(point.x - offsetX))),
-                      Math.min(9.5, Math.max(0.5, round1(point.y - offsetY))),
-                    );
-                  };
-                  const up = () => {
-                    window.removeEventListener('pointermove', move);
-                    window.removeEventListener('pointerup', up);
-                  };
-                  window.addEventListener('pointermove', move);
-                  window.addEventListener('pointerup', up);
+                      Math.min(9.5, Math.max(0.5, round1(point.y - offsetY))));
+                  });
                 }}
               >
                 <g transform={`rotate(${hull})`}>
@@ -495,17 +528,18 @@ export function LabArenaEditor({
           <strong>{text.lab.walls}</strong>
           <button type="button" className="lab-wall-add" aria-label={text.lab.addWall} title={text.lab.addWall} onClick={() => {
             const wall = { x: 6, y: 4, width: 1.5, height: 1.5 };
-            if (validWalls([wall])) onAddWall(wall);
+            if (validWalls([wall], [...arena.walls, wall])) { cancelPlacement(); onAddWall(wall); }
+            else { setRejectedWall({ index: arena.walls.length, wall }); onValidityChange(false); }
           }}>+</button>
-          <button type="button" onClick={() => { if (validWalls(classicWalls)) onClassicWalls(); }}>{text.lab.classicWalls}</button>
+          <button type="button" onClick={() => { if (validWalls(classicWalls)) { cancelPlacement(); onClassicWalls(); } }}>{text.lab.classicWalls}</button>
           {selectedWalls.length > 1 && <button type="button" className="danger-button" onClick={() => { setPlacementError(''); onRemoveWalls(selectedWalls); }}>
             <TrashIcon /> Удалить выбранные ({selectedWalls.length})
           </button>}
         </div>
         {arena.walls.length > 1 && <small className="lab-wall-selection-hint">Нажимайте номера стен, чтобы выбрать несколько.</small>}
         {arena.walls.length === 0 && <p className="muted">{text.lab.noWalls}</p>}
-        {arena.walls.length > 0 && <div className="lab-wall-list">{arena.walls.map((wall, index) => (
-          <div key={index} className={selectedWalls.includes(index) ? 'lab-wall-row selected' : 'lab-wall-row'}>
+        {shownWalls.length > 0 && <div className="lab-wall-list">{shownWalls.map((wall, index) => (
+          <div key={index} className={`lab-wall-row${selectedWalls.includes(index) ? ' selected' : ''}${rejectedWall?.index === index ? ' invalid-placement-fields' : ''}`}>
             <button
               type="button"
               className="lab-wall-select"
@@ -530,7 +564,7 @@ export function LabArenaEditor({
                 />
               </label>
             ))}
-            <button type="button" className="wall-delete-icon" title={text.lab.removeWall} aria-label={`${text.lab.removeWall} #${index + 1}`} onClick={() => { setPlacementError(''); onRemoveWalls([index]); }}><TrashIcon /></button>
+            <button type="button" className="wall-delete-icon" title={text.lab.removeWall} aria-label={`${text.lab.removeWall} #${index + 1}`} onClick={() => { cancelPlacement(); onRemoveWalls([index]); }}><TrashIcon /></button>
           </div>
         ))}</div>}
       </div>

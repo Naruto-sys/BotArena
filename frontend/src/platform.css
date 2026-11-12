@@ -344,3 +344,53 @@ dialog.ux-modal::backdrop { background: #020a13bb; backdrop-filter: blur(8px); }
 [data-theme="light"] .team-hp-control { background:#e7f1f4; }
 [data-theme="light"] .strategy-help-content>p { color:#526b7b; }
 [data-theme="light"] .wall-delete-icon { color:#b3262d!important; background:#fff1f1!important; border-color:#dda5a7!important; }
+.lab-arena .invalid-placement, .map-canvas .invalid-placement { fill: #f45c6944 !important; stroke: #ff6675 !important; stroke-width: .08; stroke-dasharray: .18 .1; }
+.lab-arena .robot-placement-preview { pointer-events: none; }
+.invalid-placement-fields { border: 1px solid #ef6471; border-radius: 8px; background: #50273044; }
+.map-placement-error { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.map-placement-error p { flex: 1 1 220px; }
+dialog.arena-modal-native { padding: 0; width: min(720px, calc(100vw - 32px)); max-width: none; }
+dialog.arena-modal-native.wide { width: min(1320px, calc(100vw - 32px)); }
+dialog.arena-modal-native::backdrop { background: #020a13c7; backdrop-filter: blur(9px); }
+[data-theme="light"] dialog.arena-modal-native::backdrop { background: #dce8edc9; }
+/* Community uses the same width and spacing as the rest of the platform. */
+.platform-content .ugc-hub { max-width: none; margin: 0; }
+.ugc-hub .ugc-hero { min-height: 230px; padding: 28px 32px; margin-bottom: 22px; border: 1px solid #2c485a; border-radius: 16px; background: linear-gradient(120deg, #10293b, #102231); }
+.ugc-hub .ugc-tabs { position: static; display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; margin: 0 0 24px; border: 1px solid #29495c; border-radius: 12px; background: #0e2230; backdrop-filter: none; }
+.ugc-hub .ugc-tabs button { flex: 1 1 auto; padding: 11px 14px; border: 0; border-radius: 8px; color: #a1bacb; }
+.ugc-hub .ugc-tabs button.active { background: #18463f; color: #b7ffec; }
+.ugc-hub .ugc-tabs button:hover { background: #19364a; }
+[data-theme="light"] .ugc-hub .ugc-hero { background: #eaf5f4; border-color: #b6d2d5; }
+[data-theme="light"] .ugc-hub .ugc-tabs { background: #edf4f7; border-color: #bfced8; }
+[data-theme="light"] .ugc-hub .ugc-tabs button { color: #426273; }
+[data-theme="light"] .ugc-hub .ugc-tabs button.active { background: #ceeade; color: #165c4b; }
+.room-advanced, .room-invite { padding: 14px; margin: 12px 0; border: 1px solid #355063; border-radius: 10px; }
+.room-advanced > summary, .room-invite > summary { color: var(--neon); }
+.room-advanced .room-form, .room-invite .room-form { margin-top: 14px; }
+.room-form .check-row { display: flex; align-items: center; flex-wrap: nowrap; gap: 10px; }
+.room-form .check-row input { width: auto; flex: 0 0 auto; }
+.room-editor { width: 100%; min-width: 0; }
+.room-form small { color: #8faabc; }
+.single-strategy { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.map-card footer { flex-wrap: wrap; gap: 8px; }
+.map-builder > label { display: grid; gap: 8px; margin-bottom: 12px; }
+.map-builder .map-help { margin-bottom: 16px; }
+.lab-wall-row.invalid-placement-fields { border-color: #ff6675 !important; }
+.arena-info::after { display: none; }
+.arena-info:hover::after, .arena-info:focus-visible::after { display: block; }
+@media(max-width:760px) {
+  .ugc-hub .ugc-hero { padding: 22px; }
+  .ugc-hub .ugc-tabs button { flex: 1 1 40%; }
+  .room-card { grid-template-columns: minmax(0,1fr); gap: 12px; }
+  .room-filters { grid-template-columns: minmax(0,1fr); }
+  .arena-info::after { position: fixed; top: auto; bottom: 16px; left: 16px; right: 16px; width: auto; max-width: none; }
+}
+
+[data-theme="light"] .lab-mode-control, [data-theme="light"] .lab-mode-bar { background:#f2f7fb; border-color:#becfdd; }
+[data-theme="light"] .lab-mode-control label, [data-theme="light"] .lab-mode-bar label { color:#405b6c; }
+[data-theme="light"] .lab-mode-control select, [data-theme="light"] .lab-mode-bar select { background:#fff; color:#183b50; border-color:#a5bdcd; }
+[data-theme="light"] .tank-tab.active { color:#126b78; background:#d9eff2; border-color:#72acb5; }
+[data-theme="light"] .movement-help summary { color:#46697d; }
+.room-toolbar-actions, .room-row-actions { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+.room-row-actions { justify-content:flex-end; }
+.room-icon-button { display:grid; place-items:center; width:2.6rem; height:2.6rem; padding:.5rem; }

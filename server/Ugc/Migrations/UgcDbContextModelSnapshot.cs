@@ -282,6 +282,9 @@ namespace BotArena.Ugc.Migrations
                     b.Property<Guid?>("GuestId")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("IsPrivate")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("MapName")
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
@@ -296,6 +299,10 @@ namespace BotArena.Ugc.Migrations
                         .IsRequired()
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
+
+                    b.Property<string>("PasswordHash")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
 
                     b.Property<long>("Stake")
                         .HasColumnType("bigint");

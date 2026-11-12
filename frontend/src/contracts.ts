@@ -184,7 +184,7 @@ export interface StrategyTransfer {
 export interface GameRoom {
   id: string; name: string; creator: FriendUser; allowClipboard: boolean; allowPresetStrategies: boolean;
   maxCharactersPerSecond: number; stake: number; status: 'Open' | 'Running' | 'Completed' | 'Cancelled';
-  occupied: boolean; createdAt: string; mapName: string; arena: Arena;
+  occupied: boolean; createdAt: string; mapName: string; arena: Arena; isPrivate: boolean;
 }
 export interface BattleMap {
   id: string; name: string; width: number; height: number; walls: Wall[]; createdAt: string; updatedAt: string;

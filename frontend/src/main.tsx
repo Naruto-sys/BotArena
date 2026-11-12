@@ -5,6 +5,7 @@ import type {
   AppMode,
   AuthSession,
   CampaignTrack,
+  BattleMap,
   MatchJobStatus,
   Movement,
   Replay,
@@ -34,7 +35,7 @@ import { StrategyHelpContent } from './StrategyHelp';
 import { AuthPanel } from './AuthPanel';
 import { ugcApi, type AuthNotice } from './ugcApi';
 import { text } from './text';
-import { Home, Workshop, LearningMap, SettingsDialog, SystemTour, type Page } from './PlatformPages';
+import { Home, Workshop, LearningMap, SystemTour, type Page } from './PlatformPages';
 import { platformText as ui } from './text';
 import { loadStrategies, saveStrategies, type SavedStrategy } from './strategyLibrary';
 import './style.css';
@@ -205,13 +206,11 @@ const modelOptions = Object.entries(text.movements).map(([id, label]) =>
   <option key={id} value={id}>{label}</option>);
 
 function App() {
-  const [page, setPage] = useState<Page>(() => location.hash === '#ugc' ? 'community' : Object.hasOwn(ui.nav, location.hash.slice(1).split('/')[0]) ? location.hash.slice(1).split('/')[0] as Page : new URLSearchParams(location.search).has('share') ? 'community' : 'home');
+  const [page, setPage] = useState<Page>(() => location.hash === '#ugc' || location.hash === '#workshop/online' ? 'community' : Object.hasOwn(ui.nav, location.hash.slice(1).split('/')[0]) ? location.hash.slice(1).split('/')[0] as Page : new URLSearchParams(location.search).has('share') ? 'community' : 'home');
   const [session, setSession] = useState<AuthSession>();
   const [authNotice, setAuthNotice] = useState<AuthNotice>();
-  const [onlineWorkshop, setOnlineWorkshop] = useState(location.hash === '#workshop/online');
   const [training, setTraining] = useState(location.hash === '#learn/pve');
-  const [rooms, setRooms] = useState(location.hash === '#arena/rooms');
-  const [settings, setSettings] = useState(false);
+  const [rooms, setRooms] = useState(location.hash.startsWith('#arena/rooms'));
   const [tourOpen, setTourOpen] = useState(false);
   const [demoInvite, setDemoInvite] = useState(() => localStorage.getItem('botarena-first-run-v2') !== 'done');
   const [demoStartPulse, setDemoStartPulse] = useState(false);
@@ -228,6 +227,7 @@ function App() {
   const [labSetup, setLabSetup] = useState<LabSetup>(loadLabSetup);
   const [presets, setPresets] = useState<BehaviorPresetInfo[]>([]);
   const [mapError, setMapError] = useState('');
+  const [mapValid, setMapValid] = useState(true);
   const [selectedWalls, setSelectedWalls] = useState<number[]>([]);
   const [selectedBase, setSelectedBase] = useState<number | null>(null);
   const [labSettingsOpen, setLabSettingsOpen] = useState(false);
@@ -369,7 +369,7 @@ function App() {
     setAuthNotice(undefined);
     setPage(next);
     const destination = new URL(location.href);
-    destination.hash = next === 'community' ? '#ugc' : next === 'workshop' && onlineWorkshop ? '#workshop/online' : `#${next}`;
+    destination.hash = next === 'community' ? '#ugc' : `#${next}`;
     if (next !== 'community') destination.searchParams.delete('share');
     history.replaceState(null, '', destination.pathname + destination.search + destination.hash);
     setExpanded(false);
@@ -420,6 +420,16 @@ function App() {
     const next = [item, ...loadStrategies().filter(entry => entry.id !== item.id)];
     if (!saveStrategies(next)) { setLibraryNote(ui.storageError); return; }
     setLibrary(next); setLibraryId(item.id); setLibraryNote(ui.saved);
+  }
+
+  function playMap(map: BattleMap) {
+    const setup = defaultLabSetup();
+    const previous = labSetup.bots.find(bot => bot.teamId === 'player' && bot.source === 'code');
+    if (previous) setup.bots[0] = { ...setup.bots[0], code: { ...previous.code }, movement: previous.movement };
+    setup.arena = { width: map.width, height: map.height, walls: map.walls.map(wall => ({ ...wall })) };
+    navigate('arena'); resetRunState(); detachStrategy();
+    setLabSetup(setup); setSelectedWalls([]); setSelectedBase(null);
+    setEditorEpoch(value => value + 1);
   }
 
   function openStrategy(item: SavedStrategy) {
@@ -522,7 +532,7 @@ function App() {
 
   async function run(event: FormEvent) {
     event.preventDefault();
-    if (activeRun.current) return;
+    if (activeRun.current || (mode === 'lab' && !mapValid)) return;
     setDemoStartPulse(false);
     if (mode === 'campaign' && level && !isLevelUnlocked(level.order, levels, completed)) return;
     setExpanded(false);
@@ -605,7 +615,7 @@ function App() {
       return value.trim().length > 0 && value.length <= 16384;
     });
   const canRun = mode === 'lab'
-    ? labSetup.bots.length >= 2 && labCodesReady
+    ? mapValid && labSetup.bots.length >= 2 && labCodesReady
     : Boolean(level && isLevelUnlocked(level.order, levels, completed) && campaignCodesReady);
 
   return (
@@ -615,11 +625,11 @@ function App() {
         <nav aria-label="Основная навигация">{Object.entries(ui.nav).map(([id, label]) =>
           <button key={id} type="button" aria-current={page === id ? 'page' : undefined}
             disabled={loading} onClick={() => navigate(id as Page)}>{label}</button>)}</nav>
-        <div className="platform-account"><button className="tour-launch" onClick={() => setTourOpen(true)}>？ Обзор</button><AuthPanel session={session} onChange={setSession} /><button className="platform-settings-button" title={ui.settings} aria-label={ui.settings} onClick={() => setSettings(true)}>⚙</button></div>
+        <div className="platform-account"><button className="tour-launch" onClick={() => setTourOpen(true)}>Обзор</button><AuthPanel session={session} onChange={setSession} /></div>
       </header>
-      {settings && <SettingsDialog onClose={() => setSettings(false)} />}
       {tourOpen && <SystemTour onClose={() => setTourOpen(false)} onNavigate={navigate} />}
       {labSettingsOpen && <ArenaModal title={ui.roster} wide onClose={() => setLabSettingsOpen(false)}>
+        {mapError && <p role="alert" className="error-card">{mapError}</p>}
         <LabSettingsDialog
           setup={labSetup}
           presets={presets}
@@ -666,10 +676,10 @@ function App() {
           const next = tracks.find(t => t.available && t.levels.some(l => !completed.includes(l.id) && isLevelUnlocked(l.order, t.levels, completed)));
           if (next) openTrack(next);
         }} />{error && <p role="alert" className="error-card">{error}</p>}</>
-      : page === 'workshop' ? <><div className="ux-tabs"><button aria-pressed={!onlineWorkshop} onClick={() => { setOnlineWorkshop(false); history.replaceState(null, '', '#workshop'); }}>{ui.localStrategies}</button><button aria-pressed={onlineWorkshop} onClick={() => { setOnlineWorkshop(true); history.replaceState(null, '', '#workshop/online'); }}>{ui.onlineWorkshop}</button></div>{onlineWorkshop ? <UgcHub /> : <Workshop items={library} onOpen={openStrategy}
+      : page === 'workshop' ? <><div className="ux-tabs"><button aria-pressed="true">{ui.localStrategies}</button><button onClick={() => navigate('community')}>{ui.onlineWorkshop} ↗</button></div><Workshop items={library} onOpen={openStrategy}
           onRemove={removeStrategy}
-          onArena={() => { setLibraryId(undefined); setStrategyName(ui.defaultName); navigate('arena'); }} />}</>
-      : page === 'community' ? <UgcHub />
+          onArena={() => { setLibraryId(undefined); setStrategyName(ui.defaultName); navigate('arena'); }} /></>
+      : page === 'community' ? <UgcHub onPlayMap={playMap} />
       : <>
         <div className="ux-page-heading"><div><h1>{ui.nav[page]}</h1><p>{page === 'learn' ? ui.learnIntro : ui.arenaIntro}</p></div></div>
         {page === 'learn' && <div className="ux-tabs"><button aria-pressed={!training} onClick={() => { setTraining(false); history.replaceState(null, '', '#learn'); }}>{ui.learningLab}</button><button aria-pressed={training} onClick={() => { setTraining(true); history.replaceState(null, '', '#learn/pve'); }}>{ui.pveProgress}</button></div>}
@@ -909,6 +919,7 @@ function App() {
                 selectedWalls={selectedWalls}
                 placementError={mapError}
                 onPlacementError={setMapError}
+                onValidityChange={setMapValid}
                 onSelectWalls={setSelectedWalls}
                 mode={labSetup.mode}
                 onModeChange={nextMode => {

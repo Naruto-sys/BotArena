@@ -11,6 +11,8 @@ import { createCaptureZoneRig, disposeCaptureZoneRig, updateCaptureZoneRig } fro
 import { createSafeZoneRig, updateSafeZoneRig } from './safeZoneLayer';
 import { gunnerPose } from './gunnerCamera';
 import { VIDEO_WIDTH, VIDEO_HEIGHT } from './replayVideo';
+import { useTheme } from './useTheme';
+import type { Theme } from './useTheme';
 
 export type CameraMode = 'auto' | 'adaptive' | 'plan' | 'overview' | 'perception' | 'timeline' | `bot:${string}`;
 
@@ -20,6 +22,7 @@ const palette = {
 };
 
 interface RenderState {
+  theme: Theme;
   frame: Frame;
   next: Frame;
   fraction: number;
@@ -634,19 +637,20 @@ export function BlueprintArena({
   captureActive?: boolean;
   onRenderFrame?: (canvas: HTMLCanvasElement, epoch: number) => void;
 }) {
+  const theme = useTheme();
   const hostRef = useRef<HTMLDivElement>(null);
   const renderState = useRef<RenderState>({
-    frame, next, fraction, position, cameraMode, showTrails,
+    theme, frame, next, fraction, position, cameraMode, showTrails,
     showChronoXray, showTacticalTrace, traceBotId, perceptionBotId, onSeek, shotPlan, captureEpoch, captureActive, onRenderFrame,
   });
   const [webglError, setWebglError] = useState(false);
 
   useEffect(() => {
     renderState.current = {
-      frame, next, fraction, position, cameraMode, showTrails,
+      theme, frame, next, fraction, position, cameraMode, showTrails,
       showChronoXray, showTacticalTrace, traceBotId, perceptionBotId, onSeek, shotPlan, captureEpoch, captureActive, onRenderFrame,
     };
-  }, [frame, next, fraction, position, cameraMode, showTrails,
+  }, [theme, frame, next, fraction, position, cameraMode, showTrails,
     showChronoXray, showTacticalTrace, traceBotId, perceptionBotId, onSeek, shotPlan, captureEpoch, captureActive, onRenderFrame]);
 
   useEffect(() => {
@@ -692,7 +696,27 @@ export function BlueprintArena({
       floorMaterial,
     );
     floor.rotation.x = -Math.PI / 2;
-    scene.add(floor, createGrid(replay));
+    const grid = createGrid(replay);
+    scene.add(floor, grid);
+
+    // The learning objective belongs to the world, so every camera projects it
+    // together with the floor (including perception, cinema and video export).
+    if (replay.marker) {
+      const marker = new THREE.Group();
+      marker.position.copy(toWorld(replay.marker, replay, 0.045));
+      const material = (opacity: number) => new THREE.MeshBasicMaterial({
+        color: 0x168fb9, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide,
+      });
+      const disc = new THREE.Mesh(new THREE.CircleGeometry(replay.marker.radius, 64), material(0.2));
+      const ring = new THREE.Mesh(new THREE.RingGeometry(Math.max(0, replay.marker.radius - 0.045), replay.marker.radius, 64), material(0.95));
+      const center = new THREE.Mesh(new THREE.CircleGeometry(0.09, 24), material(1));
+      for (const mesh of [disc, ring, center]) {
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.renderOrder = 2;
+        marker.add(mesh);
+      }
+      scene.add(marker);
+    }
 
     const safeZoneRig = createSafeZoneRig(replay.arena);
     scene.add(safeZoneRig.group);
@@ -997,6 +1021,46 @@ export function BlueprintArena({
     const closestPoint = new THREE.Vector3();
     const normalWallColor = new THREE.Color(0x09283a);
     const cutWallColor = new THREE.Color(0x08799c);
+    let sceneTheme: Theme | undefined;
+    const applyTheme = (theme: Theme) => {
+      const light = theme === 'light';
+      (scene.background as THREE.Color).setHex(light ? 0xe8f0f3 : 0x04121f);
+      (scene.fog as THREE.FogExp2).color.setHex(light ? 0xe8f0f3 : 0x04121f);
+      floorMaterial.color.setHex(light ? 0xdce8ed : 0x071e30);
+      floorMaterial.emissive.setHex(light ? 0x000000 : 0x06182a);
+      floorMaterial.emissiveIntensity = light ? 0 : 0.8;
+      ambient.color.setHex(light ? 0xffffff : 0x8ce7ff);
+      ambient.groundColor.setHex(light ? 0xbfcbd2 : 0x03101d);
+      key.color.setHex(light ? 0xffffff : 0x7fe7ff);
+      key.intensity = light ? 1.8 : 2.3;
+      const gridMaterial = (grid.children[0] as THREE.LineSegments).material as THREE.LineBasicMaterial;
+      gridMaterial.color.setHex(light ? 0x6f96aa : palette.grid);
+      gridMaterial.opacity = light ? 0.4 : 0.22;
+      ((grid.children[1] as THREE.Line).material as THREE.LineBasicMaterial).color.setHex(light ? 0x376577 : 0x70dcff);
+      normalWallColor.setHex(light ? 0x92b1bf : 0x09283a);
+      cutWallColor.setHex(light ? 0x7fb6c7 : 0x08799c);
+      for (const wall of wallRigs) {
+        wall.surface.color.copy(normalWallColor);
+        wall.surface.emissive.setHex(light ? 0x000000 : 0x0b5772);
+        wall.edges.color.setHex(light ? 0x376577 : palette.structure);
+        wall.section.color.setHex(light ? 0x19789a : 0x6ce6ff);
+      }
+      // Neon linework needs a darker, more opaque version of the same team hue on a light floor.
+      for (const [id, tank] of tanks) {
+        for (const material of tank.materials) {
+          if (material instanceof THREE.MeshStandardMaterial || material instanceof THREE.LineBasicMaterial) {
+            material.color.setHex(botColor(id)).multiplyScalar(light ? 0.38 : 1);
+            if (material instanceof THREE.MeshStandardMaterial) {
+              if (material.userData.darkEmissiveIntensity == null) material.userData.darkEmissiveIntensity = material.emissiveIntensity;
+              material.emissiveIntensity = light ? 0 : Number(material.userData.darkEmissiveIntensity);
+            }
+          }
+        }
+        tank.winnerMaterial.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending;
+        tank.winnerMaterial.needsUpdate = true;
+      }
+      sceneTheme = theme;
+    };
 
     const wallBlocks = (from: THREE.Vector3, to: THREE.Vector3, box: THREE.Box3) => {
       const distance = from.distanceTo(to);
@@ -1199,6 +1263,7 @@ export function BlueprintArena({
     const render = () => {
       animationFrame = requestAnimationFrame(render);
       const state = renderState.current;
+      if (sceneTheme === undefined || (!state.captureActive && sceneTheme !== state.theme)) applyTheme(state.theme);
       if (renderingCapture !== state.captureActive) { renderingCapture = state.captureActive; resize(); }
       const delta = Math.min(clock.getDelta(), 0.05);
       const resetCaptureCamera = state.captureEpoch !== lastCaptureEpoch;
@@ -1250,7 +1315,8 @@ export function BlueprintArena({
         tank.materials.forEach(material => {
           if ('opacity' in material) {
             const baseOpacity = Number(material.userData.blueprintOpacity ?? material.opacity);
-            material.opacity = faded ? baseOpacity * 0.35 : baseOpacity;
+            const visibleOpacity = sceneTheme === 'light' ? Math.max(baseOpacity, 0.68) : baseOpacity;
+            material.opacity = faded ? visibleOpacity * 0.35 : visibleOpacity;
           }
         });
         tank.winnerHalo.visible = matchEnded && winner;

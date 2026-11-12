@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Arena, Frame, ReachMarker, Replay } from './contracts';
+import type { Arena, Frame, Replay } from './contracts';
 import { arenaViewBox } from './ArenaCoordinates';
 import { BlueprintArena, tacticalPhase, tacticalPhaseLabel } from './BlueprintArena';
 import type { CameraMode } from './BlueprintArena';
@@ -10,6 +10,7 @@ import { buildShotPlan, directorPlaybackRate, shotAt, VISUAL_TAIL_FRAMES } from 
 import { botColor, botLabel as rosterBotLabel, resolveTeamId, teamWon } from './botDisplay';
 import { botCssColor, botLabel as cinematicBotLabel } from './botVisuals';
 import { text } from './text';
+import { loadCameraMode, saveCameraMode } from './replayPreferences';
 import { platformText as ui } from './text';
 
 const copy = text.replay;
@@ -45,23 +46,15 @@ function collectDamageNumbers(frames: Frame[], index: number, fraction: number) 
   return items;
 }
 
-function ReplayEffectsOverlay({ arena, marker, damageNumbers, finished }: {
+function ReplayEffectsOverlay({ arena, damageNumbers, finished }: {
   arena: Arena;
-  marker?: ReachMarker | null;
   damageNumbers: Array<{ key: string; x: number; y: number; damage: number; age: number; zone: boolean }>;
   finished: boolean;
 }) {
   // Capture zones live in the 3D scene so cinema / section / plan / overview stay aligned.
-  if (!marker && damageNumbers.length === 0) return null;
+  if (damageNumbers.length === 0) return null;
   return (
     <svg className="replay-effects-overlay" viewBox={arenaViewBox(arena.width, arena.height)} aria-hidden="true">
-      {marker && (
-        <g className="objective-marker">
-          <circle cx={marker.x} cy={marker.y} r={marker.radius}
-            fill="#3dc9f133" stroke="#7be0ff" strokeWidth=".07" strokeDasharray=".18 .12" />
-          <circle cx={marker.x} cy={marker.y} r=".12" fill="#7be0ff" />
-        </g>
-      )}
       {!finished && damageNumbers.map(item => (
         <text
           key={item.key}
@@ -84,7 +77,7 @@ export function ReplayPlayer({ replay, botNames, onComplete }: {
   const [position, setPosition] = useState(0);
   const [playing, setPlaying] = useState(true);
   const [speed, setSpeed] = useState(0.5);
-  const [cameraMode, setCameraMode] = useState<CameraMode>('auto');
+  const [cameraMode, setCameraMode] = useState<CameraMode>(() => loadCameraMode(replay.frames[0]?.bots.map(bot => bot.id) ?? []));
   const [showTrails, setShowTrails] = useState(true);
   const [showChronoXray, setShowChronoXray] = useState(true);
   const [showTacticalTrace, setShowTacticalTrace] = useState(false);
@@ -118,7 +111,6 @@ export function ReplayPlayer({ replay, botNames, onComplete }: {
     setPosition(0);
     setPlaying(true);
     setSpeed(0.5);
-    setCameraMode('auto');
     setTraceBotId(replay.frames[0]?.bots[0]?.id ?? '');
   }, [replay]);
 
@@ -130,7 +122,7 @@ export function ReplayPlayer({ replay, botNames, onComplete }: {
 
   useEffect(() => {
     if (cameraMode.startsWith('bot:') && !botIds.includes(cameraMode.slice(4))) {
-      setCameraMode('auto');
+      setCameraMode('plan');
     }
   }, [botIds, cameraMode]);
 
@@ -267,7 +259,6 @@ export function ReplayPlayer({ replay, botNames, onComplete }: {
           captureEpoch={video.captureEpoch} captureActive={video.busy} onRenderFrame={video.onRenderFrame} />
         {!gunnerView && <ReplayEffectsOverlay
           arena={replay.arena}
-          marker={replay.marker}
           damageNumbers={damageNumbers}
           finished={finished}
         />}
@@ -336,7 +327,7 @@ export function ReplayPlayer({ replay, botNames, onComplete }: {
         <div className="camera-modes" role="group" aria-label="Режим камеры">
           {cameraOptions.map(({ mode, label }) => (
             <button type="button" key={mode} className={cameraMode === mode ? 'active' : undefined}
-              aria-pressed={cameraMode === mode} onClick={() => setCameraMode(mode)}>
+              aria-pressed={cameraMode === mode} onClick={() => { setCameraMode(mode); saveCameraMode(mode); }}>
               {(mode === 'auto' || mode === 'adaptive') && <span className="live-dot" />}
               {label}
             </button>
