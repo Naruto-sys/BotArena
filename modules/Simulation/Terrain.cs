@@ -29,8 +29,8 @@ internal sealed class TerrainMap
     {
         this.arena = arena;
         if (!Positive(arena.Width) || !Positive(arena.Height) || !Positive(arena.CellSize) ||
-            Math.Ceiling(arena.Width / arena.CellSize) > int.MaxValue ||
-            Math.Ceiling(arena.Height / arena.CellSize) > int.MaxValue)
+            (arena.Cells?.Count > 0 && (Math.Ceiling(arena.Width / arena.CellSize) > int.MaxValue ||
+            Math.Ceiling(arena.Height / arena.CellSize) > int.MaxValue)))
             throw new ArgumentException("Arena dimensions and cell size must define a finite positive grid.", nameof(arena));
         if (arena.Cells is null || arena.TerrainRules is null || !Positive(arena.TerrainRules.FogVisibilityRange))
             throw new ArgumentException("Terrain rules and a positive finite fog range are required.", nameof(arena));
@@ -49,6 +49,9 @@ internal sealed class TerrainMap
 
     public (SurfaceType Surface, bool Fog) At(Vec2 point)
     {
+        if (cells.Count == 0) return (SurfaceType.Ground, false);
+        if (point.X / arena.CellSize > int.MaxValue || point.Y / arena.CellSize > int.MaxValue)
+            return (SurfaceType.Ground, false);
         var x = (int)Math.Floor(point.X / arena.CellSize);
         var y = (int)Math.Floor(point.Y / arena.CellSize);
         return cells.TryGetValue((x, y), out var cell) ? (cell.Surface, cell.Fog) : (SurfaceType.Ground, false);

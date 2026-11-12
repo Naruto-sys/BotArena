@@ -47,9 +47,14 @@ public class StrategyTests
     [Fact]
     public void TenSecondLimitIsDrawEvenWithUnequalHealth()
     {
-        var duel = new Duel(Config with { Arena = Config.Arena with { Walls = [] } });
-        var fireOnce = new BotAction(0, 0, new(1, 0), true);
         var ticks = Config.TickRate * 10;
+        var duel = new Duel(Config with
+        {
+            MaxTicks = ticks,
+            ShrinkZoneEnabled = false,
+            Arena = Config.Arena with { Walls = [] },
+        });
+        var fireOnce = new BotAction(0, 0, new(1, 0), true);
         for (var tick = 0; tick < ticks; tick++)
         {
             Assert.Null(duel.Result);

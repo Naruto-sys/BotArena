@@ -9,6 +9,6 @@
     <PackageReference Include="Jint" Version="4.17.0" />
     <EmbeddedResource Include="PythonBridge.py" LogicalName="BotArena.PythonBridge.py" />
     <EmbeddedResource Include="BotApi.js" LogicalName="BotArena.BotApi.js" />
-
+    <EmbeddedResource Include="StrategyHelpers.js" LogicalName="BotArena.StrategyHelpers.js" />
   </ItemGroup>
 </Project>

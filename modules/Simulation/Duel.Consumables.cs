@@ -5,8 +5,8 @@ public sealed partial class Duel
     private readonly Random random;
     private readonly List<ItemState> items = [];
     private readonly List<SmokeCloud> smokeClouds = [];
-    private readonly List<ConsumableType>[] inventories = [[], []];
-    private readonly List<ActiveEffect>[] effects = [[], []];
+    private readonly List<ConsumableType>[] inventories;
+    private readonly List<ActiveEffect>[] effects;
     private int nextItemId;
     private int nextSmokeId;
     private int nextItemSpawnTick;
@@ -81,7 +81,7 @@ public sealed partial class Duel
             walls.Any(wall => wall.DistanceSquaredTo(point) <= clearance * clearance) ||
             items.Any(item => (item.Position - point).Dot(item.Position - point) < 0.8 * 0.8)) return false;
         var tankClearance = config.Consumables.PickupRadius + clearance;
-        return !avoidBots || bots.All(bot => bot.Hp <= 0 ||
+        return !avoidBots || bots.All(bot => bot.Hp <= 0 || bot.Forfeited ||
             (bot.Position - point).Dot(bot.Position - point) > tankClearance * tankClearance);
     }
 
@@ -95,16 +95,10 @@ public sealed partial class Duel
     private void CollectConsumables()
     {
         if (!config.Consumables.Enabled) return;
-        for (var i = 0; i < bots.Length; i++)
-        {
-            if (bots[i].Hp > 0) continue;
-            inventories[i].Clear();
-            foreach (var effect in effects[i].ToArray()) EndEffect(i, effect.Type);
-            SyncConsumables(i);
-        }
+        ClearInactiveConsumables();
         foreach (var item in items.ToArray())
         {
-            var candidates = Enumerable.Range(0, bots.Length).Where(index => bots[index].Hp > 0 &&
+            var candidates = Enumerable.Range(0, bots.Length).Where(index => IsActive(index) &&
                 inventories[index].Count < config.Consumables.InventoryCapacity &&
                 (bots[index].Position - item.Position).Dot(bots[index].Position - item.Position) <=
                     config.Consumables.PickupRadius * config.Consumables.PickupRadius &&
@@ -120,6 +114,18 @@ public sealed partial class Duel
             SyncConsumables(winner);
             events.Add(new(tick, GameEventType.ItemPickedUp, bots[winner].Id,
                 Position: item.Position, ItemType: item.Type, ItemId: item.Id));
+        }
+    }
+
+    private void ClearInactiveConsumables()
+    {
+        if (!config.Consumables.Enabled) return;
+        for (var i = 0; i < bots.Length; i++)
+        {
+            if (IsActive(i)) continue;
+            inventories[i].Clear();
+            foreach (var effect in effects[i].ToArray()) EndEffect(i, effect.Type);
+            SyncConsumables(i);
         }
     }
 

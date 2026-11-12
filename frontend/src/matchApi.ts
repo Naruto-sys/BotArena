@@ -1,4 +1,5 @@
 import type { MatchJobStatus, MatchResponse, ScriptError, StrategyLanguage } from './contracts';
+import type { LabSetup } from './labDraft';
 import { text } from './text';
 
 export class MatchDiagnosticError extends Error {
@@ -7,20 +8,49 @@ export class MatchDiagnosticError extends Error {
   }
 }
 
+export function buildCustomMatchPayload(setup: LabSetup, language: StrategyLanguage) {
+  const customCode = setup.bots.find(bot => bot.teamId === 'player' && bot.source === 'code');
+  return {
+    botCode: customCode?.code[language]
+      ?? setup.bots.find(bot => bot.source === 'code')?.code[language]
+      ?? 'function tick() { return {}; }',
+    language,
+    customMatch: {
+      arena: setup.arena,
+      maxTicks: setup.maxTicks,
+      spawns: setup.bots.map(bot => ({
+        id: bot.id,
+        teamId: bot.teamId,
+        x: bot.position.x,
+        y: bot.position.y,
+        bodyAngle: bot.bodyAngle,
+        turretAngle: bot.turretAngle,
+        hp: bot.hp,
+        movement: bot.movement ?? 'tracked',
+      })),
+      loadouts: setup.bots.map(bot => bot.source === 'preset'
+        ? { botId: bot.id, source: 'preset', presetId: bot.presetId }
+        : { botId: bot.id, source: 'code', code: bot.code[language] ?? '' }),
+    },
+  };
+}
+
 export async function runMatch(
   botCode: string,
-  opponentId: string,
   language: StrategyLanguage,
   signal: AbortSignal,
   onStatus: (status: MatchJobStatus) => void,
+  target: { opponentId: string } | { campaignLevelId: string } | { customMatch: unknown },
+  botCodes?: Record<string, string>,
 ): Promise<MatchResponse> {
   const response = await fetch('/api/match-jobs', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ botCode, opponentId, language }),
+    body: JSON.stringify({ botCode, language, botCodes, ...target }),
     signal,
   });
   if (!response.ok) {
+    if (response.status === 401) throw new Error('Войдите через Yandex ID, чтобы запустить матч.');
     const problem = await response.json().catch(() => null);
     throw new Error(response.status === 429 ? text.queueFull : problem?.error ?? text.serverError(response.status));
   }

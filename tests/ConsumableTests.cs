@@ -12,7 +12,7 @@ public class ConsumableTests
     };
     private static MatchConfig Config => MatchConfig.Classic with
     {
-        Arena = new(24, 12, []), Consumables = Rules, RandomSeed = 123,
+        Arena = new(24, 12, []), Consumables = Rules, RandomSeed = 123, MaxTicks = 200, ShrinkZoneEnabled = false,
         Spawns = [new("player", new(2, 5), 0, 0), new("opponent", new(20, 5), Math.PI, Math.PI)]
     };
 
@@ -67,11 +67,12 @@ public class ConsumableTests
     }
 
     [Fact]
-    public void BlockedMapSkipsSpawnsWithoutStalling()
+    public void OccupiedArenaSkipsSpawnsWithoutStalling()
     {
         var duel = new Duel(Config with
         {
-            Arena = new(24, 12, [new(0, 0, 24, 12)]),
+            Arena = new(2.4, 1.2, []), MaxTicks = 200, ShrinkZoneEnabled = false,
+            Spawns = [new("player", new(0.6, 0.6), 0, 0), new("opponent", new(1.8, 0.6), 0, 0)],
             Consumables = Rules with { InitialCount = 3, MinSpawnSeconds = 0.05, MaxSpawnSeconds = 0.05 }
         });
         while (duel.Result is null) Step(duel);

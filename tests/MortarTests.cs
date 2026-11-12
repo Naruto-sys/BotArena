@@ -10,7 +10,7 @@ public class MortarTests
     private static MatchConfig Config => MatchConfig.Classic with
     {
         Arena = new(16, 10, [new Wall(7, 0, 1, 10)]),
-        Spawns = [new("player", new(2, 5), 0, Math.PI, WeaponType.Mortar),
+        Spawns = [new("player", new(2, 5), 0, Math.PI, Weapon: WeaponType.Mortar),
             new("opponent", EnemyPosition, Math.PI, Math.PI)]
     };
 
@@ -247,7 +247,7 @@ public class MortarTests
         }
         Assert.Equal(new[] { 35, 35, 30 }, damage);
         Assert.Equal(0, duel.Observe("opponent").Self.Hp);
-        Assert.Equal(new MatchResult("player", MatchEndReason.BotDestroyed, 121), duel.Result);
+        Assert.Equal(new MatchResult("player", MatchEndReason.BotDestroyed, 121, "player"), duel.Result);
         Assert.Contains(duel.CaptureFrame().Events, item => item.Type == GameEventType.BotDestroyed);
     }
 

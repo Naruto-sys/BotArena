@@ -17,6 +17,7 @@ public record ArenaState(double Width, double Height, IReadOnlyList<Wall> Walls)
     public double CellSize { get; init; } = 1;
     public IReadOnlyList<ArenaCell> Cells { get; init; } = [];
     public TerrainRules TerrainRules { get; init; } = new();
+    public void ValidateTerrain() => _ = new TerrainMap(this);
 }
 [JsonConverter(typeof(JsonStringEnumConverter<WeaponType>))]
 public enum WeaponType { Cannon, Mortar, Gauss }
@@ -24,12 +25,15 @@ public enum WeaponType { Cannon, Mortar, Gauss }
 [JsonConverter(typeof(JsonStringEnumConverter<WeaponChargeStage>))]
 public enum WeaponChargeStage { None, Charging, Ready }
 
-public record BotState(string Id, Vec2 Position, double BodyAngle, double TurretAngle,
+public record BotState(string Id, string TeamId, Vec2 Position, double BodyAngle, double TurretAngle,
     double Speed, int Hp, int MaxHp, double ReloadingTime, WeaponType Weapon = WeaponType.Cannon,
     WeaponChargeStage ChargeStage = WeaponChargeStage.None, double ChargeProgress = 0,
     SurfaceType Surface = SurfaceType.Ground, bool InFog = false)
 {
-    public bool CanShoot => ReloadingTime <= 0;
+    public Vec2 Velocity { get; init; }
+    public string Movement { get; init; } = "tracked";
+    public bool Forfeited { get; init; }
+    public bool CanShoot => !Forfeited && Hp > 0 && ReloadingTime <= 0;
     public IReadOnlyList<ConsumableType> Inventory { get; init; } = [];
     public IReadOnlyList<ActiveEffect> ActiveEffects { get; init; } = [];
     public int ShieldHp { get; init; }
@@ -40,7 +44,7 @@ public record BulletState(int Id, string OwnerBotId, Vec2 Position, Vec2 Directi
 [JsonConverter(typeof(JsonStringEnumConverter<GameEventType>))]
 public enum GameEventType
 {
-    ShotFired, BotHit, BotDestroyed, MatchFinished, ProjectileLanded,
+    ShotFired, BotHit, BotDestroyed, ZoneDamage, MatchFinished, ProjectileLanded,
     BeamFired, WeaponChargeStarted, WeaponReady, SurfaceChanged, FogEntered, FogExited,
     ItemSpawned, ItemPickedUp, ItemUsed, EffectStarted, EffectEnded, BotRepaired, SmokeCreated, SmokeExpired
 }
@@ -51,7 +55,9 @@ public record GameEvent(int Tick, GameEventType Type, string? SourceBotId = null
     SurfaceType? Surface = null, ConsumableType? ItemType = null, int? ItemId = null,
     int? Amount = null, int? ShieldDamage = null);
 
-public record GameFrame(int Tick, BotState[] Bots, BulletState[] Bullets, GameEvent[] Events)
+public record SafeZoneState(double X, double Y, double Width, double Height);
+
+public record GameFrame(int Tick, BotState[] Bots, BulletState[] Bullets, GameEvent[] Events, SafeZoneState? SafeZone = null)
 {
     public IReadOnlyList<ItemState> Items { get; init; } = [];
     public IReadOnlyList<SmokeCloud> SmokeClouds { get; init; } = [];
@@ -61,10 +67,21 @@ public record BotObservation(int Tick, BotState Self, BotState? Enemy, BulletSta
     public IReadOnlyList<ItemState> Items { get; init; } = [];
     public IReadOnlyList<SmokeCloud> SmokeClouds { get; init; } = [];
     public ConsumableRules ConsumableRules { get; init; } = new();
+    public IReadOnlyList<BotState> Enemies { get; init; } = [];
+    public SafeZoneState? SafeZone { get; init; }
 }
 public record BotAction(double LeftTrack, double RightTrack, Vec2 AimDirection, bool Shoot,
-    double? TurretTurn = null, Vec2? TargetPoint = null, ConsumableType? UseItem = null);
+    double? TurretTurn = null, Vec2? TargetPoint = null, ConsumableType? UseItem = null)
+{
+    public Vec2 Thrust { get; init; }
+    public double Turn { get; init; }
+    public double Throttle { get; init; }
+}
 [JsonConverter(typeof(JsonStringEnumConverter<MatchEndReason>))]
-public enum MatchEndReason { BotDestroyed, TimeLimit, BotError }
+public enum MatchEndReason { BotDestroyed, TimeLimit, BotError, ObjectiveComplete }
 
-public record MatchResult(string? WinnerBotId, MatchEndReason Reason, int DurationTicks);
+public record MatchResult(string? WinnerBotId, MatchEndReason Reason, int DurationTicks, string? WinnerTeamId = null);
+
+public abstract record MatchObjective;
+public sealed record DestroyEnemyObjective : MatchObjective;
+public sealed record ReachPointObjective(Vec2 Point, double Radius) : MatchObjective;

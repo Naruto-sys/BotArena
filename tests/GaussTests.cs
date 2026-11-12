@@ -10,7 +10,7 @@ public class GaussTests
     private static MatchConfig Config => MatchConfig.Classic with
     {
         Arena = new(16, 10, []),
-        Spawns = [new("player", new(2, 5), 0, 0, WeaponType.Gauss),
+        Spawns = [new("player", new(2, 5), 0, 0, Weapon: WeaponType.Gauss),
             new("opponent", new(14, 5), Math.PI, Math.PI)]
     };
 
@@ -148,7 +148,7 @@ public class GaussTests
         }
         Assert.Equal(new[] { 1, 51 }, shots);
         Assert.Equal(new[] { 60, 40 }, damage);
-        Assert.Equal(new MatchResult("player", MatchEndReason.BotDestroyed, 51), duel.Result);
+        Assert.Equal(new MatchResult("player", MatchEndReason.BotDestroyed, 51, "player"), duel.Result);
     }
 
     [Fact]
@@ -219,7 +219,7 @@ public class GaussTests
         using var opponent = new JavaScriptBot("function tick() { return {}; }");
         var response = Match.Run(Config, player, opponent);
         Assert.Null(response.Error);
-        Assert.Equal(new MatchResult("player", MatchEndReason.BotDestroyed, 51), response.Replay.Result);
+        Assert.Equal(new MatchResult("player", MatchEndReason.BotDestroyed, 51, "player"), response.Replay.Result);
         using var invalid = new JavaScriptBot("function tick() { return {targetPoint: {x: 14, y: 5}}; }");
         Assert.Throws<StrategyException>(() => invalid.Decide(new Duel(Config).Observe("player")));
     }
