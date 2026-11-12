@@ -39,17 +39,28 @@ if __name__ == "__main__":
     assert request("/api/strategy-languages") == (200, ["javascript", "python"])
     assert run("def tick(state): return {}", "unknown")[0] == 400
 
-    status, match = run("""
+    code = """
 count = 0
 def tick(state):
     global count
     assert state["tick"] == count
     count += 1
     return {"leftTrack": 1, "rightTrack": 1}
-""")
+"""
+    status, match = request("/api/matches", {
+        "language": "python",
+        "customMatch": {
+            "maxTicks": 200, "arena": {"width": 16, "height": 10, "walls": []},
+            "spawns": [{"id": "player", "teamId": "player", "x": 2, "y": 5},
+                       {"id": "opponent", "teamId": "opponent", "x": 14, "y": 5}],
+            "loadouts": [{"botId": "player", "source": "code", "code": code},
+                         {"botId": "opponent", "source": "code", "code": "def tick(state): return {}"}],
+        },
+    })
     assert status == 200 and match["error"] is None, (status, match.get("error"))
     check_replay(match["replay"])
-    assert match["replay"]["result"] == {"winnerBotId": None, "reason": "TimeLimit", "durationTicks": 200}
+    result = match["replay"]["result"]
+    assert result["winnerBotId"] is None and result["reason"] == "TimeLimit" and result["durationTicks"] == 200
     assert match["replay"]["frames"][5]["bots"][0]["position"]["x"] > 2
 
     status, match = run(SANDBOX_PROBE)

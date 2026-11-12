@@ -136,6 +136,9 @@ public sealed class BattleChallenge
 
 public sealed class GameRoom
 {
+    public bool IsPrivate { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? PasswordHash { get; set; }
     public Guid Id { get; set; } = Guid.NewGuid();
     public required string Name { get; set; }
     public Guid CreatorId { get; set; }

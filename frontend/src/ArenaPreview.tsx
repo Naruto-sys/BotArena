@@ -2,6 +2,7 @@ import type { Arena, CampaignSpawn, CaptureZone, ReachMarker } from './contracts
 import { ArenaCoordinates, arenaViewBox } from './ArenaCoordinates';
 import { botColor } from './botDisplay';
 import { text } from './text';
+import { useTheme } from './useTheme';
 
 export function ArenaPreview({
   arena,
@@ -14,13 +15,14 @@ export function ArenaPreview({
   marker?: ReachMarker | null;
   captureZones?: CaptureZone[] | null;
 }) {
+  const light = useTheme() === 'light';
   return (
     <div className="arena-stage">
       <svg className="arena" viewBox={arenaViewBox(arena.width, arena.height)}
         role="img" aria-label={text.campaign.previewLabel}>
         <defs>
           <pattern id="preview-grid" width="1" height="1" patternUnits="userSpaceOnUse">
-            <path d="M 1 0 H 0 V 1" fill="none" stroke="#253b51" strokeWidth=".04" />
+            <path d="M 1 0 H 0 V 1" fill="none" stroke={light ? '#a8c0ce' : '#253b51'} strokeWidth=".04" />
           </pattern>
         </defs>
         <rect width={arena.width} height={arena.height} fill="url(#preview-grid)" />
@@ -44,7 +46,7 @@ export function ArenaPreview({
           );
         })}
         {arena.walls.map((wall, i) => (
-          <rect key={i} {...wall} rx=".08" fill="#273e58" stroke="#476383" strokeWidth=".05" />
+          <rect key={i} {...wall} rx=".08" fill={light ? '#c2d3de' : '#273e58'} stroke={light ? '#54788d' : '#476383'} strokeWidth=".05" />
         ))}
         {marker && (
           <g>
@@ -61,7 +63,7 @@ export function ArenaPreview({
             <g key={spawn.id} transform={`translate(${spawn.position.x} ${spawn.position.y})`} style={{ color }}>
               <g transform={`rotate(${hull})`}>
                 <rect x="-.34" y="-.29" width=".68" height=".58" rx=".04"
-                  fill="#111c2c" stroke={color} strokeWidth=".045" />
+                  fill={light ? '#f8fbfd' : '#111c2c'} stroke={color} strokeWidth=".045" />
                 <path d="M -.29 -.2 H .29 M -.29 .2 H .29" stroke={color} strokeWidth=".045" />
               </g>
               <g transform={`rotate(${turret})`}>

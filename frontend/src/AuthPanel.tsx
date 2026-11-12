@@ -1,12 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 import type { AuthSession, OAuthProvider } from './contracts';
 import { linkProvider, login, ugcApi } from './ugcApi';
+import './themePolish.css';
 
 type AuthMode = 'login' | 'register';
 
+function AccountIcon({ kind }: { kind: 'sun' | 'moon' | 'profile' | 'logout' }) {
+  const paths = {
+    sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5" /></>,
+    moon: <path d="M20 14A8 8 0 0 1 10 4a8 8 0 1 0 10 10Z" />,
+    profile: <><circle cx="12" cy="8" r="4" /><path d="M4 22v-3a8 8 0 0 1 16 0v3" /></>,
+    logout: <><path d="M10 4H4v16h6M9 12h13m-5-5 5 5-5 5" /></>,
+  };
+  return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[kind]}</svg>;
+}
+
 export function AuthPanel({ session, onChange }: { session: AuthSession | undefined; onChange: (session: AuthSession) => void }) {
+  const profileRef = useRef<HTMLDivElement>(null);
+  const profileTrigger = useRef<HTMLButtonElement>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [loginValue, setLoginValue] = useState('');
@@ -21,12 +35,39 @@ export function AuthPanel({ session, onChange }: { session: AuthSession | undefi
   const [saving, setSaving] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [providers, setProviders] = useState<OAuthProvider[]>([]);
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => localStorage.getItem('botarena-theme') === 'light' ? 'light' : 'dark');
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    try { return localStorage.getItem('botarena-theme') === 'light' ? 'light' : 'dark'; }
+    catch { return 'dark'; }
+  });
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    localStorage.setItem('botarena-theme', theme);
+    try { localStorage.setItem('botarena-theme', theme); } catch { /* Storage may be disabled. */ }
   }, [theme]);
+
+  useEffect(() => {
+    const syncTheme = (event: StorageEvent) => {
+      if (event.key === 'botarena-theme') setTheme(event.newValue === 'light' ? 'light' : 'dark');
+    };
+    window.addEventListener('storage', syncTheme);
+    return () => window.removeEventListener('storage', syncTheme);
+  }, []);
+
+  useEffect(() => {
+    if (!profileOpen) return;
+    const outside = (event: PointerEvent) => {
+      if (!profileRef.current?.contains(event.target as Node)) setProfileOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { setProfileOpen(false); profileTrigger.current?.focus(); }
+    };
+    document.addEventListener('pointerdown', outside);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('pointerdown', outside);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [profileOpen]);
 
   useEffect(() => {
     void ugcApi.oauthProviders().then(setProviders).catch(() => setProviders([]));
@@ -86,12 +127,21 @@ export function AuthPanel({ session, onChange }: { session: AuthSession | undefi
 
   function openSettings() {
     if (!session?.authenticated) return;
+    setProfileOpen(false);
     setNickname(session.user.nickname ?? ''); setFirstName(session.user.firstName); setLastName(session.user.lastName);
     setError(''); setNotice(''); setSettingsOpen(true);
   }
 
+  const themeButton = <button type="button" className="account-action theme-toggle"
+    title={theme === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему'}
+    aria-label={theme === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему'}
+    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+    <AccountIcon kind={theme === 'dark' ? 'sun' : 'moon'} /><b>{theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}</b>
+  </button>;
+
   if (!session) return <span className="auth-loading" aria-label="Загрузка профиля" />;
   if (!session.authenticated) return <>
+    {themeButton}
     <button className="account-login" onClick={() => { setError(''); setAuthOpen(true); }}><span className="login-long">Войти / Регистрация</span><span className="login-short">Войти</span></button>
     {authOpen && createPortal(<div className="nickname-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setAuthOpen(false); }}>
       <section className="nickname-dialog auth-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title">
@@ -115,13 +165,22 @@ export function AuthPanel({ session, onChange }: { session: AuthSession | undefi
   </>;
 
   return <>
-    <div className="profile-menu">
-      {session.user.avatarUrl ? <img src={session.user.avatarUrl} alt="" referrerPolicy="no-referrer" /> : <span className="profile-fallback">{session.user.firstName[0] || session.user.nickname?.[0] || '?'}</span>}
-      <span><b>{session.user.nickname ?? `${session.user.firstName} ${session.user.lastName}`}</b><small>{session.user.firstName} {session.user.lastName}</small></span>
-      <strong className="profile-balance" title="Баланс">◈ {session.user.balance ?? 0}</strong>
-      <button title={theme === 'dark' ? 'Включить светлую тему' : 'Включить тёмную тему'} aria-label="Переключить тему" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☀' : '☾'}</button>
-      <button title="Настройки профиля" aria-label="Настройки профиля" onClick={openSettings}>⚙</button>
-      <button title="Выйти" aria-label="Выйти" onClick={async () => { await ugcApi.logout(); onChange({ authenticated: false }); }}>↪</button>
+    <div className="profile-menu" ref={profileRef} onBlur={event => {
+      if (!event.currentTarget.contains(event.relatedTarget)) setProfileOpen(false);
+    }}>
+      <strong className="profile-balance" title="Баланс"><small>Баланс</small> ◈ {session.user.balance ?? 0}</strong>
+      <button type="button" className="profile-trigger" ref={profileTrigger}
+        aria-label="Меню аккаунта" aria-expanded={profileOpen} aria-controls="account-actions"
+        onClick={() => setProfileOpen(!profileOpen)}>
+        {session.user.avatarUrl ? <img src={session.user.avatarUrl} alt="" referrerPolicy="no-referrer" /> : <span className="profile-fallback">{session.user.firstName[0] || session.user.nickname?.[0] || '?'}</span>}
+        <b className="profile-name">{session.user.nickname ?? `${session.user.firstName} ${session.user.lastName}`}</b>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d={profileOpen ? 'm6 15 6-6 6 6' : 'm6 9 6 6 6-6'} /></svg>
+      </button>
+      {profileOpen && <div id="account-actions" className="account-dropdown">
+        <button type="button" className="account-action" title="Настройки профиля" aria-label="Настройки профиля" onClick={openSettings}><AccountIcon kind="profile" /><b>Профиль</b></button>
+        {themeButton}
+        <button type="button" className="account-action" title="Выйти" aria-label="Выйти" onClick={async () => { await ugcApi.logout(); setProfileOpen(false); onChange({ authenticated: false }); }}><AccountIcon kind="logout" /><b>Выйти</b></button>
+      </div>}
     </div>
     {session.needsNickname && createPortal(<div className="nickname-backdrop">
       <form className="nickname-dialog" onSubmit={saveNickname} role="dialog" aria-modal="true" aria-labelledby="nickname-title">

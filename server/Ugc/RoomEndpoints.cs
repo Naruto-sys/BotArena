@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Identity;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,7 +15,7 @@ public static class RoomEndpoints
             long? maxStake, UgcDbContext database) =>
         {
             var query = database.GameRooms.AsNoTracking().Include(item => item.Creator)
-                .Where(item => item.Status == GameRoomStatus.Open && item.GuestId == null);
+                .Where(item => item.Status == GameRoomStatus.Open && item.GuestId == null && !item.IsPrivate);
             if (clipboard is { } clipboardValue) query = query.Where(item => item.AllowClipboard == clipboardValue);
             if (presets is { } presetValue) query = query.Where(item => item.AllowPresetStrategies == presetValue);
             if (maxCharactersPerSecond is { } speed) query = query.Where(item => item.MaxCharactersPerSecond <= speed);
@@ -23,21 +24,38 @@ public static class RoomEndpoints
             return Results.Ok(rooms.Select(RoomView));
         });
 
+        group.MapGet("/mine", async (ClaimsPrincipal principal, UgcDbContext database) =>
+        {
+            var rooms = await database.GameRooms.AsNoTracking().Include(item => item.Creator)
+                .Where(item => (item.CreatorId == principal.UserId() || item.GuestId == principal.UserId()) &&
+                    (item.Status == GameRoomStatus.Open || item.Status == GameRoomStatus.Running))
+                .OrderByDescending(item => item.CreatedAt).ToListAsync();
+            return Results.Ok(rooms.Select(RoomView));
+        });
+
         group.MapGet("/{id:guid}", async (Guid id, ClaimsPrincipal principal, UgcDbContext database) =>
         {
             if (principal.UserId() is not { } userId) return Results.Unauthorized();
-            var room = await database.GameRooms.AsNoTracking().Include(item => item.Creator)
+            var room = await database.GameRooms.AsNoTracking().Include(item => item.Creator).Include(item => item.Participants)
                 .SingleOrDefaultAsync(item => item.Id == id && (item.CreatorId == userId || item.GuestId == userId));
             if (room is null) return Results.NotFound();
             var match = room.MatchResultJson is null ? null : JsonSerializer.Deserialize<MatchResponse>(room.MatchResultJson);
-            return Results.Ok(new { room = RoomView(room), match, room.WinnerId });
+            var own = room.Participants.SingleOrDefault(item => item.UserId == userId);
+            return Results.Ok(new { room = RoomView(room), match, room.WinnerId, draft = own is null ? null : new { own.Code, own.Language, own.SourceStrategyId, own.IsReady } });
         });
 
         group.MapPost("/", async (CreateRoomRequest request, ClaimsPrincipal principal, UgcDbContext database) =>
         {
             if (principal.UserId() is not { } userId) return Results.Unauthorized();
             if (ValidateSettings(request.Name, request.MaxCharactersPerSecond, request.Stake) is { } error) return error;
-            var creator = await database.Users.SingleAsync(user => user.Id == userId);
+            if (request.IsPrivate && (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length is < 4 or > 128))
+                return Results.BadRequest(new { error = "Для приватной комнаты задайте пароль от 4 до 128 символов." });
+            // Serialize creates for the same account, including simultaneous browser tabs.
+            await using var creation = await database.Database.BeginTransactionAsync();
+            var creator = await database.Users.FromSqlInterpolated($"SELECT * FROM users WHERE \"Id\" = {userId} FOR UPDATE").SingleAsync();
+            if (await database.GameRooms.AnyAsync(item => item.CreatorId == userId &&
+                (item.Status == GameRoomStatus.Open || item.Status == GameRoomStatus.Running)))
+                return Results.Conflict(new { error = "У вас уже есть активная комната. Откройте её или закройте перед созданием новой." });
             if (creator.Balance < request.Stake) return Results.BadRequest(new { error = "Недостаточно кредитов для ставки комнаты." });
             BattleMap? battleMap = null;
             if (request.MapId is { } mapId)
@@ -48,24 +66,29 @@ public static class RoomEndpoints
             }
             var room = new GameRoom
             {
-                Name = request.Name.Trim(), Creator = creator, CreatorId = creator.Id,
+                Name = request.Name.Trim(), Creator = creator, CreatorId = creator.Id, IsPrivate = request.IsPrivate,
                 AllowClipboard = request.AllowClipboard, AllowPresetStrategies = request.AllowPresetStrategies,
                 MaxCharactersPerSecond = request.MaxCharactersPerSecond, Stake = request.Stake,
                 MapName = battleMap?.Name, ArenaJson = battleMap?.WallsJson
             };
+            if (room.IsPrivate) room.PasswordHash = new PasswordHasher<GameRoom>().HashPassword(room, request.Password!);
             room.Participants.Add(new() { Room = room, User = creator, UserId = creator.Id });
             database.GameRooms.Add(room);
             await database.SaveChangesAsync();
+            await creation.CommitAsync();
             return Results.Created($"/api/rooms/{room.Id}", RoomView(room));
         });
 
-        group.MapPost("/{id:guid}/join", async (Guid id, ClaimsPrincipal principal, UgcDbContext database) =>
+        group.MapPost("/{id:guid}/join", async (Guid id, JoinRoomRequest? request, ClaimsPrincipal principal, UgcDbContext database) =>
         {
             if (principal.UserId() is not { } userId) return Results.Unauthorized();
             var room = await database.GameRooms.AsNoTracking().Include(item => item.Creator)
                 .SingleOrDefaultAsync(item => item.Id == id);
             if (room is null || room.Status != GameRoomStatus.Open || room.GuestId != null) return Results.Conflict(new { error = "Комната уже занята или закрыта." });
             if (room.CreatorId == userId) return Results.BadRequest(new { error = "Создатель уже находится в комнате." });
+            if (room.IsPrivate && (room.PasswordHash is null || string.IsNullOrEmpty(request?.Password)
+                || request.Password.Length > 128 || new PasswordHasher<GameRoom>().VerifyHashedPassword(room, room.PasswordHash, request.Password) == PasswordVerificationResult.Failed))
+                return Results.Json(new { error = "Неверный пароль комнаты." }, statusCode: StatusCodes.Status403Forbidden);
             var guest = await database.Users.SingleAsync(user => user.Id == userId);
             if (guest.Balance < room.Stake) return Results.BadRequest(new { error = "Недостаточно кредитов для входа в комнату." });
             await using var transaction = await database.Database.BeginTransactionAsync();
@@ -144,6 +167,9 @@ public static class RoomEndpoints
                         && !database.RoomParticipants.Any(participant => participant.RoomId == id && !participant.IsReady))
                     .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.Status, GameRoomStatus.Running), cancellation);
                 if (claimed == 0) return Results.Ok(new { waiting = true });
+                database.ChangeTracker.Clear();
+                room = await database.GameRooms.Include(item => item.Creator).Include(item => item.Guest)
+                    .SingleAsync(item => item.Id == id, cancellation);
                 var guestId = room.GuestId ?? throw new InvalidOperationException("Claimed room has no guest.");
                 var first = await FriendEndpoints.Debit(database, room.CreatorId, room.Stake, cancellation);
                 var second = await FriendEndpoints.Debit(database, guestId, room.Stake, cancellation);
@@ -159,11 +185,12 @@ public static class RoomEndpoints
                 await payment.CommitAsync(cancellation);
             }
 
+            // Once stakes are committed, finish the match even if the browser disconnects.
             // ExecuteUpdate bypasses tracked entities; reload the winning launch request with fresh drafts.
             database.ChangeTracker.Clear();
             room = await database.GameRooms.Include(item => item.Creator).Include(item => item.Guest)
                 .Include(item => item.Participants).ThenInclude(item => item.User)
-                .SingleAsync(item => item.Id == id, cancellation);
+                .SingleAsync(item => item.Id == id, CancellationToken.None);
             var activeGuestId = room.GuestId ?? throw new InvalidOperationException("Running room has no guest.");
 
             var creator = room.Participants.Single(item => item.UserId == room.CreatorId);
@@ -176,12 +203,11 @@ public static class RoomEndpoints
             }
             var request = new MatchRequest(creator.Code, "room", creator.Language, guest.Code, guest.Language,
                 CustomArena: customArena);
-            if (queue.Enqueue(request, cancellation) is not { } job)
+            if (queue.Enqueue(request, CancellationToken.None) is not { } job)
             {
                 await Refund(database, room, "room_queue_refund");
                 return Results.Json(new { error = "Очередь заполнена. Ставки возвращены." }, statusCode: 429);
             }
-            using var registration = cancellation.Register(() => queue.CancelWaiting(job));
             MatchWorkerResult result;
             try { result = await job.Completion.Task; }
             catch { await Refund(database, room, "room_cancel_refund"); throw; }
@@ -248,7 +274,7 @@ public static class RoomEndpoints
     private static object RoomView(GameRoom room) => new
     {
         room.Id, room.Name, creator = new { room.Creator.Id, room.Creator.Nickname, room.Creator.AvatarUrl },
-        room.AllowClipboard, room.AllowPresetStrategies, room.MaxCharactersPerSecond, room.Stake,
+        room.AllowClipboard, room.AllowPresetStrategies, room.MaxCharactersPerSecond, room.Stake, room.IsPrivate,
         mapName = room.MapName ?? "Классическая арена",
         arena = room.ArenaJson is null ? MatchConfig.Classic.Arena : BattleMapEndpoints.Arena(
             JsonSerializer.Deserialize<List<Wall>>(room.ArenaJson, BattleMapEndpoints.Json) ?? []),
@@ -268,5 +294,7 @@ public static class RoomEndpoints
 }
 
 public sealed record CreateRoomRequest(
-    string Name, bool AllowClipboard, bool AllowPresetStrategies, int MaxCharactersPerSecond, long Stake, Guid? MapId = null);
+    string Name, bool AllowClipboard, bool AllowPresetStrategies, int MaxCharactersPerSecond, long Stake, Guid? MapId = null, bool IsPrivate = false, string? Password = null);
 public sealed record RoomDraftRequest(string Code, string Language, Guid? StrategyId = null);
+
+public sealed record JoinRoomRequest(string? Password);

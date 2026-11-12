@@ -148,10 +148,7 @@ internal static class MatchWorker
         if (string.Equals(loadout.Source, "preset", StringComparison.OrdinalIgnoreCase))
             return StrategyLanguages.Create(StrategyLanguages.JavaScript, BehaviorPresets.GetCode(loadout.PresetId!));
 
-        var language = spawn.ResolvedTeamId == Match.PlayerTeamId
-            ? request.Language
-            : StrategyLanguages.JavaScript;
-        return StrategyLanguages.Create(language, loadout.Code!);
+        return StrategyLanguages.Create(request.Language, loadout.Code!);
     }
 
     private static MatchWorkerResult RunCampaign(MatchRequest request, string levelId)
