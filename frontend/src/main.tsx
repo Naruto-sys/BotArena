@@ -229,6 +229,7 @@ function App() {
   const [presets, setPresets] = useState<BehaviorPresetInfo[]>([]);
   const [mapError, setMapError] = useState('');
   const [selectedWalls, setSelectedWalls] = useState<number[]>([]);
+  const [selectedBase, setSelectedBase] = useState<number | null>(null);
   const [labSettingsOpen, setLabSettingsOpen] = useState(false);
   const [strategyHelpOpen, setStrategyHelpOpen] = useState(false);
   const [labArenaView, setLabArenaView] = useState<'edit' | 'replay'>('edit');
@@ -628,6 +629,7 @@ function App() {
             setMapError('');
             setLabSetup(defaultLabSetup());
             setSelectedWalls([]);
+            setSelectedBase(null);
             setEditorEpoch(value => value + 1);
           }}
           onBotChange={(id, patch) => setLabSetup(previous => ({
@@ -645,6 +647,10 @@ function App() {
                 ? previous.activeBotId : (custom[0]?.id ?? previous.activeBotId) };
             });
             setEditorEpoch(value => value + 1);
+          }}
+          onModeChange={mode => {
+            setLabSetup(previous => ({ ...previous, mode }));
+            setSelectedBase(null);
           }}
         />
       </ArenaModal>}
@@ -904,6 +910,11 @@ function App() {
                 placementError={mapError}
                 onPlacementError={setMapError}
                 onSelectWalls={setSelectedWalls}
+                mode={labSetup.mode}
+                onModeChange={nextMode => {
+                  setLabSetup(previous => ({ ...previous, mode: nextMode }));
+                  setSelectedBase(null);
+                }}
                 onMoveBot={(botId, x, y) => setLabSetup(previous => ({
                   ...previous,
                   bots: previous.bots.map(bot => bot.id === botId
@@ -946,6 +957,13 @@ function App() {
                   }));
                   setSelectedWalls([]);
                 }}
+                bases={labSetup.mode === 'capturePoint' ? labSetup.bases : undefined}
+                selectedBase={selectedBase}
+                onSelectBase={setSelectedBase}
+                onChangeBase={(index, zone) => setLabSetup(previous => ({
+                  ...previous,
+                  bases: previous.bases.map((item, baseIndex) => baseIndex === index ? zone : item),
+                }))}
               />
             ) : replay ? (
               <Suspense fallback={<div className="empty">Загружаем WebGL‑сцену…</div>}>
@@ -957,7 +975,12 @@ function App() {
                 />
               </Suspense>
             ) : mode === 'campaign' && level ? (
-              <ArenaPreview arena={level.arena} spawns={level.spawns} marker={level.marker} />
+              <ArenaPreview
+                arena={level.arena}
+                spawns={level.spawns}
+                marker={level.marker}
+                captureZones={level.captureZones}
+              />
             ) : (
               <div className="empty">{text.emptyArena}</div>
             )}

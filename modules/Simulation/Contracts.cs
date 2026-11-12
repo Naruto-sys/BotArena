@@ -31,12 +31,29 @@ public record GameEvent(int Tick, GameEventType Type, string? SourceBotId = null
 
 public record SafeZoneState(double X, double Y, double Width, double Height);
 
+public record CaptureBase(string OwnerTeamId, double X, double Y, double Width, double Height);
+
+public record CaptureZoneState(
+    string OwnerTeamId,
+    double X,
+    double Y,
+    double Width,
+    double Height,
+    double Progress,
+    string? CapturingTeamId = null,
+    bool Contested = false);
+
 public record GameFrame(int Tick, BotState[] Bots, BulletState[] Bullets, GameEvent[] Events,
-    SafeZoneState? SafeZone = null);
+    SafeZoneState? SafeZone = null)
+{
+    public IReadOnlyList<CaptureZoneState> CaptureZones { get; init; } = [];
+}
+
 public record BotObservation(int Tick, BotState Self, BotState? Enemy, BulletState[] Bullets, ArenaState Arena)
 {
     public IReadOnlyList<BotState> Enemies { get; init; } = [];
     public SafeZoneState? SafeZone { get; init; }
+    public IReadOnlyList<CaptureZoneState> CaptureZones { get; init; } = [];
 }
 public record BotAction(double LeftTrack, double RightTrack, Vec2 AimDirection, bool Shoot,
     double? TurretTurn = null)
@@ -55,3 +72,8 @@ public abstract record MatchObjective;
 public sealed record DestroyEnemyObjective : MatchObjective;
 
 public sealed record ReachPointObjective(Vec2 Point, double Radius) : MatchObjective;
+
+public sealed record CapturePointObjective(
+    IReadOnlyList<CaptureBase> Bases,
+    double CaptureSeconds = 5,
+    double DecaySeconds = 5) : MatchObjective;

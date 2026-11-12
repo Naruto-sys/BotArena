@@ -62,6 +62,9 @@ public sealed class Duel : ISimulationEngine
     private readonly IMovementModel[] movement;
     private readonly double[] bodyTurnRates;
     private readonly double[] turretTurnRates;
+    private CapturePointObjective? captureObjective;
+    private double[] captureProgress = [];
+    private string?[] captureCredit = [];
     private int nextBullet;
     private int tick;
 
@@ -132,10 +135,26 @@ public sealed class Duel : ISimulationEngine
         {
             Enemies = enemies.AsReadOnly(),
             SafeZone = CurrentSafeZone(),
+            CaptureZones = CurrentCaptureZones(),
         };
     }
 
-    public GameFrame CaptureFrame() => new(tick, [.. bots], [.. bullets], [.. events], CurrentSafeZone());
+    public GameFrame CaptureFrame() => new(tick, [.. bots], [.. bullets], [.. events], CurrentSafeZone())
+    {
+        CaptureZones = CurrentCaptureZones(),
+    };
+
+    public void ConfigureCapture(CapturePointObjective objective)
+    {
+        ArgumentNullException.ThrowIfNull(objective);
+        if (objective.Bases.Count == 0)
+            throw new ArgumentException("CapturePoint requires at least one base.", nameof(objective));
+        if (objective.CaptureSeconds <= 0 || objective.DecaySeconds <= 0)
+            throw new ArgumentOutOfRangeException(nameof(objective), "Capture and decay durations must be positive.");
+        captureObjective = objective;
+        captureProgress = new double[objective.Bases.Count];
+        captureCredit = new string?[objective.Bases.Count];
+    }
 
     public void Step(IReadOnlyDictionary<string, BotAction> actions)
     {
@@ -185,6 +204,86 @@ public sealed class Duel : ISimulationEngine
         Finish(new(winnerBotId, MatchEndReason.ObjectiveComplete, tick, winner.TeamId));
     }
 
+    public void CompleteObjectiveForTeam(string teamId)
+    {
+        EnsureRunning();
+        for (var i = 0; i < bots.Length; i++)
+        {
+            if (!IsActive(i) || bots[i].TeamId != teamId) continue;
+            Finish(new(bots[i].Id, MatchEndReason.ObjectiveComplete, tick, teamId));
+            return;
+        }
+
+        Finish(new(null, MatchEndReason.ObjectiveComplete, tick, teamId));
+    }
+
+    public void CompleteObjectiveDraw()
+    {
+        EnsureRunning();
+        Finish(new(null, MatchEndReason.ObjectiveComplete, tick));
+    }
+
+    /// <summary>
+    /// Advances capture progress for configured bases. Call after Step when the match is still running.
+    /// </summary>
+    public void TickCapture()
+    {
+        if (captureObjective is null || Result is not null) return;
+
+        var captureStep = StepSeconds / captureObjective.CaptureSeconds;
+        var decayStep = StepSeconds / captureObjective.DecaySeconds;
+        var completed = new List<string>();
+
+        for (var baseIndex = 0; baseIndex < captureObjective.Bases.Count; baseIndex++)
+        {
+            var zone = captureObjective.Bases[baseIndex];
+            var ownersPresent = false;
+            string? soleAttacker = null;
+            var contestedAttackers = false;
+
+            for (var i = 0; i < bots.Length; i++)
+            {
+                if (!IsActive(i) || !InsideCaptureZone(bots[i].Position, zone)) continue;
+                if (bots[i].TeamId == zone.OwnerTeamId)
+                {
+                    ownersPresent = true;
+                    continue;
+                }
+
+                if (soleAttacker is null) soleAttacker = bots[i].TeamId;
+                else if (soleAttacker != bots[i].TeamId) contestedAttackers = true;
+            }
+
+            var contested = ownersPresent && soleAttacker is not null;
+            if (contested || contestedAttackers)
+            {
+                // Pause: progress neither grows nor decays while contested.
+            }
+            else if (soleAttacker is not null)
+            {
+                captureCredit[baseIndex] = soleAttacker;
+                captureProgress[baseIndex] = Math.Min(1, captureProgress[baseIndex] + captureStep);
+            }
+            else if (captureProgress[baseIndex] > 0)
+            {
+                captureProgress[baseIndex] = Math.Max(0, captureProgress[baseIndex] - decayStep);
+                if (captureProgress[baseIndex] <= 0)
+                {
+                    captureProgress[baseIndex] = 0;
+                    captureCredit[baseIndex] = null;
+                }
+            }
+
+            if (captureProgress[baseIndex] >= 1 && captureCredit[baseIndex] is { } winner)
+                completed.Add(winner);
+        }
+
+        if (completed.Count == 0) return;
+        var winners = completed.Distinct(StringComparer.Ordinal).ToArray();
+        if (winners.Length > 1) CompleteObjectiveDraw();
+        else CompleteObjectiveForTeam(winners[0]);
+    }
+
     public BotState Bot(string botId) => bots[FindBot(botId)];
 
     private bool IsActive(int index) => !bots[index].Forfeited && bots[index].Hp > 0;
@@ -196,6 +295,42 @@ public sealed class Duel : ISimulationEngine
     {
         if (Result is not null) throw new InvalidOperationException("The match is finished.");
     }
+
+    private IReadOnlyList<CaptureZoneState> CurrentCaptureZones()
+    {
+        if (captureObjective is null) return [];
+        var zones = new CaptureZoneState[captureObjective.Bases.Count];
+        for (var i = 0; i < captureObjective.Bases.Count; i++)
+        {
+            var zone = captureObjective.Bases[i];
+            var ownersPresent = false;
+            string? soleAttacker = null;
+            for (var botIndex = 0; botIndex < bots.Length; botIndex++)
+            {
+                if (!IsActive(botIndex) || !InsideCaptureZone(bots[botIndex].Position, zone)) continue;
+                if (bots[botIndex].TeamId == zone.OwnerTeamId) ownersPresent = true;
+                else if (soleAttacker is null) soleAttacker = bots[botIndex].TeamId;
+                else if (soleAttacker != bots[botIndex].TeamId) soleAttacker = "contested";
+            }
+
+            var contested = ownersPresent && soleAttacker is not null || soleAttacker == "contested";
+            zones[i] = new(
+                zone.OwnerTeamId,
+                zone.X,
+                zone.Y,
+                zone.Width,
+                zone.Height,
+                captureProgress[i],
+                captureCredit[i],
+                contested);
+        }
+
+        return zones;
+    }
+
+    private static bool InsideCaptureZone(Vec2 position, CaptureBase zone) =>
+        position.X >= zone.X && position.X <= zone.X + zone.Width &&
+        position.Y >= zone.Y && position.Y <= zone.Y + zone.Height;
 
     private SafeZoneState? CurrentSafeZone()
     {

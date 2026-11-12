@@ -16,6 +16,16 @@ export interface LabBot {
   code: Partial<Record<StrategyLanguage, string>>;
 }
 
+export type LabMatchMode = 'destroy' | 'capturePoint';
+
+export interface CaptureBaseZone {
+  ownerTeamId: 'player' | 'opponent';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface LabSetup {
   allyCount: number;
   enemyCount: number;
@@ -23,6 +33,8 @@ export interface LabSetup {
   maxTicks: number;
   bots: LabBot[];
   activeBotId: string;
+  mode: LabMatchMode;
+  bases: CaptureBaseZone[];
 }
 
 export interface BehaviorPresetInfo {
@@ -46,6 +58,11 @@ export const classicWalls: Wall[] = [
   { x: 4.5, y: 1.9, width: 2.0, height: 1.3 },
   { x: 7.25, y: 4.15, width: 1.5, height: 1.7 },
   { x: 9.5, y: 6.8, width: 2.0, height: 1.3 },
+];
+
+export const defaultCaptureBases: CaptureBaseZone[] = [
+  { ownerTeamId: 'player', x: 1.2, y: 4.0, width: 2.0, height: 2.0 },
+  { ownerTeamId: 'opponent', x: 12.8, y: 4.0, width: 2.0, height: 2.0 },
 ];
 
 const defaultAllyCode: Record<StrategyLanguage, string> = {
@@ -126,6 +143,8 @@ export function defaultLabSetup(): LabSetup {
     maxTicks: 1000,
     bots,
     activeBotId: bots[0].id,
+    mode: 'destroy',
+    bases: defaultCaptureBases.map(zone => ({ ...zone })),
   };
 }
 
@@ -135,10 +154,21 @@ export function loadLabSetup(): LabSetup {
     if (!raw) return defaultLabSetup();
     const parsed = JSON.parse(raw) as LabSetup;
     if (!parsed?.bots?.length || !parsed.arena) return defaultLabSetup();
+    const defaults = defaultLabSetup();
     return {
-      ...defaultLabSetup(),
+      ...defaults,
       ...parsed,
       maxTicks: Math.max(parsed.maxTicks ?? 0, 1000),
+      mode: parsed.mode === 'capturePoint' ? 'capturePoint' : 'destroy',
+      bases: Array.isArray(parsed.bases) && parsed.bases.length === 2
+        ? parsed.bases.map(zone => ({
+          ownerTeamId: zone.ownerTeamId === 'opponent' ? 'opponent' as const : 'player' as const,
+          x: zone.x,
+          y: zone.y,
+          width: zone.width,
+          height: zone.height,
+        }))
+        : defaults.bases.map(zone => ({ ...zone })),
       arena: {
         width: 16,
         height: 10,

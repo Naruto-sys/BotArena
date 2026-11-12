@@ -3,11 +3,12 @@ import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { Arena, CampaignSpawn, Wall } from './contracts';
 import { ArenaCoordinates, arenaViewBox } from './ArenaCoordinates';
 import { botColor, botLabel } from './botDisplay';
-import { classicWalls, type LabBot } from './labDraft';
+import { classicWalls, type CaptureBaseZone, type LabBot, type LabMatchMode } from './labDraft';
 import { botsOverlap, wallOverlapsBot } from './mapGeometry';
 import { text } from './text';
 
 const MIN_WALL = 0.4;
+const MIN_BASE = 0.5;
 const HANDLE = 0.22;
 
 type Corner = 'nw' | 'ne' | 'sw' | 'se';
@@ -113,6 +114,12 @@ export function LabArenaEditor({
   onAddWall,
   onRemoveWalls,
   onClassicWalls,
+  mode,
+  onModeChange,
+  bases,
+  selectedBase,
+  onSelectBase,
+  onChangeBase,
 }: {
   arena: Arena;
   bots: LabBot[];
@@ -125,9 +132,16 @@ export function LabArenaEditor({
   onAddWall: (wall: Wall) => void;
   onRemoveWalls: (indices: number[]) => void;
   onClassicWalls: () => void;
+  mode: LabMatchMode;
+  onModeChange: (mode: LabMatchMode) => void;
+  bases?: CaptureBaseZone[];
+  selectedBase?: number | null;
+  onSelectBase?: (index: number | null) => void;
+  onChangeBase?: (index: number, zone: CaptureBaseZone) => void;
 }) {
   const spawns = bots.map(toSpawn);
   const activeWall = selectedWalls[selectedWalls.length - 1];
+  const showBases = !!bases && bases.length > 0 && !!onChangeBase;
 
   function validWalls(walls: Wall[]) {
     for (const wall of walls) {
@@ -260,8 +274,76 @@ export function LabArenaEditor({
     );
   }
 
+  function clampBase(zone: CaptureBaseZone): CaptureBaseZone {
+    const width = Math.max(MIN_BASE, Math.min(arena.width, zone.width));
+    const height = Math.max(MIN_BASE, Math.min(arena.height, zone.height));
+    return {
+      ...zone,
+      x: round1(Math.max(0, Math.min(arena.width - width, zone.x))),
+      y: round1(Math.max(0, Math.min(arena.height - height, zone.y))),
+      width: round1(width),
+      height: round1(height),
+    };
+  }
+
+  function startMoveBase(index: number, event: ReactPointerEvent<SVGRectElement>) {
+    if (!bases || !onChangeBase || !onSelectBase) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const svg = event.currentTarget.ownerSVGElement;
+    if (!svg) return;
+    const zone0 = bases[index];
+    if (!zone0) return;
+    onSelectWalls([]);
+    onSelectBase(index);
+    const start = clientToArena(svg, event.clientX, event.clientY);
+    const offsetX = start.x - zone0.x;
+    const offsetY = start.y - zone0.y;
+    bindPointerDrag(svg, { x: event.clientX, y: event.clientY }, point => {
+      onChangeBase(index, clampBase({
+        ...zone0,
+        x: point.x - offsetX,
+        y: point.y - offsetY,
+      }));
+    });
+  }
+
+  function startResizeBase(
+    index: number,
+    corner: Corner,
+    event: ReactPointerEvent<SVGRectElement>,
+  ) {
+    if (!bases || !onChangeBase || !onSelectBase) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const svg = event.currentTarget.ownerSVGElement;
+    if (!svg) return;
+    const zone0 = bases[index];
+    if (!zone0) return;
+    onSelectWalls([]);
+    onSelectBase(index);
+    bindPointerDrag(svg, { x: event.clientX, y: event.clientY }, point => {
+      onChangeBase(index, clampBase({
+        ...zone0,
+        ...resizeFromCorner(zone0, corner, point),
+      }));
+    });
+  }
+
   return (
     <div className="lab-map">
+      <div className="lab-mode-bar">
+        <label>{text.lab.matchMode}
+          <select
+            value={mode}
+            onChange={event => onModeChange(event.target.value as LabMatchMode)}
+          >
+            <option value="destroy">{text.lab.modes.destroy}</option>
+            <option value="capturePoint">{text.lab.modes.capturePoint}</option>
+          </select>
+        </label>
+        <p className="muted">{text.lab.modeHint[mode]}</p>
+      </div>
       {placementError && <p role="alert" className="error-card map-placement-error">{placementError}</p>}
       <div className="arena-stage">
         <svg
@@ -271,8 +353,9 @@ export function LabArenaEditor({
           aria-label={text.lab.mapLabel}
           onClick={event => {
             if (dragging.current) return;
-            if ((event.target as Element).closest('[data-bot], .lab-wall, .lab-wall-handle')) return;
+            if ((event.target as Element).closest('[data-bot], .lab-wall, .lab-wall-handle, .lab-base, .lab-base-handle')) return;
             onSelectWalls([]);
+            onSelectBase?.(null);
           }}
         >
           <defs>
@@ -282,6 +365,52 @@ export function LabArenaEditor({
           </defs>
           <rect width={arena.width} height={arena.height} fill="url(#lab-grid)" />
           <ArenaCoordinates width={arena.width} height={arena.height} />
+          {showBases && bases!.map((zone, index) => {
+            const selected = selectedBase === index;
+            const fill = zone.ownerTeamId === 'player' ? '#2f6fed44' : '#e35d3344';
+            const stroke = zone.ownerTeamId === 'player' ? '#6ea8ff' : '#ff8f6b';
+            return (
+              <g key={`base-${zone.ownerTeamId}`} className="lab-base-group">
+                <rect
+                  x={zone.x}
+                  y={zone.y}
+                  width={zone.width}
+                  height={zone.height}
+                  rx=".06"
+                  fill={fill}
+                  stroke={stroke}
+                  strokeWidth={selected ? '.08' : '.05'}
+                  strokeDasharray=".16 .1"
+                  className={selected ? 'lab-base selected' : 'lab-base'}
+                  onPointerDown={event => startMoveBase(index, event)}
+                />
+                <text
+                  x={zone.x + zone.width / 2}
+                  y={zone.y + 0.35}
+                  textAnchor="middle"
+                  className="lab-base-label"
+                  fill={stroke}
+                >
+                  {text.lab.captureBase(zone.ownerTeamId)}
+                </text>
+                {selected && (['nw', 'ne', 'sw', 'se'] as const).map(corner => {
+                  const point = cornerPoint(zone, corner);
+                  return (
+                    <rect
+                      key={corner}
+                      className={`lab-base-handle lab-wall-handle-${corner}`}
+                      x={point.x - HANDLE / 2}
+                      y={point.y - HANDLE / 2}
+                      width={HANDLE}
+                      height={HANDLE}
+                      rx=".04"
+                      onPointerDown={event => startResizeBase(index, corner, event)}
+                    />
+                  );
+                })}
+              </g>
+            );
+          })}
           {arena.walls.map((wall, index) => {
             const selected = selectedWalls.includes(index);
             const active = activeWall === index;

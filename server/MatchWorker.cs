@@ -104,12 +104,18 @@ internal static class MatchWorker
                 spawn.TurretAngle,
                 spawn.TeamId,
                 spawn.Hp) { Movement = MovementCatalog.Create(spawn.Movement) }).ToArray();
+        var captureMode = CapturePointSetup.IsCapturePoint(custom.Mode);
         var config = MatchConfig.Classic with
         {
             MaxTicks = custom.MaxTicks ?? MatchConfig.Classic.MaxTicks,
             Arena = custom.Arena with { Walls = Array.AsReadOnly(custom.Arena.Walls.ToArray()) },
-            Spawns = Array.AsReadOnly(spawns)
+            Spawns = Array.AsReadOnly(spawns),
+            ShrinkZoneEnabled = !captureMode && MatchConfig.Classic.ShrinkZoneEnabled,
         };
+
+        MatchObjective? objective = captureMode
+            ? CapturePointSetup.CreateObjective(custom.Bases)
+            : null;
 
         var loadouts = custom.Loadouts.ToDictionary(item => item.BotId, StringComparer.Ordinal);
         var runtimes = new Dictionary<string, IBotRuntime>(StringComparer.Ordinal);
@@ -129,7 +135,7 @@ internal static class MatchWorker
                 .Where(spawn => spawn.ResolvedTeamId == Match.PlayerTeamId)
                 .Select(spawn => spawn.Id)
                 .ToHashSet(StringComparer.Ordinal);
-            return new(Match.Run(config, runtimes, logBotIds: playerIds), null);
+            return new(Match.Run(config, runtimes, objective, logBotIds: playerIds), null);
         }
         finally
         {

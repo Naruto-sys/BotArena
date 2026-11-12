@@ -176,6 +176,20 @@ static IResult? ValidateCustomMatch(MatchRequest request, CustomMatchSpec custom
     if (hasPlayerCode && request.Language is { } lang && !StrategyLanguages.Available().Contains(lang))
         return Results.BadRequest(new { error = "Выбранный язык стратегии недоступен." });
 
+    if (custom.Mode is { } mode &&
+        !string.Equals(mode, CapturePointSetup.ModeDestroy, StringComparison.OrdinalIgnoreCase) &&
+        !CapturePointSetup.IsCapturePoint(mode))
+        return Results.BadRequest(new { error = "Режим матча должен быть destroy или capturePoint." });
+
+    if (CapturePointSetup.IsCapturePoint(custom.Mode))
+    {
+        if (CapturePointSetup.ValidateBases(custom.Arena, custom.Bases) is { } baseError)
+            return Results.BadRequest(new { error = baseError });
+        var teams = custom.Spawns.Select(spawn => spawn.TeamId).ToHashSet(StringComparer.Ordinal);
+        if (teams.Count != 2)
+            return Results.BadRequest(new { error = "Захват точки доступен только для двух команд." });
+    }
+
     return null;
 }
 

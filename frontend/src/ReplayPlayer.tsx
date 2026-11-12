@@ -51,6 +51,7 @@ function ReplayEffectsOverlay({ arena, marker, damageNumbers, finished }: {
   damageNumbers: Array<{ key: string; x: number; y: number; damage: number; age: number; zone: boolean }>;
   finished: boolean;
 }) {
+  // Capture zones live in the 3D scene so cinema / section / plan / overview stay aligned.
   if (!marker && damageNumbers.length === 0) return null;
   return (
     <svg className="replay-effects-overlay" viewBox={arenaViewBox(arena.width, arena.height)} aria-hidden="true">

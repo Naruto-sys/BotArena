@@ -407,6 +407,382 @@ internal static class BehaviorPresets
                 aimAt: scout
               };
             }
+            """),
+        (new("base-captor", "Захватчик базы",
+            "Универсальный ИИ захвата: 8-связный BFS, рейд в зону, удержание, защита своей базы и ближняя дуэль.", "strong"),
+            """
+            const CELL = 0.75;
+            const MARGIN = 0.42;
+            const DC = [1, -1, 0, 0, 1, 1, -1, -1];
+            const DR = [0, 0, 1, -1, 1, -1, 1, -1];
+
+            let occ = null;
+            let cols = 0;
+            let rows = 0;
+            let path = null;
+            let pathGoal = null;
+            let pathTick = -999;
+            let lastPos = null;
+            let stuckFor = 0;
+            let visited = null;
+            let parent = null;
+            let queue = null;
+            let lastEnemy = null;
+            let lastEnemyTick = -999;
+            let holdAngle = 0;
+            let mode = 'raid';
+            let stage = 'lane';
+
+            function world(c, r) {
+              return { x: (c + 0.5) * CELL, y: (r + 0.5) * CELL };
+            }
+
+            function buildOccupancy(arena, walls) {
+              cols = Math.max(1, Math.ceil(arena.width / CELL));
+              rows = Math.max(1, Math.ceil(arena.height / CELL));
+              const size = cols * rows;
+              occ = new Int8Array(size);
+              visited = new Int8Array(size);
+              parent = new Int16Array(size);
+              queue = new Int16Array(size);
+              const minC = Math.max(0, Math.floor(MARGIN / CELL));
+              const maxC = Math.min(cols - 1, Math.floor((arena.width - MARGIN) / CELL));
+              const minR = Math.max(0, Math.floor(MARGIN / CELL));
+              const maxR = Math.min(rows - 1, Math.floor((arena.height - MARGIN) / CELL));
+              for (let i = 0; i < size; i++) occ[i] = 1;
+              for (let r = minR; r <= maxR; r++) {
+                for (let c = minC; c <= maxC; c++) occ[r * cols + c] = 0;
+              }
+              for (let i = 0; i < walls.length; i++) {
+                const wall = walls[i];
+                const c0 = Math.max(0, Math.floor((wall.x - MARGIN) / CELL));
+                const r0 = Math.max(0, Math.floor((wall.y - MARGIN) / CELL));
+                const c1 = Math.min(cols - 1, Math.floor((wall.x + wall.width + MARGIN) / CELL));
+                const r1 = Math.min(rows - 1, Math.floor((wall.y + wall.height + MARGIN) / CELL));
+                for (let r = r0; r <= r1; r++) {
+                  for (let c = c0; c <= c1; c++) occ[r * cols + c] = 1;
+                }
+              }
+            }
+
+            function cellOf(point) {
+              return {
+                c: Math.max(0, Math.min(cols - 1, Math.floor(point.x / CELL))),
+                r: Math.max(0, Math.min(rows - 1, Math.floor(point.y / CELL)))
+              };
+            }
+
+            function nearestFree(point) {
+              const start = cellOf(point);
+              if (!occ[start.r * cols + start.c]) return start;
+              for (let radius = 1; radius <= 8; radius++) {
+                for (let dc = -radius; dc <= radius; dc++) {
+                  for (let dr = -radius; dr <= radius; dr++) {
+                    if (Math.abs(dc) !== radius && Math.abs(dr) !== radius) continue;
+                    const c = start.c + dc;
+                    const r = start.r + dr;
+                    if (c < 0 || r < 0 || c >= cols || r >= rows) continue;
+                    if (!occ[r * cols + c]) return { c, r };
+                  }
+                }
+              }
+              return start;
+            }
+
+            function bfsPath(startPoint, goalPoint) {
+              const start = nearestFree(startPoint);
+              const goal = nearestFree(goalPoint);
+              const startIndex = start.r * cols + start.c;
+              const goalIndex = goal.r * cols + goal.c;
+              if (startIndex === goalIndex) return [world(goal.c, goal.r)];
+              const size = cols * rows;
+              for (let i = 0; i < size; i++) {
+                visited[i] = 0;
+                parent[i] = -1;
+              }
+              let head = 0;
+              let tail = 0;
+              queue[tail++] = startIndex;
+              visited[startIndex] = 1;
+              let found = -1;
+              while (head < tail) {
+                const current = queue[head++];
+                if (current === goalIndex) {
+                  found = current;
+                  break;
+                }
+                const c = current % cols;
+                const r = (current - c) / cols;
+                for (let d = 0; d < 8; d++) {
+                  const nc = c + DC[d];
+                  const nr = r + DR[d];
+                  if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue;
+                  const next = nr * cols + nc;
+                  if (visited[next] || occ[next]) continue;
+                  if (d >= 4) {
+                    const sideA = r * cols + nc;
+                    const sideB = nr * cols + c;
+                    if (occ[sideA] || occ[sideB]) continue;
+                  }
+                  visited[next] = 1;
+                  parent[next] = current;
+                  queue[tail++] = next;
+                }
+              }
+              if (found < 0) return null;
+              const cells = [];
+              for (let node = found; node >= 0; node = parent[node]) {
+                const c = node % cols;
+                const r = (node - c) / cols;
+                cells.push(world(c, r));
+                if (node === startIndex) break;
+              }
+              cells.reverse();
+              return cells;
+            }
+
+            function nextWaypoint(self, goal, arena, walls, tick, force) {
+              if (!occ) buildOccupancy(arena, walls);
+              const goalChanged = !pathGoal ||
+                Math.hypot(goal.x - pathGoal.x, goal.y - pathGoal.y) > 0.9;
+              if (force || !path || goalChanged || tick - pathTick > 14) {
+                path = bfsPath(self.position, goal);
+                pathGoal = { x: goal.x, y: goal.y };
+                pathTick = tick;
+              }
+              if (!path || path.length === 0) return goal;
+              let index = 0;
+              while (index < path.length - 1 && distance(self, path[index]) < CELL * 0.65) index++;
+              return path[Math.min(path.length - 1, index + 1)];
+            }
+
+            function zoneCenter(zone) {
+              return {
+                x: zone.x + zone.width * 0.5,
+                y: zone.y + zone.height * 0.5
+              };
+            }
+
+            function insideZone(point, zone) {
+              return point.x >= zone.x && point.x <= zone.x + zone.width
+                && point.y >= zone.y && point.y <= zone.y + zone.height;
+            }
+
+            function clampPoint(point, arena) {
+              return {
+                x: Math.min(arena.width - MARGIN, Math.max(MARGIN, point.x)),
+                y: Math.min(arena.height - MARGIN, Math.max(MARGIN, point.y))
+              };
+            }
+
+            function laneGate(arena, from, to) {
+              const midX = (from.x + to.x) * 0.5;
+              return clampPoint({ x: midX, y: arena.height * 0.5 }, arena);
+            }
+
+            function approachPoint(self, zone, arena) {
+              const center = zoneCenter(zone);
+              if (distance(self, center) < Math.max(zone.width, zone.height) * 0.85) return center;
+              if (Math.abs(self.position.x - center.x) > 3.2
+                && Math.abs(self.position.y - arena.height * 0.5) > 1.1) {
+                stage = 'lane';
+                return laneGate(arena, self.position, center);
+              }
+              stage = 'breach';
+              return center;
+            }
+
+            function orbitPoint(zone, tick) {
+              const center = zoneCenter(zone);
+              const radius = Math.max(0.28, Math.min(zone.width, zone.height) * 0.22);
+              const angle = holdAngle + tick * 0.13;
+              return {
+                x: center.x + Math.cos(angle) * radius,
+                y: center.y + Math.sin(angle) * radius
+              };
+            }
+
+            function pickZones(self, captureZones) {
+              const zones = captureZones || [];
+              const own = zones.find(zone => zone.ownerTeamId === self.teamId);
+              const enemy = zones.find(zone => zone.ownerTeamId !== self.teamId);
+              return { own, enemy };
+            }
+
+            function chooseMode(self, enemy, own, enemyZone) {
+              const enemyOnOurBase = own && (
+                (own.progress || 0) > 0.05
+                || own.contested
+                || (own.capturingTeamId && own.capturingTeamId !== self.teamId)
+                || (enemy && insideZone(enemy.position, own))
+              );
+              const weAreCapturing = !!(enemyZone && insideZone(self.position, enemyZone));
+              const captureProgress = enemyZone ? (enemyZone.progress || 0) : 0;
+              const hpRatio = self.hp / Math.max(1, self.maxHp);
+              const enemyClose = enemy && distance(self, enemy.position) < 2.05;
+              const enemyWeak = enemy && enemy.hp <= self.hp * 0.55;
+              const enemyGuardingBase = !!(enemyZone && enemy && insideZone(enemy.position, enemyZone));
+              const nearEnemyBase = !!(enemyZone && distance(self, zoneCenter(enemyZone)) < 4.5);
+
+              if (enemyOnOurBase && (!weAreCapturing || captureProgress < 0.6)) {
+                mode = 'defend';
+                return mode;
+              }
+              if (weAreCapturing && (enemyGuardingBase || (enemyZone && enemyZone.contested))) {
+                mode = 'clear';
+                return mode;
+              }
+              if (weAreCapturing || captureProgress >= 0.12) {
+                mode = 'hold';
+                return mode;
+              }
+              if (nearEnemyBase && enemyGuardingBase) {
+                mode = 'breach';
+                return mode;
+              }
+              // Capture objective beats open-field duel: only skirmish when no zones exist.
+              if (!enemyZone && enemyClose && (enemyWeak || hpRatio > 0.55)) {
+                mode = 'duel';
+                return mode;
+              }
+              if (!enemyZone && hpRatio < 0.28 && enemy && distance(self, enemy.position) < 3.0) {
+                mode = 'recover';
+                return mode;
+              }
+              mode = 'raid';
+              return mode;
+            }
+
+            function combatAim(self, enemy, fallback) {
+              if (!enemy) return fallback;
+              const dist = distance(self, enemy.position);
+              const lead = Math.min(2.2, dist * 0.1);
+              const heading = enemy.bodyAngle || 0;
+              const speed = typeof enemy.speed === 'number' ? enemy.speed : 2.4;
+              return {
+                x: enemy.position.x + Math.cos(heading) * speed * lead * 0.05,
+                y: enemy.position.y + Math.sin(heading) * speed * lead * 0.05
+              };
+            }
+
+            function tick(state) {
+              const self = state.self;
+              const enemy = state.enemy;
+              const arena = state.arena;
+              const tick = state.tick;
+              const walls = arena.walls || [];
+              const { own, enemy: enemyZone } = pickZones(self, state.captureZones);
+
+              if (!occ) buildOccupancy(arena, walls);
+              if (lastPos) stuckFor = distance(self, lastPos) < 0.07 ? stuckFor + 1 : 0;
+              lastPos = { x: self.position.x, y: self.position.y };
+              const force = stuckFor > 16;
+              if (force) {
+                path = null;
+                stuckFor = 0;
+                holdAngle += Math.PI * 0.85;
+                stage = 'lane';
+              }
+
+              if (enemy) {
+                lastEnemy = {
+                  x: enemy.position.x,
+                  y: enemy.position.y,
+                  hp: enemy.hp
+                };
+                lastEnemyTick = tick;
+              }
+
+              const remembered = enemy || (lastEnemy && tick - lastEnemyTick < 50
+                ? { position: lastEnemy, hp: lastEnemy.hp }
+                : null);
+
+              chooseMode(self, enemy, own, enemyZone);
+
+              let driveTarget;
+              if (mode === 'defend' && own) {
+                driveTarget = enemy && insideZone(enemy.position, own)
+                  ? {
+                      x: (enemy.position.x + zoneCenter(own).x) * 0.5,
+                      y: (enemy.position.y + zoneCenter(own).y) * 0.5
+                    }
+                  : zoneCenter(own);
+              } else if (mode === 'recover' && own) {
+                driveTarget = {
+                  x: zoneCenter(own).x * 0.55 + self.position.x * 0.45,
+                  y: arena.height * 0.5
+                };
+              } else if ((mode === 'clear' || mode === 'breach') && enemyZone) {
+                const center = zoneCenter(enemyZone);
+                if (mode === 'breach' && !insideZone(self.position, enemyZone)) {
+                  driveTarget = center;
+                } else if (enemy) {
+                  // Stay inside the zone while pressing the defender out / down.
+                  const push = {
+                    x: enemy.position.x * 0.65 + center.x * 0.35,
+                    y: enemy.position.y * 0.65 + center.y * 0.35
+                  };
+                  driveTarget = insideZone(push, enemyZone) ? push : center;
+                } else {
+                  driveTarget = center;
+                }
+              } else if (mode === 'duel' && enemy) {
+                const dist = distance(self, enemy.position);
+                const angle = Math.atan2(
+                  enemy.position.y - self.position.y,
+                  enemy.position.x - self.position.x
+                );
+                const side = Math.sin(tick * 0.2) >= 0 ? 1 : -1;
+                driveTarget = dist > 2.6
+                  ? enemy.position
+                  : clampPoint({
+                      x: enemy.position.x - Math.cos(angle) * 1.55
+                        + Math.cos(angle + Math.PI / 2) * 1.15 * side,
+                      y: enemy.position.y - Math.sin(angle) * 1.55
+                        + Math.sin(angle + Math.PI / 2) * 1.15 * side
+                    }, arena);
+              } else if (mode === 'hold' && enemyZone) {
+                if (insideZone(self.position, enemyZone)) {
+                  driveTarget = orbitPoint(enemyZone, tick);
+                } else {
+                  driveTarget = zoneCenter(enemyZone);
+                }
+              } else if (enemyZone) {
+                driveTarget = approachPoint(self, enemyZone, arena);
+              } else if (remembered) {
+                driveTarget = remembered.position;
+              } else {
+                driveTarget = { x: arena.width * 0.72, y: arena.height * 0.5 };
+              }
+
+              if (force) {
+                driveTarget = clampPoint({
+                  x: driveTarget.x + Math.cos(holdAngle) * 1.8,
+                  y: arena.height * 0.5 + Math.sin(holdAngle) * 1.2
+                }, arena);
+              }
+
+              const aimPoint = combatAim(
+                self,
+                enemy,
+                remembered ? remembered.position : driveTarget
+              );
+              const enemyInFight = !!enemy && (
+                mode === 'clear' || mode === 'defend' || mode === 'duel' || mode === 'breach'
+                || (mode === 'hold' && enemyZone && insideZone(enemy.position, enemyZone))
+                || (mode === 'raid' && distance(self, enemy.position) < 1.9)
+                || (mode === 'recover' && distance(self, enemy.position) < 2.8)
+              );
+              const canShootEnemy = enemyInFight
+                && self.canShoot
+                && facing(self, enemy.position, mode === 'hold' || mode === 'raid' ? 0.14 : 0.08);
+
+              return {
+                driveTo: nextWaypoint(self, driveTarget, arena, walls, tick, force),
+                aimAt: enemyInFight ? aimPoint : (remembered ? remembered.position : driveTarget),
+                shoot: canShootEnemy
+              };
+            }
             """)
     ];
 

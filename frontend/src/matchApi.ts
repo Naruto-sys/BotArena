@@ -18,6 +18,16 @@ export function buildCustomMatchPayload(setup: LabSetup, language: StrategyLangu
     customMatch: {
       arena: setup.arena,
       maxTicks: setup.maxTicks,
+      mode: setup.mode,
+      bases: setup.mode === 'capturePoint'
+        ? setup.bases.map(zone => ({
+          ownerTeamId: zone.ownerTeamId,
+          x: zone.x,
+          y: zone.y,
+          width: zone.width,
+          height: zone.height,
+        }))
+        : undefined,
       spawns: setup.bots.map(bot => ({
         id: bot.id,
         teamId: bot.teamId,

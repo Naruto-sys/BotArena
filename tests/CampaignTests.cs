@@ -10,7 +10,7 @@ public class CampaignTests
         Assert.Equal(
             new[] { "controls-beginner", "controls-advanced", "modes" },
             CampaignCatalog.TracksList.Select(track => track.Id));
-        Assert.Equal(18, CampaignCatalog.All.Count);
+        Assert.Equal(19, CampaignCatalog.All.Count);
         Assert.Equal(
             new[] { "move", "steer-short", "steer-long", "shoot-simple", "shoot-cover", "track", "duel" },
             CampaignCatalog.TracksList.Single(track => track.Id == "controls-beginner").Levels.Select(level => level.Id));
@@ -18,7 +18,7 @@ public class CampaignTests
             new[] { "adv-move", "adv-steer-short", "adv-steer-long", "adv-shoot-simple", "adv-shoot-cover", "adv-track", "adv-duel" },
             CampaignCatalog.TracksList.Single(track => track.Id == "controls-advanced").Levels.Select(level => level.Id));
         Assert.Equal(
-            new[] { "mode-duel", "mode-team-3v3", "mode-ffa", "mode-outnumbered" },
+            new[] { "mode-duel", "mode-team-3v3", "mode-ffa", "mode-outnumbered", "mode-capture-point" },
             CampaignCatalog.TracksList.Single(track => track.Id == "modes").Levels.Select(level => level.Id));
         Assert.True(CampaignCatalog.TracksList.Single(track => track.Id == "modes").Available);
     }

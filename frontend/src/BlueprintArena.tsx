@@ -7,6 +7,7 @@ import { botColor } from './botVisuals';
 import { createPerceptionRig, updatePerceptionRig } from './perceptionLayer';
 import type { LastKnownTarget } from './perceptionLayer';
 import { createTimeTower, updateTimeTower } from './timeTower';
+import { createCaptureZoneRig, disposeCaptureZoneRig, updateCaptureZoneRig } from './captureZoneLayer';
 import { createSafeZoneRig, updateSafeZoneRig } from './safeZoneLayer';
 import { gunnerPose } from './gunnerCamera';
 import { VIDEO_WIDTH, VIDEO_HEIGHT } from './replayVideo';
@@ -695,6 +696,8 @@ export function BlueprintArena({
 
     const safeZoneRig = createSafeZoneRig(replay.arena);
     scene.add(safeZoneRig.group);
+    const captureZoneRig = createCaptureZoneRig(replay.arena);
+    scene.add(captureZoneRig.group);
 
     const wallRigs: WallRig[] = [];
     for (const wall of replay.arena.walls) {
@@ -1204,6 +1207,7 @@ export function BlueprintArena({
         activeDirectorShotId = ''; adaptiveShotId = ''; adaptivePose = undefined;
       }
       updateSafeZoneRig(safeZoneRig, replay.arena, state.frame.safeZone, state.next.safeZone, state.fraction);
+      updateCaptureZoneRig(captureZoneRig, replay.arena, state.frame.captureZones);
       const currentBots = new Map<string, Bot>();
       const perceptionMode = state.cameraMode === 'perception';
       const timelineMode = state.cameraMode === 'timeline';
@@ -1599,6 +1603,7 @@ export function BlueprintArena({
       resizeObserver.disconnect();
       renderer.domElement.removeEventListener('pointerdown', seekFromTower);
       safeZoneRig.boundary.dispose();
+      disposeCaptureZoneRig(captureZoneRig);
       disposeScene(scene);
       renderer.dispose();
       renderer.domElement.remove();
