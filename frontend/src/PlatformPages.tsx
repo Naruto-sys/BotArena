@@ -1,19 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { CampaignTrack, StrategyLanguage } from './contracts';
+import type { CampaignTrack } from './contracts';
 import type { SavedStrategy } from './strategyLibrary';
 import { platformText as ui } from './text';
 export type Page = keyof typeof ui.nav;
 export function ComingSoon({ children }: { children: React.ReactNode }) {
   return <div className="ux-placeholder"><span className="ux-tag">{ui.soon}</span><p>{children}</p></div>;
 }
-export function Home({ tracks, completed, languages, navigate, onContinue, onDemo, demoInvite }: { tracks: CampaignTrack[]; completed: string[]; languages: StrategyLanguage[]; navigate: (page: Page) => void; onContinue: () => void; onDemo: () => void; demoInvite: boolean }) {
-  const available = tracks.filter(t => t.available);
-  const ids = new Set(tracks.flatMap(t => t.levels.map(l => l.id)));
-  const done = completed.filter(id => ids.has(id)).length;
+export function Home({ navigate, onContinue, onDemo, demoInvite }: { navigate: (page: Page) => void; onContinue: () => void; onDemo: () => void; demoInvite: boolean }) {
   return <div className="ux-home">
     <section className="ux-hero" data-tour-target="home-start"><div><h1>{ui.hero}</h1><p>{ui.intro}</p><div className="ux-actions"><button className="primary" onClick={onContinue}>{ui.learn} →</button><button onClick={() => navigate('arena')}>{ui.arena}</button><button className={`demo-launch-button ${demoInvite ? 'soft-invite-pulse' : ''}`} onClick={onDemo}>▶ Тестовый запуск · 1 минута</button></div>{demoInvite && <p className="demo-invite-copy">Начните с готового примера: код уже написан, останется запустить бой.</p>}</div><div className="ux-radar" aria-hidden="true">BA</div></section>
-    <div className="ux-stats" data-tour-target="home-progress"><div><b>{done} / {ids.size}</b><span>{ui.progress}</span></div><div><b>{available.length}</b><span>{ui.chapters}</span></div><div><b>{languages.map(l => l === 'javascript' ? 'JS' : 'Python').join(' + ')}</b><span>{ui.local}</span></div></div>
     <h2>{ui.next}</h2><div className="ux-grid">{ui.paths.map(([title, description], i) => <article className="panel ux-path" key={title}><small>0{i + 1}</small><h2>{title}</h2><p>{description}</p><button onClick={() => navigate((['learn', 'arena', 'workshop'] as Page[])[i])}>{title} →</button></article>)}</div>
   </div>;
 }
@@ -60,7 +56,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
 
 const tourSteps: { page: Page; section: string; title: string; description: string; target: string }[] = [
   { page: 'home', section: 'Главная', title: 'Первый шаг', description: 'Начните с тестового боя или ближайшего учебного испытания.', target: '[data-tour-target="home-start"]' },
-  { page: 'home', section: 'Главная', title: 'Ваш прогресс', description: 'Здесь видно, сколько испытаний уже пройдено и какие главы доступны.', target: '[data-tour-target="home-progress"]' },
+  { page: 'home', section: 'Главная', title: 'Тестовый бой', description: 'Готовый пример поможет посмотреть, как код управляет роботом: запустите его на Арене.', target: '.demo-launch-button' },
   { page: 'home', section: 'Главная', title: 'Маршруты', description: 'Карточки ведут к обучению, свободной арене и сохранённым стратегиям.', target: '.ux-grid' },
   { page: 'learn', section: 'Обучение', title: 'Карта уровней', description: 'Доступные узлы подсвечены, а следующий уровень открывается после победы.', target: '.learning-map' },
   { page: 'learn', section: 'Обучение', title: 'Доступное испытание', description: 'Нажмите на яркий узел, чтобы открыть редактор и условие задачи.', target: '.lesson-stop.available' },
