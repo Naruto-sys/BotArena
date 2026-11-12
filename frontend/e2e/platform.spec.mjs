@@ -787,3 +787,113 @@ test('footer sits at viewport bottom on short pages and follows long content', a
   const bottom=await page.locator('.platform-footer').boundingBox();
   expect(bottom.y).toBeGreaterThanOrEqual(last.y+last.height+40);
 });
+
+test('audio panel and expanded mixer switch themes in both toggle states', async ({ page }) => {
+  await page.addInitScript(()=>localStorage.setItem('botarena-theme','light'));
+  await arena(page); await start(page).click();
+  await page.locator('.blueprint-canvas').waitFor({state:'attached',timeout:30000});
+  await page.locator('.replay-toolbox > summary').filter({hasText:/^Звук$/}).click();
+  const audio=page.getByRole('group',{name:'Звук боя',exact:true});
+  await expect(audio).toHaveCSS('background-color','rgb(244, 249, 252)');
+  if (await audio.locator('.audio-toggle').getAttribute('aria-pressed') === 'true') await audio.locator('.audio-toggle').click();
+  await expect(audio.locator('.audio-toggle')).toHaveCSS('background-color','rgb(255, 255, 255)');
+  await audio.getByRole('button',{name:'Включить звук',exact:true}).click();
+  await expect(audio.locator('.audio-toggle')).toHaveCSS('background-color','rgb(220, 241, 235)');
+  await audio.locator('summary').click();
+  await expect(audio.locator('.audio-channels .audio-volume').first()).toHaveCSS('color','rgb(82, 108, 125)');
+  await expect(audio.locator('.audio-volume output').first()).toHaveCSS('color','rgb(41, 79, 98)');
+  await page.getByRole('button',{name:'Включить тёмную тему',exact:true}).click();
+  await expect(audio).toHaveCSS('background-color','rgb(11, 23, 37)');
+  await page.getByRole('button',{name:'Включить светлую тему',exact:true}).click();
+  await expect(audio).toHaveCSS('background-color','rgb(244, 249, 252)');
+  await audio.getByRole('button',{name:'Выключить звук',exact:true}).click();
+  await expect(audio.locator('.audio-toggle')).toHaveCSS('background-color','rgb(255, 255, 255)');
+  await page.setViewportSize({width:390,height:844});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
+});
+
+test('PvE uses the standard workspace with preview, retained drafts, next level and a visible exit', async ({ page }) => {
+  await signup(page.request);
+  const course=await page.request.get('/api/pve/').then(r=>r.json()); const first=course.blocks[0].levels[0], next=course.blocks[0].levels[1];
+  expect(first.arena.width).toBeGreaterThan(0); expect(first.spawns.length).toBeGreaterThanOrEqual(2);
+  await page.goto('/#learn/pve'); await page.getByRole('button',{name:first.title,exact:true}).click();
+  const workspace=page.locator('.pve-workspace');
+  await expect(page.locator('.lesson-overlay')).toHaveCount(0);
+  await expect(workspace.locator('.editor h1')).toHaveText(first.title);
+  await expect(workspace.locator('.replay svg.arena')).toBeVisible();
+  await expect(workspace.locator('.pve-workspace-heading button')).toBeVisible();
+  const draft='function tick(){ return {}; } // personal draft';
+  await workspace.locator('.cm-content').fill(draft);
+  await workspace.getByLabel('Выберите язык стратегии',{exact:true}).selectOption('python');
+  await workspace.locator('.cm-content').fill('def tick(state):\n    return {}');
+  await workspace.getByLabel('Выберите язык стратегии',{exact:true}).selectOption('javascript');
+  await expect(workspace.locator('.cm-content')).toContainText('personal draft');
+  await workspace.locator('.pve-workspace-heading button').click();
+  await expect(workspace).toHaveCount(0); await expect(page.locator('.chapter-rail')).toBeVisible();
+  await page.getByRole('button',{name:first.title,exact:true}).click();
+  await expect(workspace.locator('.cm-content')).toContainText('personal draft');
+  await workspace.getByRole('button',{name:'Показать подсказку',exact:true}).click();
+  await expect(workspace.getByText(first.hints[0],{exact:true})).toBeVisible();
+  await workspace.getByRole('button',{name:'Вставить правильный код',exact:true}).click();
+  await start(page).click();
+  await expect(workspace.locator('.pve-attempt-result.success-card')).toBeVisible({timeout:30000});
+  await expect(workspace.getByRole('button',{name:'Следующий уровень →',exact:true})).toBeVisible();
+  await workspace.getByRole('button',{name:'Следующий уровень →',exact:true}).click();
+  await expect(workspace.locator('.editor h1')).toHaveText(next.title);
+  await expect(workspace.locator('.blueprint-canvas')).toHaveCount(0);
+  await workspace.getByRole('button',{name:'К уровням PvE',exact:true}).click();
+  await expect(page.locator('.level-stop.completed')).toHaveCount(1);
+  await expect(page.locator('.level-map').getByRole('button',{name:next.title,exact:true})).toBeEnabled();
+});
+
+test('leaving a running PvE attempt cannot put its result in a reopened workspace', async ({ page }) => {
+  await signup(page.request);
+  const course=await page.request.get('/api/pve/').then(r=>r.json()); const first=course.blocks[0].levels[0];
+  await page.goto('/#learn/pve'); await page.getByRole('button',{name:first.title,exact:true}).click();
+  let release, arrived;
+  const gate=new Promise(resolve=>{release=resolve;}), responseArrived=new Promise(resolve=>{arrived=resolve;});
+  await page.route(`**/api/pve/levels/${first.id}/attempt`, async route=>{
+    const response=await route.fetch(); arrived(); await gate; await route.fulfill({response});
+  });
+  try {
+    await page.getByRole('button',{name:'Вставить правильный код',exact:true}).click(); await start(page).click(); await responseArrived;
+    await page.locator('.pve-workspace-heading button').click();
+    await page.getByRole('button',{name:first.title,exact:true}).click();
+    await page.locator('.pve-workspace .cm-content').fill('function tick(){return {};} // new draft');
+    release();
+    await expect(start(page)).toBeEnabled({timeout:30000});
+    await expect(page.locator('.pve-attempt-result')).toHaveCount(0);
+    await expect(page.locator('.pve-workspace .blueprint-canvas')).toHaveCount(0);
+    await expect(page.locator('.pve-workspace .cm-content')).toContainText('new draft');
+  } finally { release(); }
+});
+
+test('PvE workspace is responsive in both themes and keeps an exit available', async ({ page }) => {
+  await signup(page.request); await page.goto('/#learn/pve');
+  await page.locator('.level-node:enabled').first().click();
+  const workspace=page.locator('.pve-workspace');
+  for (const width of [1440,390]) {
+    await page.setViewportSize({width,height:900});
+    for (const theme of ['dark','light']) {
+      await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
+      await expect(workspace.locator('.pve-workspace-heading button')).toBeVisible();
+      await expect(workspace.locator('.replay')).toBeVisible();
+    }
+  }
+  await workspace.getByRole('button',{name:'Развернуть редактор',exact:true}).click();
+  await expect(workspace.locator('.replay')).toBeHidden();
+  await workspace.locator('.pve-workspace-heading button').click();
+  await expect(workspace).toHaveCount(0); await expect(page.locator('.chapter-rail')).toBeVisible();
+});
+
+test('changing accounts clears the in-memory PvE draft', async ({ page }) => {
+  await signup(page.request); await page.goto('/#learn/pve'); await page.locator('.level-node:enabled').first().click();
+  await page.locator('.pve-workspace .cm-content').fill('function tick(){return {};} // account A draft');
+  await page.getByRole('button',{name:'Меню аккаунта',exact:true}).click();
+  await page.getByRole('button',{name:'Выйти',exact:true}).click();
+  await expect(page.locator('.learning-auth')).toBeVisible();
+  await signup(page.request); await page.evaluate(()=>window.dispatchEvent(new Event('botarena-auth-changed')));
+  await page.locator('.level-node:enabled').first().click();
+  await expect(page.locator('.pve-workspace .cm-content')).not.toContainText('account A draft');
+});

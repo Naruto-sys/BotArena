@@ -142,6 +142,11 @@ public static class PveEndpoints
     {
         level.Id, level.Order, level.BlockId, level.BlockOrder, level.Stage, level.IsTraining,
         level.Title, level.Command, level.Description, level.Goal, level.Hints, level.Reward,
+        arena = level.Config.Arena,
+        spawns = level.Config.Spawns.Select(spawn => new
+        {
+            spawn.Id, teamId = spawn.ResolvedTeamId, spawn.Position, spawn.BodyAngle, spawn.TurretAngle
+        }),
         starterCode = new { javascript = level.JavaScriptStarter, python = level.PythonStarter },
         solutionCode = new { javascript = level.JavaScriptSolution, python = level.PythonSolution },
         completed = progress?.CompletedAt != null, locked,

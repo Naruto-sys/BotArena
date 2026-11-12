@@ -682,3 +682,36 @@ dialog.arena-modal-native::backdrop { background: #020a13c7; backdrop-filter: bl
 [data-theme="light"] .maneuver-icon { background:#e6f3ef; color:#217563; border-color:#b7d5cb; }
 [data-theme="light"] .maneuver-card .copy-code-button.copied { color:#236b52; background:#e1f4eb; border-color:#97c4ad; }
 [data-theme="light"] .maneuver-card .copy-error { color:#a33e36; }
+
+[data-theme="light"] .audio-controls { background:#f4f9fc; border-color:#c6d8e2; }
+[data-theme="light"] .audio-controls .audio-toggle { background:#fff; color:#31596b; border-color:#b1cbd7; }
+[data-theme="light"] .audio-controls .audio-toggle.active { background:#dcf1eb; color:#236757; border-color:#8dbdad; }
+[data-theme="light"] .audio-controls .audio-toggle:hover { border-color:#67a99b; }
+[data-theme="light"] .audio-indicator { background:#91a8b5; }
+[data-theme="light"] .audio-toggle.active .audio-indicator { background:#2a987e; box-shadow:none; }
+[data-theme="light"] .audio-volume { color:#526c7d; }
+[data-theme="light"] .audio-volume input { accent-color:#218c79; }
+[data-theme="light"] .audio-volume output { color:#294f62; }
+[data-theme="light"] .audio-mixer summary { color:#357369; }
+[data-theme="light"] .audio-hint { color:#5e7c8b; }
+[data-theme="light"] .audio-error { color:#a34034; }
+
+.pve-workspace-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:4px 0 20px; flex-wrap:wrap; }
+.pve-workspace-heading > span { font-size:12px; color:#87a5b7; }
+.pve-workspace .pve-hints { display:flex; gap:8px; flex-wrap:wrap; }
+.pve-workspace .pve-hints > p { flex:1 1 100%; }
+.pve-workspace .pve-hints button { font-size:12px; }
+.pve-workspace .pve-attempt-result { display:grid; gap:10px; padding:14px; border-radius:10px; }
+.pve-workspace .pve-attempt-result p { margin:0; font-size:13px; }
+.pve-workspace .pve-retry { background:#332b1b; border:1px solid #79673b; color:#e6d6a3; }
+.pve-workspace .pve-personal-stats { color:#89adbd; font-size:13px; }
+.pve-workspace .lesson-stats { margin-bottom:0; }
+.pve-workspace .arena-panel-heading { justify-content:space-between; }
+.pve-workspace .pve-leaderboard { margin-top:24px; border:1px solid #294052; border-radius:12px; }
+.pve-editor-expanded .layout { grid-template-columns:minmax(0,1fr); }
+.pve-editor-expanded .replay { display:none; }
+[data-theme="light"] .pve-workspace-heading > span, [data-theme="light"] .pve-personal-stats { color:#567586; }
+[data-theme="light"] .pve-workspace .pve-retry { background:#fff5df; border-color:#dbc38d; color:#7a622a; }
+[data-theme="light"] .pve-workspace .lesson-stats { background:#eaf7f1; color:#204e42; border-color:#97bdae; }
+[data-theme="light"] .pve-workspace .lesson-stats span, [data-theme="light"] .pve-workspace .lesson-stats > b { color:#246455; }
+[data-theme="light"] .pve-workspace .lesson-stats small { color:#53796e; }
