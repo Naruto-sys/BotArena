@@ -221,6 +221,7 @@ function App() {
   const [libraryNote, setLibraryNote] = useState('');
   const [libraryId, setLibraryId] = useState<string>();
   const editorPanel = useRef<HTMLFormElement>(null);
+  const replayPanel = useRef<HTMLElement>(null);
   const startButton = useRef<HTMLButtonElement>(null);
   const [mode, setMode] = useState<AppMode>(() => location.hash.startsWith('#arena') ? 'lab' : 'campaign');
   const [languages, setLanguages] = useState<StrategyLanguage[]>(['javascript']);
@@ -361,6 +362,13 @@ function App() {
     setCampaignNote('');
     setJobStatus(undefined);
   }
+
+  useEffect(() => {
+    if (!loading || !replayPanel.current) return;
+    const header = document.querySelector('.platform-header')?.getBoundingClientRect().height ?? 0;
+    const top = replayPanel.current.getBoundingClientRect().top + window.scrollY - header - 12;
+    window.scrollTo({ top: Math.max(0, top), behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  }, [loading]);
 
   function selectMode(next: AppMode) {
     if (next === mode) return;
@@ -656,7 +664,7 @@ function App() {
   return (
     <main className={`platform-app${expanded ? ' editor-expanded' : ''}`}>
       <header className="platform-header">
-        <button className="platform-brand" onClick={() => navigate('home')}><img src="/botarena-forge-icon.png" alt="" /><span>{text.brand}<small>CODE · SIMULATE · EVOLVE</small></span></button>
+        <button className="platform-brand" aria-label={text.brand} onClick={() => navigate('home')}><img src="/botarena-forge-icon.png" alt="" /><span>{text.brand}<small>CODE · SIMULATE · EVOLVE</small></span></button>
         <nav aria-label="Основная навигация">{Object.entries(ui.nav).map(([id, label]) =>
           <button key={id} type="button" aria-current={page === id ? 'page' : undefined}
             disabled={loading} onClick={() => navigate(id as Page)}>{label}</button>)}</nav>
@@ -941,7 +949,7 @@ function App() {
             </details>
 
           </form>
-          <section className="panel replay">
+          <section ref={replayPanel} className="panel replay">
             <div className="arena-panel-heading">
               <div className="arena-title"><h2>{text.arena}</h2>{mode === 'lab' && <span className="arena-info" tabIndex={0} role="img" aria-label={text.lab.mapHint} data-tooltip={text.lab.mapHint}>i</span>}</div>
               {replay && <button type="button" onClick={() => { setExpanded(false); editorPanel.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>{ui.backCode}</button>}

@@ -597,3 +597,35 @@ dialog.arena-modal-native::backdrop { background: #020a13c7; backdrop-filter: bl
 [data-theme="light"] .lab-settings .number-stepper button { background:#e7f1f5; color:#366477; }
 [data-theme="light"] .lab-settings .number-stepper button:hover:enabled { background:#d0e8e6; color:#155f59; }
 @media (max-width:760px) { .number-stepper { min-height:44px; grid-template-columns:44px minmax(40px,1fr) 44px; } .lab-team > header .number-field { width:148px; } }
+
+/* A single rhythm for the three account controls. Balance is informational. */
+.platform-account, .platform-account .profile-menu { align-items:center; gap:8px; }
+.platform-account .tour-launch, .platform-account .account-login,
+.platform-account .profile-trigger, .platform-account .profile-balance {
+  box-sizing:border-box; height:40px; min-height:40px; margin:0; border:1px solid #345166;
+  border-radius:10px; background:#102432; color:#c7e4ed; line-height:1;
+}
+.platform-account .tour-launch, .platform-account .account-login { padding:0 12px; font-size:13px; font-weight:600; }
+.platform-account .profile-trigger { padding:5px 9px 5px 5px; gap:8px; }
+.platform-account .profile-trigger .profile-fallback, .platform-account .profile-trigger > img {
+  display:grid; place-items:center; flex:0 0 28px; width:28px; height:28px;
+  border-radius:50%; padding:0; font-size:16px; line-height:1; object-fit:cover;
+}
+.platform-account .profile-trigger .profile-name { font-size:13px; }
+.platform-account .profile-balance { display:flex; align-items:center; gap:6px; padding:0 10px; }
+.platform-account .profile-balance > svg { flex-shrink:0; color:#68d6be; }
+.platform-account .profile-balance small { font-size:11px; font-weight:500; color:#8eafbf; }
+.platform-account .profile-balance b { font-size:13px; font-weight:650; font-variant-numeric:tabular-nums; color:#90ebd1; }
+[data-theme="light"] .platform-account .tour-launch, [data-theme="light"] .platform-account .account-login,
+[data-theme="light"] .platform-account .profile-trigger, [data-theme="light"] .platform-account .profile-balance {
+  background:#f5fafc; border-color:#b7cdd8; color:#294f62;
+}
+[data-theme="light"] .platform-account .profile-balance small { color:#617c8b; }
+[data-theme="light"] .platform-account .profile-balance b, [data-theme="light"] .platform-account .profile-balance > svg { color:#217b67; }
+@media(max-width:760px) {
+  .platform-account, .platform-account .profile-menu { gap:6px; }
+  .platform-account .profile-balance { padding:0 8px; gap:4px; }
+  .platform-account .profile-trigger { padding:5px; gap:4px; }
+  .platform-account > .theme-toggle { height:40px; min-height:40px; }
+}
+@media(max-width:420px) { .platform-brand > span { display:none; } }

@@ -645,3 +645,37 @@ test('roster number controls support buttons, typed HP, limits and both themes',
   await page.getByRole('dialog').getByRole('button', { name:'Сбросить', exact:true }).click();
   await expect(teamHp).toHaveValue('100');
 });
+
+test('header account controls share height and alignment in both themes and layouts', async ({ page }) => {
+  await signup(page.request); await page.goto('/');
+  for (const width of [1440, 390, 320]) {
+    await page.setViewportSize({ width, height:900 });
+    for (const theme of ['dark','light']) {
+      await page.evaluate(theme => { document.documentElement.dataset.theme=theme; }, theme);
+      const controls = await Promise.all(['.tour-launch','.profile-balance','.profile-trigger'].map(selector => page.locator(selector).boundingBox()));
+      for (const bounds of controls) {
+        expect(Math.abs(bounds.height - controls[0].height)).toBeLessThan(1);
+        expect(Math.abs(bounds.y - controls[0].y)).toBeLessThan(1);
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth-innerWidth)).toBeLessThanOrEqual(1);
+      await expect(page.locator('.platform-brand')).toHaveAccessibleName(/BotArena/);
+      await expect(page.locator('.profile-fallback')).toBeVisible();
+    }
+  }
+});
+
+for (const width of [1440,390]) {
+  test(`launch scrolls to Arena after leaving expanded editor at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({width,height:844}); await arena(page);
+    await page.getByRole('button', {name:'Развернуть редактор',exact:true}).click();
+    await start(page).click();
+    await expect(page.locator('.replay')).toBeVisible();
+    await expect.poll(async () => {
+      const target=await page.locator('.replay').boundingBox();
+      return target.y;
+    }).toBeLessThan(844 * .45);
+    await page.locator('.blueprint-canvas').waitFor({state:'attached',timeout:30000});
+    await expect.poll(() => page.locator('.replay').evaluate(node => node.getBoundingClientRect().top)).toBeLessThan(844*.45);
+    await expect(page.getByRole('button',{name:'План',exact:true})).toHaveAttribute('aria-pressed','true');
+  });
+}
