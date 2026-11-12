@@ -1,4 +1,4 @@
-import type { Arena, CampaignSpawn, ReachMarker } from './contracts';
+import type { Arena, CampaignSpawn, CaptureZone, ReachMarker } from './contracts';
 import { ArenaCoordinates, arenaViewBox } from './ArenaCoordinates';
 import { botColor } from './botDisplay';
 import { text } from './text';
@@ -7,10 +7,12 @@ export function ArenaPreview({
   arena,
   spawns,
   marker,
+  captureZones,
 }: {
   arena: Arena;
   spawns: CampaignSpawn[];
   marker?: ReachMarker | null;
+  captureZones?: CaptureZone[] | null;
 }) {
   return (
     <div className="arena-stage">
@@ -23,6 +25,24 @@ export function ArenaPreview({
         </defs>
         <rect width={arena.width} height={arena.height} fill="url(#preview-grid)" />
         <ArenaCoordinates width={arena.width} height={arena.height} />
+        {(captureZones ?? []).map(zone => {
+          const stroke = zone.ownerTeamId === 'player' ? '#6ea8ff' : '#ff8f6b';
+          const fill = zone.ownerTeamId === 'player' ? '#2f6fed44' : '#e35d3344';
+          return (
+            <rect
+              key={zone.ownerTeamId}
+              x={zone.x}
+              y={zone.y}
+              width={zone.width}
+              height={zone.height}
+              rx=".06"
+              fill={fill}
+              stroke={stroke}
+              strokeWidth=".06"
+              strokeDasharray=".16 .1"
+            />
+          );
+        })}
         {arena.walls.map((wall, i) => (
           <rect key={i} {...wall} rx=".08" fill="#273e58" stroke="#476383" strokeWidth=".05" />
         ))}

@@ -88,6 +88,14 @@ body { background: radial-gradient(ellipse at 40% -25%, #153c50 0, transparent 5
 .arena-modal-body { max-height:calc(100dvh - 126px); overflow:auto; padding:22px; }
 .lab-settings { display:grid; gap:18px; }
 .lab-settings-top { display:flex; justify-content:space-between; align-items:center; gap:12px; color:#8faabc; }
+.lab-mode-control { display:grid; gap:8px; padding:14px 16px; border:1px solid #2f4b5e; border-radius:13px; background:#0c1b2a; }
+.lab-mode-control label { display:grid; gap:6px; font-size:12px; color:#8faabc; }
+.lab-mode-control select { width:min(280px,100%); background:#152536; color:#e8f1fa; border:1px solid #39526f; border-radius:.35rem; padding:.4rem .55rem; font:inherit; }
+.lab-mode-control .muted { margin:0; font-size:12px; line-height:1.45; }
+.lab-base { cursor:grab; }
+.lab-base:active { cursor:grabbing; }
+.lab-base-handle { fill:#d7ecff; stroke:#7be0ff; stroke-width:.04; cursor:nwse-resize; }
+.lab-base-label { font-size:.28px; pointer-events:none; }
 .lab-reset-button { color:#ff786f!important; background:transparent!important; border-color:#8b4848!important; }
 .lab-reset-button:hover:not(:disabled) { color:#fff!important; background:#b52f32!important; border-color:#df5757!important; }
 .lab-team-layout { display:grid; grid-template-columns:1fr 1fr; gap:18px; }

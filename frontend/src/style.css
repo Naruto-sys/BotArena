@@ -724,6 +724,29 @@ main { padding: 0 1.2rem 1.2rem; }
   font: .8rem/1.45 ui-monospace, monospace;
 }
 .lab-roster, .lab-map { display: grid; gap: .55rem; }
+.lab-mode-bar {
+  display: grid;
+  gap: .35rem;
+  padding: .65rem .75rem;
+  border: 1px solid #2d455d;
+  border-radius: .4rem;
+  background: #0d1824;
+}
+.lab-mode-bar label {
+  display: grid;
+  gap: .35rem;
+  color: #9bb4cb;
+  font-size: .78rem;
+}
+.lab-mode-bar select {
+  width: min(18rem, 100%);
+  padding: .45rem .55rem;
+  color: #e8f2fb;
+  background: #071017;
+  border: 1px solid #39526f;
+  border-radius: .3rem;
+}
+.lab-mode-bar .muted { margin: 0; font-size: .78rem; }
 .lab-counts { display: flex; flex-wrap: wrap; gap: .55rem; align-items: end; }
 .lab-counts label, .lab-bot-card label, .lab-wall-row label {
   display: grid; gap: .2rem; font-size: .8rem; color: #a6b9ce;
@@ -748,7 +771,7 @@ main { padding: 0 1.2rem 1.2rem; }
 .lab-arena { cursor: default; }
 .lab-wall { cursor: grab; }
 .lab-wall:active { cursor: grabbing; }
-.lab-wall-handle {
+.lab-wall-handle, .lab-base-handle {
   fill: #7be0ff;
   stroke: #0e1824;
   stroke-width: .04;

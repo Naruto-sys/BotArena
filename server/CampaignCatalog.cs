@@ -835,6 +835,217 @@ internal static class CampaignCatalog
             }
         """;
 
+    private static readonly string ModeCaptureJs = BehaviorPresets.GetCode("base-captor");
+
+    private const string ModeCapturePy = """
+        # Универсальный захватчик базы: рейд / удержание / защита / дуэль / отход.
+        import math
+
+        last_enemy = None
+        last_enemy_tick = -999
+        hold_phase = 0.0
+        mode = "raid"
+        last_pos = None
+        stuck_for = 0
+
+        def zone_center(zone):
+            return {
+                "x": zone["x"] + zone["width"] * 0.5,
+                "y": zone["y"] + zone["height"] * 0.5,
+            }
+
+        def inside_zone(point, zone):
+            return (
+                zone["x"] <= point["x"] <= zone["x"] + zone["width"]
+                and zone["y"] <= point["y"] <= zone["y"] + zone["height"]
+            )
+
+        def clamp_point(point, arena):
+            return {
+                "x": min(arena["width"] - 0.5, max(0.5, point["x"])),
+                "y": min(arena["height"] - 0.5, max(0.5, point["y"])),
+            }
+
+        def approach(self, zone, arena):
+            center = zone_center(zone)
+            if distance(self, center) < max(zone["width"], zone["height"]) * 0.85:
+                return center
+            if abs(self["position"]["x"] - center["x"]) > 3.2 and abs(self["position"]["y"] - arena["height"] * 0.5) > 1.1:
+                return clamp_point(
+                    {
+                        "x": (self["position"]["x"] + center["x"]) * 0.5,
+                        "y": arena["height"] * 0.5,
+                    },
+                    arena,
+                )
+            return center
+
+        def orbit(zone, tick):
+            center = zone_center(zone)
+            radius = max(0.28, min(zone["width"], zone["height"]) * 0.22)
+            angle = hold_phase + tick * 0.13
+            return {
+                "x": center["x"] + math.cos(angle) * radius,
+                "y": center["y"] + math.sin(angle) * radius,
+            }
+
+        def tick(state):
+            global last_enemy, last_enemy_tick, hold_phase, mode, last_pos, stuck_for
+            self = state["self"]
+            enemy = state["enemy"]
+            arena = state["arena"]
+            tick_n = state["tick"]
+            zones = state.get("captureZones") or []
+            own = next((z for z in zones if z["ownerTeamId"] == self["teamId"]), None)
+            enemy_zone = next((z for z in zones if z["ownerTeamId"] != self["teamId"]), None)
+
+            if last_pos is not None:
+                stuck_for = stuck_for + 1 if distance(self, last_pos) < 0.07 else 0
+            last_pos = {"x": self["position"]["x"], "y": self["position"]["y"]}
+            force = stuck_for > 16
+            if force:
+                stuck_for = 0
+                hold_phase += math.pi * 0.85
+
+            if enemy is not None:
+                last_enemy = {
+                    "x": enemy["position"]["x"],
+                    "y": enemy["position"]["y"],
+                    "hp": enemy["hp"],
+                }
+                last_enemy_tick = tick_n
+
+            enemy_on_our_base = bool(
+                own is not None
+                and (
+                    (own.get("progress") or 0) > 0.05
+                    or own.get("contested")
+                    or (own.get("capturingTeamId") not in (None, self["teamId"]))
+                    or (enemy is not None and inside_zone(enemy["position"], own))
+                )
+            )
+            we_capturing = enemy_zone is not None and inside_zone(self["position"], enemy_zone)
+            capture_progress = (enemy_zone.get("progress") or 0) if enemy_zone else 0
+            hp_ratio = self["hp"] / max(1, self["maxHp"])
+            enemy_close = enemy is not None and distance(self, enemy["position"]) < 2.05
+            enemy_weak = enemy is not None and enemy["hp"] <= self["hp"] * 0.55
+            enemy_guarding = bool(
+                enemy_zone is not None and enemy is not None and inside_zone(enemy["position"], enemy_zone)
+            )
+            near_enemy_base = bool(
+                enemy_zone is not None and distance(self, zone_center(enemy_zone)) < 4.5
+            )
+
+            contested = bool(enemy_zone and enemy_zone.get("contested"))
+
+            if enemy_on_our_base and (not we_capturing or capture_progress < 0.6):
+                mode = "defend"
+            elif we_capturing and (enemy_guarding or contested):
+                mode = "clear"
+            elif we_capturing or capture_progress >= 0.12:
+                mode = "hold"
+            elif near_enemy_base and enemy_guarding:
+                mode = "breach"
+            elif enemy_zone is None and enemy_close and (enemy_weak or hp_ratio > 0.55):
+                mode = "duel"
+            elif (
+                enemy_zone is None
+                and hp_ratio < 0.28
+                and enemy is not None
+                and distance(self, enemy["position"]) < 3.0
+            ):
+                mode = "recover"
+            else:
+                mode = "raid"
+
+            if mode == "defend" and own is not None:
+                if enemy is not None and inside_zone(enemy["position"], own):
+                    drive = {
+                        "x": (enemy["position"]["x"] + zone_center(own)["x"]) * 0.5,
+                        "y": (enemy["position"]["y"] + zone_center(own)["y"]) * 0.5,
+                    }
+                else:
+                    drive = zone_center(own)
+            elif mode == "recover" and own is not None:
+                center = zone_center(own)
+                drive = {
+                    "x": center["x"] * 0.55 + self["position"]["x"] * 0.45,
+                    "y": arena["height"] * 0.5,
+                }
+            elif mode in ("clear", "breach") and enemy_zone is not None:
+                center = zone_center(enemy_zone)
+                if mode == "breach" and not inside_zone(self["position"], enemy_zone):
+                    drive = center
+                elif enemy is not None:
+                    push = {
+                        "x": enemy["position"]["x"] * 0.65 + center["x"] * 0.35,
+                        "y": enemy["position"]["y"] * 0.65 + center["y"] * 0.35,
+                    }
+                    drive = push if inside_zone(push, enemy_zone) else center
+                else:
+                    drive = center
+            elif mode == "duel" and enemy is not None:
+                dist = distance(self, enemy["position"])
+                angle = math.atan2(
+                    enemy["position"]["y"] - self["position"]["y"],
+                    enemy["position"]["x"] - self["position"]["x"],
+                )
+                side = 1 if math.sin(tick_n * 0.2) >= 0 else -1
+                if dist > 2.6:
+                    drive = enemy["position"]
+                else:
+                    drive = clamp_point(
+                        {
+                            "x": enemy["position"]["x"] - math.cos(angle) * 1.55 + math.cos(angle + math.pi / 2) * 1.15 * side,
+                            "y": enemy["position"]["y"] - math.sin(angle) * 1.55 + math.sin(angle + math.pi / 2) * 1.15 * side,
+                        },
+                        arena,
+                    )
+            elif mode == "hold" and enemy_zone is not None:
+                if inside_zone(self["position"], enemy_zone):
+                    drive = orbit(enemy_zone, tick_n)
+                else:
+                    drive = zone_center(enemy_zone)
+            elif enemy_zone is not None:
+                drive = approach(self, enemy_zone, arena)
+            elif last_enemy is not None and tick_n - last_enemy_tick < 50:
+                drive = {"x": last_enemy["x"], "y": last_enemy["y"]}
+            else:
+                drive = {"x": arena["width"] * 0.72, "y": arena["height"] * 0.5}
+
+            if force:
+                drive = clamp_point(
+                    {
+                        "x": drive["x"] + math.cos(hold_phase) * 1.8,
+                        "y": arena["height"] * 0.5 + math.sin(hold_phase) * 1.2,
+                    },
+                    arena,
+                )
+
+            enemy_in_fight = bool(
+                enemy is not None
+                and (
+                    mode in ("clear", "defend", "duel", "breach")
+                    or (mode == "hold" and enemy_zone is not None and inside_zone(enemy["position"], enemy_zone))
+                    or (mode == "raid" and distance(self, enemy["position"]) < 1.9)
+                    or (mode == "recover" and distance(self, enemy["position"]) < 2.8)
+                )
+            )
+            if enemy_in_fight:
+                aim = enemy["position"]
+                shoot = self["canShoot"] and facing(
+                    self, enemy["position"], 0.12 if mode in ("raid", "hold") else 0.08
+                )
+            elif last_enemy is not None and tick_n - last_enemy_tick < 50:
+                aim = {"x": last_enemy["x"], "y": last_enemy["y"]}
+                shoot = False
+            else:
+                aim = drive
+                shoot = False
+
+            return {"driveTo": drive, "aimAt": aim, "shoot": shoot}
+        """;
+
     private const string ModeFfaJs = """
         // FFA: берём ближайшую цель и не даём ей отойти.
         function tick({ self, enemy }) {
@@ -954,6 +1165,39 @@ internal static class CampaignCatalog
         .Replace("__BOT__", botId, StringComparison.Ordinal)
         .Replace("__Y__", peekY.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal);
 
+    private const string ModeCaptureGuard = """
+        // Патруль у своей половины вне зоны: стреляет мимо, чтобы захватчик успел удержать базу.
+        let patrol = null;
+        function tick({ self, enemy, tick }) {
+          if (!patrol || reached(self, patrol, 0.8) || tick % 80 === 0) {
+            patrol = {
+              x: 9.6,
+              y: tick % 160 < 80 ? 2.4 : 7.6
+            };
+          }
+          const aim = enemy
+            ? { x: enemy.position.x, y: enemy.position.y + (self.position.y < 5 ? 2.4 : -2.4) }
+            : patrol;
+          return {
+            driveTo: patrol,
+            aimAt: aim,
+            shoot: !!enemy && self.canShoot && facing(self, aim, 0.12) && tick % 3 === 0
+          };
+        }
+        """;
+
+    private static readonly MatchConfig CaptureArena = MatchConfig.Classic with
+    {
+        MaxTicks = 700,
+        Arena = new(16, 10, []),
+        Spawns = Array.AsReadOnly(new BotSpawn[]
+        {
+            new("player", new(2.2, 5), 0, 0, "player"),
+            new("opponent", new(9.6, 7.6), Math.PI, Math.PI, "opponent"),
+        }),
+        ShrinkZoneEnabled = false,
+    };
+
     private static readonly CampaignLevel[] ModesLevels =
     [
         new(
@@ -1010,7 +1254,19 @@ internal static class CampaignCatalog
             ModeCoverHoldJs("player-1", 2.2),
             ModeCoverHoldPy("player-1", 2.2),
             PlayerScripts: PlayerTeam2Scripts,
-            OpponentScripts: OutnumberedOpponentScripts)
+            OpponentScripts: OutnumberedOpponentScripts),
+        new(
+            "mode-capture-point",
+            5,
+            "Захват точки",
+            "У каждой команды база. Сложный захватчик сам выбирает рейд, удержание, защиту и дуэль.",
+            "Стартовый код — пресет «Захватчик базы». Запустите матч и смотрите захват.",
+            "CapturePoint",
+            CapturePointSetup.CreateObjective(CapturePointSetup.DefaultBases),
+            CaptureArena,
+            ModeCaptureGuard,
+            ModeCaptureJs,
+            ModeCapturePy)
     ];
 
     private static readonly CampaignTrack[] Tracks =
@@ -1022,7 +1278,7 @@ internal static class CampaignCatalog
             "Тот же путь, но через leftTrack, rightTrack и aimDirection.",
             true, Array.AsReadOnly(AdvancedLevels)),
         new("modes", 3, "Режимы",
-            "Знакомство с режимами боя: 1×1, команды, FFA и бой в меньшинстве.",
+            "Знакомство с режимами боя: 1×1, команды, FFA, меньшинство и захват точки.",
             true, Array.AsReadOnly(ModesLevels))
     ];
 
@@ -1105,6 +1361,17 @@ internal static class CampaignCatalog
             level.Hint,
             arena = level.Config.Arena,
             marker = level.Marker,
+            captureZones = level.Objective is CapturePointObjective capture
+                ? capture.Bases.Select(zone => new
+                {
+                    ownerTeamId = zone.OwnerTeamId,
+                    x = zone.X,
+                    y = zone.Y,
+                    width = zone.Width,
+                    height = zone.Height,
+                    progress = 0,
+                })
+                : null,
             spawns = level.Config.Spawns.Select(spawn => new
             {
                 spawn.Id,

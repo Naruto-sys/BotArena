@@ -24,11 +24,15 @@ public record CustomMatchLoadout(
     string Source,
     string? PresetId = null,
     string? Code = null);
+public record CustomMatchBase(string OwnerTeamId, double X, double Y, double Width, double Height);
+
 public record CustomMatchSpec(
     ArenaState Arena,
     IReadOnlyList<CustomMatchSpawn> Spawns,
     IReadOnlyList<CustomMatchLoadout> Loadouts,
-    int? MaxTicks = null);
+    int? MaxTicks = null,
+    string? Mode = null,
+    IReadOnlyList<CustomMatchBase>? Bases = null);
 public record MatchRequest(
     string? BotCode,
     string? OpponentId = null,

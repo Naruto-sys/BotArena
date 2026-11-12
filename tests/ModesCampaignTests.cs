@@ -5,12 +5,12 @@ namespace BotArena.Tests;
 public class ModesCampaignTests
 {
     [Fact]
-    public void ModesTrackIsAvailableWithFourDemoLevels()
+    public void ModesTrackIsAvailableWithFiveDemoLevels()
     {
         var track = CampaignCatalog.TracksList.Single(item => item.Id == "modes");
         Assert.True(track.Available);
         Assert.Equal(
-            new[] { "mode-duel", "mode-team-3v3", "mode-ffa", "mode-outnumbered" },
+            new[] { "mode-duel", "mode-team-3v3", "mode-ffa", "mode-outnumbered", "mode-capture-point" },
             track.Levels.Select(level => level.Id));
     }
 
@@ -26,6 +26,17 @@ public class ModesCampaignTests
         Assert.Null(response.Error);
         Assert.Equal("player", response.Replay.Result.WinnerTeamId);
         Assert.Equal(MatchEndReason.BotDestroyed, response.Replay.Result.Reason);
+    }
+
+    [Fact]
+    public void CapturePointDemoStarterWinsByCapture()
+    {
+        var level = CampaignCatalog.Find("mode-capture-point")!;
+        Assert.IsType<CapturePointObjective>(level.Objective);
+        var response = RunLevel(level);
+        Assert.Null(response.Error);
+        Assert.Equal("player", response.Replay.Result.WinnerTeamId);
+        Assert.Equal(MatchEndReason.ObjectiveComplete, response.Replay.Result.Reason);
     }
 
     private static MatchResponse RunLevel(CampaignLevel level)

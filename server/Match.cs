@@ -19,6 +19,8 @@ internal static class Match
             logBotIds = new HashSet<string>(StringComparer.Ordinal) { "player" };
 
         var duel = new Duel(config);
+        if (objective is CapturePointObjective capture)
+            duel.ConfigureCapture(capture);
         var frames = new List<GameFrame> { duel.CaptureFrame() };
         var behaviorSamples = new List<BehaviorSample>();
         var actions = new Dictionary<string, BotAction>(StringComparer.Ordinal);
@@ -80,6 +82,9 @@ internal static class Match
                 if (bot.Hp > 0 && double.Hypot(offset.X, offset.Y) <= reach.Radius)
                     duel.CompleteObjective("player");
             }
+
+            if (objective is CapturePointObjective && duel.Result is null)
+                duel.TickCapture();
 
             frames.Add(duel.CaptureFrame());
         }

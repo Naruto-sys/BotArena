@@ -1,17 +1,18 @@
 import { useState } from 'react';
-import type { BehaviorPresetInfo, LabBot, LabSetup } from './labDraft';
+import type { BehaviorPresetInfo, LabBot, LabMatchMode, LabSetup } from './labDraft';
 import { botLabel } from './botDisplay';
 import { text } from './text';
 
 type BotPatch = Partial<Pick<LabBot, 'name' | 'hp'>>;
 
-export function LabSettingsDialog({ setup, presets, onRosterChange, onReset, onBotChange, onBehaviorChange }: {
+export function LabSettingsDialog({ setup, presets, onRosterChange, onReset, onBotChange, onBehaviorChange, onModeChange }: {
   setup: LabSetup;
   presets: BehaviorPresetInfo[];
   onRosterChange: (allies: number, enemies: number) => void;
   onReset: () => void;
   onBotChange: (id: string, patch: BotPatch) => void;
   onBehaviorChange: (id: string, value: string) => void;
+  onModeChange: (mode: LabMatchMode) => void;
 }) {
   const [teamHp, setTeamHp] = useState({ player: 100, opponent: 100 });
   const teams = [
@@ -21,6 +22,15 @@ export function LabSettingsDialog({ setup, presets, onRosterChange, onReset, onB
 
   return <div className="lab-settings">
     <div className="lab-settings-top"><p>Настройки сохраняются автоматически.</p><button type="button" className="lab-reset-button" onClick={onReset}>{text.lab.reset}</button></div>
+    <div className="lab-mode-control">
+      <label>{text.lab.matchMode}
+        <select value={setup.mode} onChange={event => onModeChange(event.target.value as LabMatchMode)}>
+          <option value="destroy">{text.lab.modes.destroy}</option>
+          <option value="capturePoint">{text.lab.modes.capturePoint}</option>
+        </select>
+      </label>
+      <p className="muted">{text.lab.modeHint[setup.mode]}</p>
+    </div>
     <div className="lab-team-layout">
       {teams.map(team => <section className={`lab-team lab-team-${team.id}`} key={team.id}>
         <header>
@@ -40,7 +50,11 @@ export function LabSettingsDialog({ setup, presets, onRosterChange, onReset, onB
             <label>{text.lab.hp}<input type="number" min={1} max={500} value={bot.hp} onChange={event => onBotChange(bot.id, { hp: Number(event.target.value) })} /></label>
             <label>{text.lab.behavior}<select value={bot.source === 'code' ? 'code' : bot.presetId} onChange={event => onBehaviorChange(bot.id, event.target.value)}>
               <option value="code">{text.lab.customCode}</option>
-              {presets.map(preset => <option key={preset.id} value={preset.id}>{preset.name} ({preset.strength === 'weak' ? text.lab.weak : text.lab.standard})</option>)}
+              {presets.map(preset => <option key={preset.id} value={preset.id}>{preset.name} ({
+                preset.strength === 'weak' ? text.lab.weak
+                  : preset.strength === 'strong' ? text.lab.strong
+                  : text.lab.standard
+              })</option>)}
             </select></label>
             {bot.source === 'preset' && <p className="muted">{presets.find(item => item.id === bot.presetId)?.description}</p>}
           </li>)}

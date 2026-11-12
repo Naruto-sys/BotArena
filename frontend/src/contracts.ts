@@ -46,12 +46,23 @@ export interface BattleEvent {
   damage: number | null;
 }
 export interface SafeZone { x: number; y: number; width: number; height: number }
+export interface CaptureZone {
+  ownerTeamId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  progress?: number;
+  capturingTeamId?: string | null;
+  contested?: boolean;
+}
 export interface Frame {
   tick: number;
   bots: Bot[];
   bullets: Bullet[];
   events: BattleEvent[];
   safeZone?: SafeZone | null;
+  captureZones?: CaptureZone[];
 }
 export interface ReachMarker { x: number; y: number; radius: number }
 export interface Replay {
@@ -83,6 +94,7 @@ export interface CampaignLevel {
   hint: string;
   arena: Arena;
   marker?: ReachMarker | null;
+  captureZones?: CaptureZone[] | null;
   spawns: CampaignSpawn[];
   playerBotIds?: string[];
   starters?: Record<string, Record<StrategyLanguage, string>>;
