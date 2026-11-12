@@ -489,3 +489,39 @@ test('merged mobile header keeps bottom navigation, guest login and account avat
   await expect(page.getByRole('button', { name: 'Настройки профиля', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Включить светлую тему', exact: true })).toBeVisible();
 });
+
+for (const authenticated of [false, true]) {
+  test(`campaign success opens next level directly (${authenticated ? 'account' : 'guest'})`, async ({ page }) => {
+    if (authenticated) await signup(page.request);
+    const tracks = await page.request.get('/api/campaign').then(r => r.json());
+    const track = tracks.find(item => item.available && item.levels.some(level => level.id === 'move'));
+    const first = track.levels.find(level => level.id === 'move');
+    const next = track.levels.find(level => level.order === first.order + 1);
+    await page.goto('/#learn');
+    await page.locator('.chapter-route').filter({ hasText: track.name }).getByRole('button', { name: `${first.name}: Доступен`, exact: true }).click();
+    const nextButton = page.getByRole('button', { name: 'Следующий уровень →', exact: true });
+    await expect(nextButton).toHaveCount(0);
+    await page.locator('.cm-content').fill('function tick() { return { driveTo: { x: 10, y: 5 } }; }');
+    await start(page).click(); await expect(nextButton).toBeVisible({ timeout: 30000 });
+    await nextButton.click();
+    await expect(page.locator('.editor h1')).toHaveText(next.name);
+    expect((await page.locator('.cm-line').allTextContents()).join('\n').trim()).toBe(next.starter.javascript.trim());
+    await expect(nextButton).toHaveCount(0);
+    await expect(page.locator('.blueprint-canvas')).toHaveCount(0);
+    await expect(page.locator('.editor .error-card')).toHaveCount(0);
+  });
+}
+
+test('campaign completion does not offer a nonexistent next level', async ({ page }) => {
+  const tracks = await page.request.get('/api/campaign').then(r => r.json());
+  const track = tracks.find(item => item.available && item.levels.some(level => level.id === 'move'));
+  const first = track.levels.find(level => level.id === 'move');
+  // A one-level catalogue exercises the end-of-track UI with a real match result.
+  await page.route('**/api/campaign', route => route.fulfill({ json: [{ ...track, levelCount: 1, levels: [first] }] }));
+  await page.goto('/#learn');
+  await page.locator('.chapter-route').filter({ hasText: track.name }).getByRole('button', { name: `${first.name}: Доступен`, exact: true }).click();
+  await page.locator('.cm-content').fill('function tick() { return { driveTo: { x: 10, y: 5 } }; }');
+  await start(page).click();
+  await expect(page.locator('.campaign-result')).toBeVisible({ timeout: 30000 });
+  await expect(page.getByRole('button', { name: 'Следующий уровень →', exact: true })).toHaveCount(0);
+});

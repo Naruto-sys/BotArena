@@ -254,6 +254,7 @@ function App() {
   const track = tracks.find(item => item.id === trackId);
   const levels = track?.levels ?? [];
   const level = levels.find(item => item.id === levelId);
+  const nextCampaignLevel = level && levels.find(item => item.order === level.order + 1);
   const playerBotIds = level?.playerBotIds ?? ['player'];
   const campaignActiveBotId = playerBotIds.includes(playerBotId) ? playerBotId : playerBotIds[0];
   const labCustomBots = customBots(labSetup);
@@ -839,7 +840,15 @@ function App() {
             {jobStatus?.state === 'queued' && <p role="status">{text.queuePosition(jobStatus.position)}</p>}
             {mode === 'lab' && labCustomBots.length > 0 && <div className="ux-save"><input aria-label={ui.name} value={strategyName} maxLength={100} onChange={e => setStrategyName(e.target.value)} /><button type="button" onClick={saveCurrentStrategy}>{ui.save}</button>{libraryNote && <small role="status">{libraryNote}</small>}</div>}
             {error && <p role="alert" className="error-card">{error}</p>}
-            {campaignNote && <p role="status" className="success-card">{campaignNote}</p>}
+            {campaignNote && <div role="status" className="success-card campaign-result">
+              <p>{campaignNote}</p>
+              {mode === 'campaign' && nextCampaignLevel && completed.includes(levelId) && <button
+                type="button" className="primary" onClick={() => {
+                  selectLevel(nextCampaignLevel.id);
+                  setExpanded(false);
+                  editorPanel.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}>{text.campaign.nextLevel} →</button>}
+            </div>}
             {scriptError && (
               <div role="alert" className="error-card">
                 <div className="error-heading">

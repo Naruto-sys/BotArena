@@ -564,3 +564,7 @@ dialog.arena-modal-native::backdrop { background: #020a13c7; backdrop-filter: bl
   .profile-menu { flex-wrap:nowrap; }
   .profile-menu .profile-trigger { gap:4px; padding:3px; }
 }
+
+.campaign-result { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
+.campaign-result p { margin:0; flex:1 1 220px; }
+.campaign-result button { flex-shrink:0; }
