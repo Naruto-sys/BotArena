@@ -186,6 +186,7 @@ export const text = {
     pause: 'Пауза',
     resume: 'Продолжить',
     position: 'Позиция реплея',
+    showDamage: 'Показывать урон',
     speed: 'Скорость реплея',
     speedOption: (speed: number) => `${speed}×`,
     time: (position: number, duration: number) => `${position.toFixed(1)} / ${duration.toFixed(1)} с`,

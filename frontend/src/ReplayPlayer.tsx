@@ -81,6 +81,7 @@ export function ReplayPlayer({ replay, botNames, onComplete }: {
   const [showTrails, setShowTrails] = useState(true);
   const [showChronoXray, setShowChronoXray] = useState(true);
   const [showTacticalTrace, setShowTacticalTrace] = useState(false);
+  const [showDamageNumbers, setShowDamageNumbers] = useState(false);
   const [traceBotId, setTraceBotId] = useState(replay.frames[0]?.bots[0]?.id ?? '');
   const heldChronoShots = useRef(new Set<string>());
   const chronoHoldUntil = useRef(0);
@@ -164,7 +165,7 @@ export function ReplayPlayer({ replay, botNames, onComplete }: {
   const next = replay.frames[Math.min(lastFrame, index + 1)];
   const fraction = position < lastFrame ? position - Math.floor(position) : 0;
   const roster = frame.bots;
-  const damageNumbers = collectDamageNumbers(replay.frames, index, fraction);
+  const damageNumbers = showDamageNumbers ? collectDamageNumbers(replay.frames, index, fraction) : [];
   const displayLabel = (botId: string, teamId?: string) =>
     rosterBotLabel(botId, teamId, roster, botNames);
   const winnerBotId = replay.result.winnerBotId;
@@ -257,7 +258,7 @@ export function ReplayPlayer({ replay, botNames, onComplete }: {
           showChronoXray={showChronoXray} showTacticalTrace={showTacticalTrace}
           traceBotId={traceBotId} perceptionBotId={traceBotId} onSeek={seekReplay}
           captureEpoch={video.captureEpoch} captureActive={video.busy} onRenderFrame={video.onRenderFrame} />
-        {!gunnerView && <ReplayEffectsOverlay
+        {showDamageNumbers && !gunnerView && <ReplayEffectsOverlay
           arena={replay.arena}
           damageNumbers={damageNumbers}
           finished={finished}
@@ -344,6 +345,11 @@ export function ReplayPlayer({ replay, botNames, onComplete }: {
             <input type="checkbox" checked={showTacticalTrace}
               onChange={event => setShowTacticalTrace(event.target.checked)} />
             Тактический след
+          </label>
+          <label className="trail-toggle">
+            <input type="checkbox" checked={showDamageNumbers}
+              onChange={event => setShowDamageNumbers(event.target.checked)} />
+            {copy.showDamage}
           </label>
           {(showTacticalTrace || cameraMode === 'perception') && botIds.length > 1 && (
             <select aria-label="Бот для анализа" value={traceBotId}

@@ -699,3 +699,32 @@ test('arena has no technical corner labels and finished result is inset and read
     }
   }
 });
+
+test('damage labels are opt-in through battle analysis and disappear when disabled', async ({ page }) => {
+  await arena(page);
+  const setup = await stored(page);
+  setup.arena.walls = []; setup.maxTicks = 100;
+  setup.bots.forEach((bot,index) => {
+    bot.position = {x:index ? 10 : 3, y:5}; bot.source='code';
+    bot.code.javascript = index ? 'function tick(){return {};}' : 'function tick(){return {aimDirection:{x:1,y:0},shoot:true};}';
+  });
+  await page.evaluate(setup => localStorage.setItem('botarena.labSetup.v1', JSON.stringify(setup)), setup);
+  await page.reload();
+  const completed = page.waitForResponse(async response => {
+    if (!response.url().includes('/api/match-jobs/') || response.status() !== 200) return false;
+    const body=await response.json(); return body.state==='completed' && !!body.match;
+  });
+  await start(page).click(); const replay=(await (await completed).json()).match.replay;
+  const hit = replay.frames.find(frame => frame.events.some(event => event.type==='BotHit' && event.damage>0));
+  expect(hit).toBeTruthy();
+  await page.locator('.blueprint-canvas').waitFor({state:'attached',timeout:30000});
+  await page.getByRole('button',{name:'Пауза',exact:true}).click();
+  await page.getByRole('slider',{name:'Позиция реплея',exact:true}).fill(String(hit.tick));
+  await expect(page.locator('.arena-damage')).toHaveCount(0);
+  await page.getByText('Анализ боя',{exact:true}).click();
+  const toggle=page.getByRole('checkbox',{name:'Показывать урон',exact:true});
+  await expect(toggle).not.toBeChecked(); await toggle.check();
+  await expect(page.locator('.arena-damage').first()).toBeVisible();
+  await expect(page.locator('.arena-damage').first()).toContainText('-20');
+  await toggle.uncheck(); await expect(page.locator('.arena-damage')).toHaveCount(0);
+});

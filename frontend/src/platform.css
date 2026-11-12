@@ -636,3 +636,6 @@ dialog.arena-modal-native::backdrop { background: #020a13c7; backdrop-filter: bl
 [data-theme="light"] .blueprint-stage .match-outcome { color:#24495b; background:#fffffff0; border-color:#a9c5cf; box-shadow:0 6px 24px #284d641a; }
 [data-theme="light"] .match-outcome > span { color:#5c7888; }
 @media(max-width:760px) { .blueprint-stage .match-outcome { top:18px; padding:8px 14px; } }
+
+.ux-home > .ux-hero + h2 { margin:32px 0 20px; }
+@media(max-width:760px) { .ux-home > .ux-hero + h2 { margin:24px 0 16px; } }
