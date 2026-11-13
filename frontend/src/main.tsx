@@ -760,7 +760,7 @@ function App() {
         {mode === 'lab' && mapNotice && <p role="status" className="ugc-notice">{mapNotice}</p>}
         <div className="layout">
           <form ref={editorPanel} className="panel editor" onSubmit={run}>
-            <div className="ux-editor-heading"><small>{ui.editor}</small><button type="button" onClick={() => setExpanded(!expanded)}>{expanded ? ui.collapse : ui.focus}</button></div>
+            <div className="ux-editor-heading"><button type="button" onClick={() => setExpanded(!expanded)}>{expanded ? ui.collapse : ui.focus}</button></div>
             {mode === 'campaign' && (
               <button type="button" className="campaign-back" onClick={backToHub}>
                 {text.campaign.backToHub}

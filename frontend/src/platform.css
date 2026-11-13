@@ -48,7 +48,7 @@ body { background: radial-gradient(ellipse at 40% -25%, #153c50 0, transparent 5
 .platform-content .editor { gap: 14px; }
 .platform-content .editor > h1 { font-size: 21px; }
 .ux-editor-heading { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
-.ux-editor-heading button { font-size: 11px; }
+.ux-editor-heading button { margin-left: auto; font-size: 11px; }
 .platform-content .lab-roster { border: 1px solid #2b465b; border-radius: 10px; padding: 12px; }
 .platform-content .lab-bot-list { max-height: 400px; overflow: auto; }
 .platform-content .campaign-levels { max-height: 290px; overflow: auto; }
