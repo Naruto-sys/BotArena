@@ -243,6 +243,24 @@ public static class RoomEndpoints
             return Results.Ok(new { waiting = false, match = result.Response, winnerId });
         });
 
+        group.MapDelete("/{id:guid}/ready", async (Guid id, ClaimsPrincipal principal, UgcDbContext database) =>
+        {
+            if (principal.UserId() is not { } userId) return Results.Unauthorized();
+            var updated = await database.RoomParticipants
+                .Where(item => item.RoomId == id && item.UserId == userId && item.IsReady
+                    && item.Room.Status == GameRoomStatus.Open)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.IsReady, false));
+            if (updated != 0) return Results.NoContent();
+
+            var participant = await database.RoomParticipants.AsNoTracking()
+                .Include(item => item.Room)
+                .SingleOrDefaultAsync(item => item.RoomId == id && item.UserId == userId);
+            if (participant is null) return Results.NotFound();
+            if (participant.Room.Status != GameRoomStatus.Open)
+                return Results.Conflict(new { error = "Матч уже запущен, отменить ожидание нельзя." });
+            return Results.NoContent();
+        });
+
         group.MapDelete("/{id:guid}", async (Guid id, ClaimsPrincipal principal, UgcDbContext database) =>
         {
             var updated = await database.GameRooms.Where(item => item.Id == id && item.CreatorId == principal.UserId()

@@ -74,6 +74,7 @@ export const ugcApi = {
   updateRoomDraft: (id: string, value: { code: string; language: StrategyLanguage; strategyId?: string }) =>
     request(`/api/rooms/${id}/draft`, { method: 'PUT', body: JSON.stringify(value) }),
   readyRoom: (id: string) => request<{ waiting: boolean; match?: MatchResponse; winnerId?: string | null }>(`/api/rooms/${id}/ready`, { method: 'POST' }),
+  cancelRoomWaiting: (id: string) => request<void>(`/api/rooms/${id}/ready`, { method: 'DELETE' }),
   cancelRoom: (id: string) => request<void>(`/api/rooms/${id}`, { method: 'DELETE' }),
   maps: () => request<BattleMap[]>('/api/maps/'),
   createMap: (value: { name: string; walls: Wall[] }) => request<BattleMap>('/api/maps/', { method: 'POST', body: JSON.stringify(value) }),

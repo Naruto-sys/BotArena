@@ -157,6 +157,17 @@ export function RoomsPanel() {
     try { await ugcApi.cancelRoom(target.id); if (room?.id === target.id) { setRoom(undefined); setWaiting(false); } await refresh(); }
     catch (problem) { handleError(problem); }
   }
+  async function cancelWaiting() {
+    if (!room || !waiting) return;
+    setBusy(true); setError('');
+    try {
+      await ugcApi.cancelRoomWaiting(room.id);
+      setWaiting(false); setNotice('Ожидание отменено. Код снова можно редактировать.');
+      const details = await ugcApi.room(room.id);
+      setRoom(details.room);
+    } catch (problem) { handleError(problem); }
+    finally { setBusy(false); }
+  }
 
   const ownActive = mine.find(item => item.creator.id === currentUserId);
   const roomLink = room ? `${location.origin}/#arena/rooms/${room.id}` : '';
@@ -196,7 +207,9 @@ export function RoomsPanel() {
         {room.allowPresetStrategies && strategies.length === 0 && <p className="muted">Сохранённых стратегий пока нет. Введите код ниже.</p>}
         {!strategyId && <><label>Язык<select disabled={waiting || !!match || room.status !== 'Open'} value={language} onChange={event => setLanguage(event.target.value as StrategyLanguage)}><option value="javascript">JavaScript</option><option value="python">Python</option></select></label><label>Код<textarea className="room-code" value={code} disabled={waiting || !!match || room.status !== 'Open'} onCopy={event => { if (!room.allowClipboard) event.preventDefault(); }} onCut={event => { if (!room.allowClipboard) event.preventDefault(); }} onPaste={event => { if (!room.allowClipboard) event.preventDefault(); }} onChange={event => changeCode(event.target.value)} spellCheck={false} /></label></>}
         {error && <p role="alert" className="error-card">{error}</p>}{notice && <p role="status" className="ugc-notice">{notice}</p>}
-        {match ? <ReplayPlayer replay={match.replay} /> : <button className="primary battle-start" disabled={busy || waiting || room.status !== 'Open' || (!strategyId && !code.trim())} onClick={() => void ready()}>{room.status === 'Cancelled' ? 'Комната закрыта' : waiting ? 'Ждём соперника…' : busy ? 'Проверяем…' : `Готов к бою за ◈ ${room.stake}`}</button>}
+        {match ? <ReplayPlayer replay={match.replay} /> : waiting
+          ? <button className="danger-button battle-start" disabled={busy || room.status !== 'Open'} onClick={() => void cancelWaiting()}>{busy ? 'Отменяем…' : 'Отменить ожидание'}</button>
+          : <button className="primary battle-start" disabled={busy || room.status !== 'Open' || (!strategyId && !code.trim())} onClick={() => void ready()}>{room.status === 'Cancelled' ? 'Комната закрыта' : busy ? 'Проверяем…' : `Готов к бою за ◈ ${room.stake}`}</button>}
         <div className="ugc-actions"><button onClick={() => setRoom(undefined)}>Закрыть окно</button>{currentUserId === room.creator.id && <button className="danger-button" disabled={room.status !== 'Open' || !!match} onClick={() => void cancel()}>Закрыть мою комнату</button>}</div>
       </div>
     </ArenaModal>}
