@@ -139,10 +139,10 @@ export function PveMap({ session }: { session: AuthSession | undefined }) {
         <Suspense fallback={<div className="code-editor" />}><StrategyEditor key={`${selected.id}-${language}`} language={language} initialCode={code} onChange={updateCode} /></Suspense>
         <button className="primary" disabled={busy || !code.trim()}>{busy ? 'Проверяем алгоритм…' : 'Запустить матч'}</button>
         {error && <p role="alert" className="error-card">{error}</p>}
-        {result && <div role="status" className={`pve-attempt-result ${result.completed ? 'success-card' : 'pve-retry'}`}><strong>{result.message}</strong><p>{result.completed ? `Награда: ◈ ${result.rewardAwarded || 'уже получена'}` : 'Посмотрите повтор, измените код и запустите проверку снова.'}</p>{result.completed && following && <button type="button" className="primary" onClick={() => open(following)}>Следующий уровень →</button>}</div>}
+        {result && <div role="status" className={`pve-attempt-result ${result.completed ? 'success-card' : 'pve-retry'}`}><strong>{result.message}</strong><p>{result.completed ? `Награда: ◈ ${result.rewardAwarded || 'уже получена'}` : 'Посмотрите повтор, измените код и запустите проверку снова.'}</p></div>}
         {(result?.stats ?? selected.stats) && <details className="pve-personal-stats"><summary>Личная статистика</summary><Stats title="Личная сводка" stats={(result?.stats ?? selected.stats)!} /></details>}
       </form>
-      <section ref={arena} className="panel replay"><div className="arena-panel-heading"><h2>Арена</h2><button type="button" onClick={returnToMap}>К уровням PvE</button></div>{busy && <p role="status" className="muted">Считаем бой… Можно вернуться к уровням, результат сохранится в профиле.</p>}{result ? <ReplayPlayer replay={result.match.replay} /> : <ArenaPreview arena={selected.arena} spawns={selected.spawns} />}</section>
+      <section ref={arena} className="panel replay"><div className="arena-panel-heading"><h2>Арена</h2>{result?.completed ? <button type="button" className="primary" onClick={() => following ? open(following) : returnToMap()}>Продолжить</button> : <button type="button" onClick={returnToMap}>К уровням PvE</button>}</div>{busy && <p role="status" className="muted">Считаем бой… Можно вернуться к уровням, результат сохранится в профиле.</p>}{result ? <ReplayPlayer replay={result.match.replay} /> : <ArenaPreview arena={selected.arena} spawns={selected.spawns} />}</section>
     </div>
     {!selected.isTraining && <Leaderboard data={leaderboard} />}
   </section>;
