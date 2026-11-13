@@ -370,29 +370,6 @@ namespace BotArena.Ugc.Migrations
 
                     b.ToTable("maneuvers", (string)null);
 
-                    b.HasData(
-                        new
-                        {
-                            Id = "precise-aim-js",
-                            Category = "combat",
-                            Code = "function preciseAim({ self, enemy }) {\n  if (!enemy) return {};\n  const x = enemy.position.x - self.position.x;\n  const y = enemy.position.y - self.position.y;\n  const angle = Math.atan2(y, x);\n  const error = Math.atan2(Math.sin(angle - self.turretAngle), Math.cos(angle - self.turretAngle));\n  return { aimDirection: { x, y }, shoot: self.canShoot && Math.abs(error) < 0.05 };\n}",
-                            Description = "Наводит башню и стреляет после попадания цели в узкий сектор.",
-                            Language = "javascript",
-                            Name = "Точное наведение",
-                            Tags = new[] { "прицел", "стрельба" },
-                            Usage = "preciseAim(state)"
-                        },
-                        new
-                        {
-                            Id = "keep-distance-js",
-                            Category = "movement",
-                            Code = "function keepDistance({ self, enemy }, target = 4.5) {\n  if (!enemy) return {};\n  const x = enemy.position.x - self.position.x;\n  const y = enemy.position.y - self.position.y;\n  const drive = Math.max(-1, Math.min(1, Math.hypot(x, y) - target));\n  const error = Math.atan2(y, x) - self.bodyAngle;\n  const turn = Math.max(-1, Math.min(1, error * 2));\n  return { leftTrack: drive + turn, rightTrack: drive - turn, aimDirection: { x, y } };\n}",
-                            Description = "Подъезжает или отступает, сохраняя заданную дистанцию до цели.",
-                            Language = "javascript",
-                            Name = "Удержание дистанции",
-                            Tags = new[] { "движение", "дистанция" },
-                            Usage = "keepDistance(state, 4.5)"
-                        });
                 });
 
             modelBuilder.Entity("BotArena.OAuthIdentity", b =>
