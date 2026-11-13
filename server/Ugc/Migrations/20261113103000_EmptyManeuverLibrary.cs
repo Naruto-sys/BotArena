@@ -11,8 +11,12 @@ public sealed class EmptyManeuverLibrary : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {
-        migrationBuilder.DeleteData(table: "maneuvers", keyColumn: "Id", keyValue: "keep-distance-js");
-        migrationBuilder.DeleteData(table: "maneuvers", keyColumn: "Id", keyValue: "precise-aim-js");
+        migrationBuilder.DeleteData(
+            table: "maneuvers", keyColumn: "Id", keyColumnType: "character varying(80)",
+            keyValue: "keep-distance-js");
+        migrationBuilder.DeleteData(
+            table: "maneuvers", keyColumn: "Id", keyColumnType: "character varying(80)",
+            keyValue: "precise-aim-js");
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)
@@ -20,6 +24,12 @@ public sealed class EmptyManeuverLibrary : Migration
         migrationBuilder.InsertData(
             table: "maneuvers",
             columns: new[] { "Id", "Category", "Code", "Description", "Language", "Name", "Tags", "Usage" },
+            columnTypes: new[]
+            {
+                "character varying(80)", "character varying(30)", "character varying(16384)",
+                "character varying(1000)", "character varying(20)", "character varying(80)",
+                "text[]", "character varying(500)"
+            },
             values: new object[,]
             {
                 {
