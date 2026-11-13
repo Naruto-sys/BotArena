@@ -58,6 +58,25 @@ public class UgcTests
     }
 
     [Fact]
+    public void StrategyCodeLineLimitAcceptsOneThousandLines()
+    {
+        var code = string.Join('\n', Enumerable.Repeat("return {};", StrategyCodeLimits.MaxLines));
+
+        Assert.Null(StrategyCodeLimits.Validate(code));
+        Assert.Equal(StrategyCodeLimits.MaxLines, StrategyCodeLimits.CountLines(code));
+    }
+
+    [Fact]
+    public void StrategyCodeLineLimitRejectsFinalMatchCodeAboveOneThousandLines()
+    {
+        var code = string.Join("\r\n", Enumerable.Repeat("return {};", StrategyCodeLimits.MaxLines + 1));
+        var request = new MatchRequest(code, "rookie", StrategyLanguages.JavaScript);
+
+        Assert.NotNull(StrategyCodeLimits.Validate(request));
+        Assert.Equal(StrategyCodeLimits.MaxLines + 1, StrategyCodeLimits.CountLines(code));
+    }
+
+    [Fact]
     public void ProtectedApisChallengeTheSessionCookie()
     {
         var services = new ServiceCollection();

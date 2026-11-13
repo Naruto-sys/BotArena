@@ -209,6 +209,8 @@ internal static class MatchWorker
 
     public static async Task<MatchWorkerResult> RunAsync(MatchRequest request, CancellationToken cancellation)
     {
+        if (StrategyCodeLimits.Validate(request) is { } limitError)
+            return new(null, limitError);
         var start = new ProcessStartInfo(Environment.ProcessPath!)
         {
             UseShellExecute = false,

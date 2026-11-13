@@ -4,6 +4,7 @@ internal static class StrategyValidator
 {
     public static (bool Active, string? Error) Validate(string language, string code)
     {
+        if (StrategyCodeLimits.Validate(code) is { } limitError) return (false, limitError);
         try
         {
             using var runtime = StrategyLanguages.Create(language, code);

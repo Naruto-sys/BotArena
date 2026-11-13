@@ -59,6 +59,8 @@ public static class PveEndpoints
             if (!PveCatalog.TryGet(id, out var level)) return Results.NotFound();
             if (string.IsNullOrWhiteSpace(request.Code) || request.Code.Length > 16_384)
                 return Results.BadRequest(new { error = "Код должен содержать от 1 до 16 384 символов." });
+            if (StrategyCodeLimits.Validate(request.Code) is { } limitError)
+                return Results.BadRequest(new { error = limitError });
             if (request.Language is not StrategyLanguages.JavaScript and not StrategyLanguages.Python)
                 return Results.BadRequest(new { error = "Неизвестный язык стратегии." });
             var previous = level.Order > 1 ? PveCatalog.Levels[level.Order - 2] : null;

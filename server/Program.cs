@@ -74,6 +74,8 @@ return 0;
 
 static IResult? Validate(MatchRequest request)
 {
+    if (StrategyCodeLimits.Validate(request) is { } limitError)
+        return Results.BadRequest(new { error = limitError });
     if (request.Language is { } language && !StrategyLanguages.Available().Contains(language))
         return Results.BadRequest(new { error = "Выбранный язык стратегии недоступен." });
 
