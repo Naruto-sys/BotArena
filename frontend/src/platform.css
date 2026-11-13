@@ -45,9 +45,9 @@ body { background: radial-gradient(ellipse at 40% -25%, #153c50 0, transparent 5
 .ux-stages .active { color: var(--neon); }
 .platform-content .layout { width:100%; max-width:none; grid-template-columns: minmax(360px, .9fr) minmax(0, 1.65fr); gap: 20px; }
 .platform-content .panel { border-color: #294253; background: linear-gradient(135deg, #112335, #0e1c2c); border-radius: 14px; padding: 20px; }
-.platform-content .editor { gap: 14px; }
-.platform-content .editor > h1 { font-size: 21px; }
-.ux-editor-heading { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+.platform-content .editor { position: relative; gap: 14px; }
+.platform-content .editor > h1 { padding-right: 170px; font-size: 21px; }
+.ux-editor-heading { position: absolute; z-index: 2; top: 20px; right: 20px; display: flex; gap: 10px; align-items: center; justify-content: space-between; }
 .ux-editor-heading button { margin-left: auto; font-size: 11px; }
 .platform-content .lab-roster { border: 1px solid #2b465b; border-radius: 10px; padding: 12px; }
 .platform-content .lab-bot-list { max-height: 400px; overflow: auto; }
@@ -504,7 +504,8 @@ dialog.arena-modal-native::backdrop { background: #020a13c7; backdrop-filter: bl
   .platform-content button.primary, .editor > button.primary { min-height: 48px; }
   .arena-workspace-toolbar { flex-wrap: wrap; }
   .arena-workspace-toolbar button { flex: 1 1 8rem; min-height: 44px; }
-  .ux-editor-heading { align-items: flex-start; flex-wrap: wrap; }
+  .platform-content .editor > h1 { padding-top: 52px; padding-right: 0; }
+  .ux-editor-heading { top: 14px; right: 14px; align-items: flex-start; flex-wrap: wrap; }
   .ux-save { flex-direction: column; align-items: stretch; }
   .ux-page-heading h1 { font-size: 1.6rem; }
   .ux-tabs, .ugc-tabs { flex-wrap: wrap; overflow: visible; }
