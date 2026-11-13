@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace BotArena.Migrations;
+namespace BotArena.Ugc.Migrations;
 
 [DbContext(typeof(UgcDbContext))]
 [Migration("20261113103000_EmptyManeuverLibrary")]
