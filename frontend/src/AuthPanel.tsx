@@ -201,7 +201,7 @@ export function AuthPanel({ session, onChange }: { session: AuthSession | undefi
         <form className="password-form" onSubmit={changePassword}><h3>{session.hasPassword ? 'Изменить пароль' : 'Установить пароль'}</h3>{session.hasPassword && <label>Текущий пароль<input required type="password" autoComplete="current-password" value={currentPassword} onChange={event => setCurrentPassword(event.target.value)} /></label>}<label>Новый пароль<input required minLength={8} maxLength={128} type="password" autoComplete="new-password" value={newPassword} onChange={event => setNewPassword(event.target.value)} /></label><button disabled={saving}>{session.hasPassword ? 'Изменить пароль' : 'Установить пароль'}</button></form>
         <div className="linked-accounts"><h3>Связанные аккаунты</h3>{providers.map(provider => <div key={provider.id}><span>{provider.displayName}</span>{session.linkedOAuthProviders.includes(provider.id) ? <b>Подключён</b> : <button onClick={() => linkProvider(provider.id)}>Привязать</button>}</div>)}{providers.length === 0 && <p className="muted">OAuth-сервисы не настроены.</p>}</div>
         <div className="theme-setting"><span><b>Тема интерфейса</b><small>{theme === 'dark' ? 'Тёмная' : 'Светлая'}</small></span><button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☀ Светлая' : '☾ Тёмная'}</button></div>
-        {error && <p className="error">{error}</p>}{notice && <p className="success-card">{notice}</p>}
+        {error && <p className="error">{error}</p>}{notice && <p className="success-card" role="status">{notice}</p>}
       </section>
     </div>, document.body)}
   </>;
